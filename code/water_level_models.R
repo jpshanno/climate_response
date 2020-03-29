@@ -66,6 +66,8 @@ site_info[, `:=`(site = expand_site(site),
                  treatment = factor(treatment, levels = c("Control", "Girdle", "Ash Cut")))]
 setkey(site_info, site)
 
+# write.csv(site_info, "tmp/site_info_with_coordinates.csv", row.names = FALSE)
+
 # No precip data for 111 & 139
 
 temps <- 
@@ -73,7 +75,8 @@ temps <-
 
 temps[, `:=`(site = expand_site(site),
              sample_date = as.IDate(sample_date), 
-             gdd_10 = (max_temp_c + min_temp_c) / 2 - 10)]
+             gdd_10 = (max_temp_c + min_temp_c) / 2 - 10,
+             range_temp_c = ifelse(is.na(range_temp_c), max_temp_c - min_temp_c, range_temp_c))]
 setkey(temps, site, sample_date)
 
 water_balance <- 
@@ -87,20 +90,29 @@ water_balance[site_info,
                    lon = lon,
                    lat = lat)]
 
-water_balance[, `:=`(field_season = as.character(year(sample_date)),
+water_balance[, `:=`(field_season = year(sample_date),
+                     field_season_fct = as.factor(year(sample_date)),
+                     site_fct = as.factor(site),
                      doy = yday(sample_date),
                      sample_month = month(sample_date),
-                     sample_week = isoweek(sample_date + 1), # isoweek is Monday-Sunday, `+ 1` makes the week Sun-Sat
-                     delta_wl = water_level_cm - shift(water_level_cm),
-                     precip_2day_cm = precip_cm + shift(precip_cm, 1),
-                     precip_3day_cm = precip_cm + shift(precip_cm, 2) + shift(precip_cm, 1))]
+                     sample_week = isoweek(sample_date + 1))] # isoweek is Monday-Sunday, `+ 1` makes the week Sun-Sat
 
 # Create Day and Week of Season
-water_balance[, `:=`(dos = doy - yday(paste0(unique(year(sample_date)), "-05-15")),
-                     wos = sample_week - isoweek(paste0(unique(year(sample_date)), "-05-16"))), # isoweek is Monday-Sunday, `-05-16` makes the week Sun-Sat
+water_balance[, `:=`(dos = 1 + doy - yday(paste0(unique(year(sample_date)), "-05-15")),
+                     wos = 1 + sample_week - isoweek(paste0(unique(year(sample_date)), "-05-16"))), # isoweek is Monday-Sunday, `-05-16` makes the week Sun-Sat
               by = .(field_season)]
-water_balance[, scaled_dos := dos / 100]
+water_balance[, `:=`(scaled_dos = dos / 100,
+                     scaled_wos = wos / 100)]
 
+# Add lagged water level and delta_wl
+
+water_balance[, `:=`(lagged_wl = shift(water_level_cm, 1, type = "lag"),
+                     delta_wl = water_level_cm - shift(water_level_cm),
+                     lagged_precip_2day = shift(precip_cm + shift(precip_cm, 1)),
+                     precip_2day_cm = precip_cm + shift(precip_cm, 1),
+                     precip_3day_cm = precip_cm + shift(precip_cm, 2) + shift(precip_cm, 1)),
+              by = .(site, field_season)]
+              
 # Add PET -----------------------------------------------------------------
 
 # Aridity bias is something that should be considered if we see very dry future
@@ -125,7 +137,10 @@ water_balance[extrasolar,
 lambda_MJ_kg <- 
   2.45
 
+# Original HS equation taken from [@hargreaves-2003]
 water_balance[, pet_hs_cm := 0.1 * 0.0023 * rad_MJ_m2 / lambda_MJ_kg * (mean_temp_c + 17.8) * sqrt(max_temp_c - min_temp_c)]
+
+# Modified HS equation taken from [@droogers-2002]
 water_balance[, pet_hm_cm := 0.1 * 0.0023 * rad_MJ_m2 / lambda_MJ_kg * (mean_temp_c + 17.8) * (max_temp_c - min_temp_c - 0.00123 * precip_cm) ** 0.76]
 
 # Remove periods for now -----------------------------------------
@@ -140,10 +155,11 @@ water_balance <-
 
 # 2016 has too many missing models for a hierarchical GAM, 2019 is not ready yet
 water_balance <- 
-  water_balance[!(field_season %in% c("2016", "2019"))]
+  water_balance[!(field_season %in% c(2016, 2019))]
 
 empty_seasons <- 
-  water_balance[, .(N = sum(!(is.na(delta_wl) | is.na(precip_2day_cm) | is.na(max_temp_c)))), by = .(site, field_season)][N == 0, .(site, field_season)]
+  water_balance[, .(N = sum(!(is.na(delta_wl) | is.na(precip_2day_cm) | is.na(max_temp_c)))), 
+                by = .(site, field_season)][N == 0, .(site, field_season)]
 
 water_balance <- 
   water_balance[!empty_seasons, on = .(site, field_season)]
@@ -244,8 +260,8 @@ water_balance[precip_thresholds,
   plot_annotation(tag_levels = "A")
 
 
-# Temperature
-{{ggplot(data = water_balance[precip_cm == 0, 
+# Temperature & PET
+{{{ggplot(data = water_balance[precip_cm == 0, 
                               .(correlation = cor(delta_wl, 
                                                   min_temp_c, 
                                                   use = "pairwise.complete.obs",
@@ -274,243 +290,92 @@ water_balance[precip_thresholds,
             aes(x = as.factor(sample_month), 
                 y = correlation)) + 
         geom_boxplot() +
-        ggtitle("Maximum Daily Temp")}} *
+        ggtitle("Maximum Daily Temp")}} / 
+    {{ggplot(data = water_balance[, 
+                                .(correlation = cor(delta_wl, 
+                                                    pet_hs_cm, 
+                                                    use = "pairwise.complete.obs",
+                                                    method = "spearman")), 
+                                by = .(site, sample_month)],
+           aes(x = as.factor(sample_month), 
+               y = correlation)) + 
+    geom_boxplot() +
+    ggtitle("HS PET")} +
+        {ggplot(data = water_balance[, 
+                                     .(correlation = cor(delta_wl, 
+                                                         pet_hm_cm, 
+                                                         use = "pairwise.complete.obs",
+                                                         method = "spearman")), 
+                                     by = .(site, sample_month)],
+                aes(x = as.factor(sample_month), 
+                    y = correlation)) + 
+            geom_boxplot() +
+            ggtitle("HM PET")} + 
+        plot_spacer()}} *
   theme_minimal() *
   xlab("Month") *
   coord_cartesian(ylim = c(-1, 0.5)) +
   plot_annotation(tag_levels = "A")
 
-ggplot(data = water_balance[, 
-                            .(correlation = cor(delta_wl, 
-                                                pet_cm, 
-                                                use = "pairwise.complete.obs",
-                                                method = "spearman")), 
-                            by = .(site, sample_month)],
-       aes(x = as.factor(sample_month), 
-           y = correlation)) + 
-  geom_boxplot() +
-  ggtitle("HS PET") +
-  theme_minimal() +
-  xlab("Month") +
-  coord_cartesian(ylim = c(-1, 0.5))
 
-# GAM Model ---------------------------------------------------------------
+# Look at scaled values
+scaled <- 
+  water_balance[, lapply(.SD, function(x){if(!is.numeric(x)) return(x);as.numeric(scale(x))}), 
+                .SDcols = patterns("temp_c|delta_wl|precip.*cm|pet|site$")]
 
-# library(mgcv)
-# test <- water_balance[site == "151" & field_season == 2012]
-# gammod_test <- gam(delta_wl ~ s(max_temp_c, by = sample_month) + s(precip_2day_cm, by = sample_month), data = test)
-# test[, predicted := predict(gammod_test, newdata = test)]
-# ggplot(data = test, 
-#        aes(x = delta_wl, 
-#            y = predicted, 
-#            color = as.factor(sample_month))) + 
-#   geom_point() + 
-#   geom_abline(intercept = 0, slope = 1) +
-#   facet_wrap(~sample_month)
+scaled <- 
+  melt(scaled, 
+       id.vars = c("site", "delta_wl"), 
+       variable.name = "driver")[!is.na(delta_wl) & !is.na(value)]
 
+scaled_driver_summary <- 
+  water_balance[, lapply(.SD, function(x){if(!is.numeric(x)) return(x);as.numeric(scale(x))}), 
+                .SDcols = patterns("temp_c|delta_wl|precip.*cm|pet|site$")] %>% 
+  melt(id.vars = c("site", "delta_wl"), 
+       variable.name = "driver") %>% 
+  .[!is.na(delta_wl) & !is.na(value)] %>% 
+  .[, .(linear_slope = abs(coef(lm(delta_wl ~ value))[2]),
+        abs_correlation = abs(cor(value, delta_wl, method = "spearman")),
+        gam_r2 = summary(gam(delta_wl ~ s(value)))$r.sq), 
+    by = .(driver, site)] %>% 
+  .[, class := ifelse(grepl("precip", driver), "input", "loss")]
 
+{{ggplot(aes(y = gam_r2, x = driver), 
+       data = scaled_driver_summary) +
+  geom_boxplot()} /
+{ggplot(aes(y = abs_correlation, x = driver), 
+        data = scaled_driver_summary) +
+    geom_boxplot()} /
+{ggplot(aes(y = linear_slope, x = driver), 
+        data = scaled_driver_summary) +
+    geom_boxplot()}} *
+  aes(color = class) *
+  plot_annotation(title = "Scaled Drivers")
 
-# library(tidyverse)
+unscaled_driver_summary <- 
+  melt(water_balance, 
+       id.vars = c("site", "delta_wl"), 
+       measure.vars = patterns("temp_c|precip.*cm|pet"), 
+       variable.name = "driver") %>% 
+  .[!is.na(delta_wl) & !is.na(value)] %>% 
+  .[,.(linear_slope = abs(coef(lm(delta_wl ~ value))[2]), 
+       abs_correlation = abs(cor(value, delta_wl, method = "spearman")), 
+       gam_r2 = summary(gam(delta_wl ~ s(value)))$r.sq), 
+    by = .(driver, site)] %>% 
+  .[, class := ifelse(grepl("precip", driver), "input", "loss")]
 
-# Fit a single model with no random effects, but a different family. It looks
-# like a good fit, but doesn't seem to work out at the site/field season level.
-# I think this approach is worth exploring
+{ggplot(aes(y = gam_r2, x = driver), 
+        data = unscaled_driver_summary) +
+    geom_boxplot()} /
+  {ggplot(aes(y = abs_correlation, x = driver), 
+          data = unscaled_driver_summary) +
+      geom_boxplot()} /
+  {ggplot(aes(y = linear_slope, x = driver), 
+          data = unscaled_driver_summary) +
+      geom_boxplot()} *
+  aes(color = class) *
+  plot_annotation(title = "Unscaled Drivers")
 
-gam(delta_wl ~ 
-      s(dos, 
-        bs = "cc") + 
-      # s(precip_2day_cm, precip_cm) + 
-      # s(max_temp_c) + 
-      site_numeric*field_season, 
-    data = .) %>% 
-  broom::augment() %>% 
-  group_by(site_numeric, 
-           field_season) %>% 
-  mutate(.fitted = cumsum(.fitted)) %>%
-  ggplot(data = ., 
-         aes(y = .fitted, 
-             x = dos, 
-             color = as.factor(site_numeric))) + 
-  geom_line(stat = "summary", 
-            fun.y = mean) + 
-  facet_wrap(~field_season)
-
-# Using bs = 'cc' is good for water level, but meaningless for delta_wl. If I 
-# wanted to use 'cc' to get a good cycle (not necessarily the best option, eg
-# low spring water levels could be exceeded after wet summer or fall)
-
-# It looks like this is the model to start working from to improve. Start working
-# with the training data!
-
-# Need to look specifically at 2012 to try and capture extreme dry periods, and
-# should identify a season for wet conditions. Perhaps training/testing will not
-# be chronologically split but instead should be based on extreme wet years, or
-# years that had large events
-
-gamm4_mod <- 
-  gamm4(delta_wl ~ s(dos) + s(pet_cm, by = precip_occurrence_threshold) + s(precip_2day_cm), 
-        random = ~(dos | site/field_season) + (pet_cm | site/field_season) + (precip_2day_cm | site/field_season), 
-        data = water_balance)
-
-plot(gamm4_mod[[2]], scale = 0, pages = 1)
-
-water_balance %>% 
-  mutate(.fitted = predict(gamm4_mod[[2]], newdata = water_balance)) %>% 
-  group_by(site, field_season) %>% 
-  mutate(delta_wl = cumsum(replace_na(delta_wl, 0)),
-         .fitted = cumsum(replace_na(.fitted, 0))) %>% 
-  ggplot(data = .,
-         aes(x = doy,
-             y = .fitted)) +
-  geom_line() +
-  geom_line(aes(y = delta_wl),
-            linetype = "dotted") +
-  facet_grid(field_season ~ site, 
-             scales = "free") +
-  theme_minimal()
-
-gamm4_mod_wl <- 
-  gamm4(water_level_cm ~ s(dos, bs = "cc") + s(pet_cm, by = precip_occurrence_threshold) + s(precip_2day_cm), 
-        random = ~(dos | site/field_season) + (pet_cm | site/field_season) + (precip_2day_cm | site/field_season), 
-        data = water_balance)
-
-water_balance %>% 
-  mutate(.fitted = predict(gamm4_mod_wl[[2]], newdata = water_balance)) %>% 
-  ggplot(data = .,
-         aes(x = doy,
-             y = .fitted)) +
-  geom_line() +
-  geom_line(aes(y = water_level_cm),
-            linetype = "dotted") +
-  facet_grid(field_season ~ site, 
-             scales = "free") +
-  theme_minimal()
-
-# mod_gam <-
-  gam(delta_wl ~
-        s(doy, sp = 10) +
-        s(max_temp_c, sp = 1) +
-        s(precip_2day_cm, sp = 100),
-      family = "scat",
-      data = water_balance)
-# plot(mod_gam)
-# gam.check(mod_gam)
-
-# Fit a single model using site and field season as random effects
-# mod_gam <-  
-  # gam(delta_wl ~
-  #       s(doy) +
-  #       s(max_temp_c,
-  #         precip_occurrence,
-  #         sp = 1000,
-  #         by = sample_month) +
-  #       s(precip_2day_cm,
-  #         precip_occurrence,
-  #         water_level_cm,
-  #         sp = 1000) +
-  #       ti(max_temp_c, precip_2day_cm) +
-  #       s(site_numeric, field_season, bs = "re"),
-  #     data = water_balance)
-# 
-# water_balance[, c("delta_wl_pred", "se_pred") := predict(mod_gam, newdata = water_balance, se.fit = TRUE)]
-
-test_dat <- copy(water_balance)
-test_dat[delta_wl >= 25, delta_wl:=NA_real_]
-test_mod <- gam(delta_wl ~ max_temp_c + precip_2day_cm, family = "scat", data = test_dat) %T>% plot(pages = 1, scale = 0)
-test_dat[, delta_wl_pred := predict(test_mod, newdata = test_dat)]
-test_dat %>% group_by(site, field_season) %>% mutate(cum_wl = cumsum(delta_wl_pred)) %>% plot(cum_wl ~ doy, data = .)
-test_dat %>% group_by(site, field_season) %>% mutate(cum_delta_wl_pred = cumsum(delta_wl_pred), cum_delta_wl = cumsum(replace_na(delta_wl, 0))) %>% ggplot(data = ., aes(x = doy, y = cum_delta_wl_pred)) + geom_line() + geom_line(aes(y = cum_delta_wl), col = "gray50") + facet_grid(site ~ field_season, scales = "free") + theme_bw()
-# Looks like I have seasonal drawdown figured out, but not the rebound
-
-# Fit separate models for each level of site:field_season 
-gams <-
-  water_balance %>%
-  select(-sample_date) %>% 
-  group_nest(site, field_season) %>%
-  mutate(mod = map(data,
-                   ~  gam(delta_wl ~
-                            s(doy) +
-                            s(max_temp_c, sp = 1000, by = sample_month) +
-                            s(precip_2day_cm, sp = 1000, by = sample_month) +
-                            ti(max_temp_c, precip_2day_cm),
-                          # family = "scat",
-                          data = .x))) %>%
-  mutate(pred = map2(mod, data,
-                     ~predict(.x,
-                              newdata = .y,
-                              se.fit = TRUE) %>%
-                       as_tibble() %>%
-                       set_names("delta_wl_pred", "pred_se")))
-
-gam_models <- 
-  gams %>%
-  select(site, field_season, mod)
-
-# This looks good. Just need to get starting levels better. Need to find 
-# predictors for intial seasonal values. Also need to incorporate ARMA residual
-# structure
-
-gams <-
-  gams %>% 
-  select(-mod) %>% 
-  unnest(cols = c(data, pred)) %>%
-  mutate(sample_date = as.IDate(sample_date_numeric)) %>% 
-  group_by(site, field_season) %>% 
-  # mutate(predicted_water_level_cm = quantile(water_level_cm, probs = 0.95, na.rm = TRUE)) %>% 
-  mutate(predicted_water_level_cm = ifelse(sample_date == min(sample_date[!is.na(water_level_cm)]),
-                                           water_level_cm, NA_real_)) %>%
-  fill(predicted_water_level_cm, .direction = "down") %>% # Uses observed starting value for each year
-  # Uses median of starting values for each site
-  # group_by(site) %>% 
-  # mutate(predicted_water_level_cm = median(predicted_water_level_cm, na.rm = TRUE)) %>% 
-  # group_by(site, field_season) %>% 
-  mutate(delta_wl_pred = ifelse(sample_date == min(sample_date),
-                                0, delta_wl_pred),
-         predicted_water_level_cm = predicted_water_level_cm + cumsum(delta_wl_pred),
-         sample_date = lubridate::date(as.IDate(sample_date)))
-
-
-ggplot(data = gams,
-       aes(x = delta_wl,
-           y = delta_wl_pred,
-           color = as.factor(precip_occurrence))) + 
-  geom_point() +
-  geom_abline(aes(intercept = 0,
-                  slope = 1)) +
-  facet_wrap(~site, 
-             scales = "free")
-
-ggplot(gams, 
-       aes(x = delta_wl, 
-           y = delta_wl_pred, 
-           color = site)) + 
-  geom_point() + 
-  geom_abline(aes(slope = 1, 
-                  intercept = 0)) + 
-  facet_wrap(~sample_month,
-             scale = "free")
-
-ggplot(gams, 
-       aes(x = delta_wl, 
-           y = scale(delta_wl_pred - delta_wl), 
-           color = site)) + 
-  geom_point() +
-  facet_wrap(~sample_month, scales = "free")
-
-
-plot(density(gams$delta_wl_pred - gams$delta_wl, na.rm = TRUE))
-qqnorm(gams$delta_wl_pred - gams$delta_wl); qqline(gams$delta_wl_pred - gams$delta_wl)
-
-
-
-{ggplot(data = filter(gams, field_season == 2017),
-       aes(x = sample_date)) +
-  geom_line(aes(y = water_level_cm),
-            linetype = "dotted") +
-  geom_line(aes(y = predicted_water_level_cm)) +
-  facet_wrap(~site,
-             scales = "free") +
-  theme_bw()}
 
 
 
@@ -518,25 +383,6 @@ qqnorm(gams$delta_wl_pred - gams$delta_wl); qqline(gams$delta_wl_pred - gams$del
 # These could all be blocked by month
 # s(doy) + s(max_temp_c) + s(precip_2day_cm)
 # s(doy) + s(max_temp_c, precip_occurrence) + s(precip_2day_cm, water_level_cm)
-
-# Potential Distrubitons: (found via lmomco)
-# test_vals <- water_balance[!is.na(delta_wl), delta_wl]
-# ggplot() + geom_density(aes(x = test_vals)) + geom_density(aes(x = rlmomco(1000, lmr2par(x = test_vals, type = "aep4"))), col = "red")
-# aep4 <- works with raw data, negative values are okay
-# exp
-# emu, exp, gam, gep, gev, gld, glo, gno, gov, gpa, gum, kap, kmu, kur, lap, lmrq, ln3, nor, pe3, ray, revgum, rice, sla, st3, texp, wak, or wei.
-
-# Water year might not be that useful for two reasons:
-#   1. We don't have data from fall 2011 (I don't think, have to check), or 
-#      the fall before paired watersheds
-#   2. Not currently keeping data past the end of October because of 
-#      inconsistencies with ice in last winter
-
-water_balance[, water_year := ifelse(month(sample_date) >= 10, field_season +1, field_season)]
-water_balance[, water_doy := julian(sample_date, origin = min(sample_date)), by = .(site, water_year)]
-
-# water_balance[, precip_2day := frollsum(precip_cm, 2, align = "right"), by = .(site, field_season)]
-# water_balance[, precip_lag := shift(precip_cm, 1, fill = NA_real_), by = .(site, field_season)]
 
 # library(vlbuildr)
 # vl_chart(data = water_balance) %>% 
@@ -547,38 +393,25 @@ water_balance[, water_doy := julian(sample_date, origin = min(sample_date)), by 
 #   vl_resolve_axis_x(how = "independent") %>% 
 #   vl_facet_wrap(field = "water_year:Q")
 
-# Create harmonic covariates <- include other covariates here
-harmonics <- 
-  water_balance[, .(seq_date = as.IDate(as.IDate("2012-01-01"):as.IDate("2019-12-31")))]
-
-harmonics[, `:=`(no_harm = 1,
-                 sin1 = 100 * sin(pi*as.integer(seq_date)/max(yday(seq_date))), 
-                 sin2 = 100 * sin(2*pi*as.integer(seq_date)/max(yday(seq_date))), 
-                 sin4 = 100 * sin(4*pi*as.integer(seq_date)/max(yday(seq_date))), 
-                 cos1 = 100 * cos(pi*as.integer(seq_date)/max(yday(seq_date))), 
-                 cos2 = 100 * cos(2*pi*as.integer(seq_date)/max(yday(seq_date))), 
-                 cos4 = 100 * cos(4*pi*as.integer(seq_date)/max(yday(seq_date)))), 
-          by = .(year(seq_date))]
-
-setkey(harmonics, seq_date)
-
-water_balance <- 
-  water_balance[harmonics, 
-                on = .(sample_date = seq_date),
-                nomatch = 0]
+# Split Data --------------------------------------------------------------
 
 control_train <- 
-  water_balance[treatment_period == "Pre-treatment" | (treatment == "control" & field_season <= 2017), ]
+  water_balance[treatment_period == "Pre-treatment" | 
+                  (treatment == "Control" & field_season <= 2017), ]
 
 control_test <- 
-  water_balance[treatment == "control" & field_season > 2017, ]
+  water_balance[treatment == "Control" & 
+                  field_season > 2017, ]
 
 # Need to test if Ash Cut & Girdle can be pooled like this
 treatment_train <- 
-  water_balance[treatment %in% c("girdle", "ash cut") & treatment_period == "Post-treatment" & field_season <= 2017]
+  water_balance[treatment %in% c("Girdle", "Ash Cut") & 
+                  treatment_period == "Post-treatment" & 
+                  field_season <= 2017]
 
 treatment_test <- 
-  water_balance[treatment %in% c("girdle", "ash cut") & field_season > 2017]
+  water_balance[treatment %in% c("Girdle", "Ash Cut") & 
+                  field_season > 2017]
 
 # Check that all datasets are unique, should be all zeroes
 combn(x = c("control_train", "control_test", "treatment_train", "treatment_test"), 
@@ -588,17 +421,25 @@ combn(x = c("control_train", "control_test", "treatment_train", "treatment_test"
 ggplot(data = control_train, 
        aes(x = yday(sample_date),
            y = water_level_cm, 
-           color = as.factor(field_season))) + 
+           color = field_season_fct)) + 
   geom_line() + 
   facet_wrap(~site)
 
 
 ggplot(data = control_train, 
-       aes(x = yday(sample_date),
-           y = c(NA_real_, diff(water_level_cm)), 
-           color = as.factor(field_season))) + 
+       aes(x = dos,
+           y = delta_wl, 
+           color = field_season_fct)) + 
   geom_line() + 
   facet_wrap(~site)
+
+
+
+# Model Selection ---------------------------------------------------------
+
+# Should create smooth plots of different drivers (dos, wos, pet, precip, etc)
+# for site/field season groups to evaluate the need for GS, GI, S, I models
+# as in [@pedersen-2019, p. 31]
 
 # Could try with PET in mm (which helps some, but does not completely solve the 
 # problem). Could also try to use max temp C, which is of a larger scale. The
@@ -606,34 +447,216 @@ ggplot(data = control_train,
 # drivers within the model. PET may abe better than max temp, unless max temp is
 # set to have an intercept of 0
 
-control_train[, pet_mm := pet_cm / 10]
-control_train[, site := as.factor(site)]
-control_train[, field_season := as.factor(field_season)]
+# Use t2(full = TRUE) to generate tensor products as they found oversmoothing of
+# the global function when using te()
 
-gamm4_mod <- 
-  gamm4(delta_wl ~ s(scaled_dos) + t2(pet_cm, precip_2day_cm), 
-        random = ~(scaled_dos | site/field_season) + (pet_cm | site/field_season) + (precip_2day_cm | site/field_season), 
+# Looks like the water level model may overfit (even if the test data looks good)
+# There's no observable treatment effect (which is interesting). The delta_wl 
+# model may be better, but I kind of think I have to find a way to use precip as
+# an intervention rather than as a predictor. I can capture the sharp spike, but
+# not the rapid decline. Maybe I need a 'days since rain' predictor or something
+
+week_knots <- 
+  c(min(water_balance$scaled_wos) - 0.01, max(water_balance$scaled_wos) + 0.01)
+
+mod_g <- 
+  gam(water_level_cm ~ te(scaled_wos, pet_hs_cm, precip_2day_cm, lagged_wl, 
+                          bs = c("cc", "tp", "tp", "tp")), 
+      knots = list(scaled_wos = week_knots),
+      method = "REML",
+      data = control_train)
+
+# Took about 20 minutes to fit, but better fit of extremes compared to Gaussian
+# family. Should probably do scaled sample_week
+mod_g_scat <- 
+  gam(water_level_cm ~ te(scaled_wos, pet_hs_cm, precip_2day_cm, lagged_wl, 
+                          bs = c("cc", "tp", "tp", "tp")), 
+      knots = list(scaled_wos = week_knots),
+      method = "REML",
+      family = scat,
+      data = control_train,
+      control = list(nthreads = 4))
+
+mod_g_dwl_full <- 
+  gam(delta_wl ~ te(sample_week, pet_hs_cm, precip_2day_cm, water_level_cm), 
+      method = "REML",
+      data = control_train)
+
+mod_g_dwl_only_pet <- 
+  gam(delta_wl ~ te(sample_week, pet_hs_cm), 
+      method = "REML",
+      data = control_train)
+
+gmm_full <- 
+  gamm4(delta_wl ~ s(dos) + t2(pet_hs_cm, precip_2day_cm), 
+        random = ~(dos | site/field_season) + (pet_hs_cm | site/field_season) + (precip_2day_cm | site/field_season), 
         data = control_train)
 
-plot(gamm4_mod[[2]], scale = 0, pages = 1)
+gmm_scaled_dos <- 
+  gamm4(delta_wl ~ s(scaled_dos) + t2(pet_hs_cm, precip_2day_cm), 
+        random = ~(scaled_dos | field_season_fct/site_fct) + 
+          (pet_hs_cm | field_season_fct/site_fct) + 
+          (precip_2day_cm | field_season_fct/site_fct), 
+        data = control_train)
 
-library(tidyverse)
+# This doesn't work quite right because it can't predict 2018 in the test data
+gam_scaled_dos <- 
+  gam(delta_wl ~ s(scaled_dos) + t2(pet_hs_cm, precip_2day_cm, by = field_season_fct) + s(site_fct, bs = "re"), 
+      method = "REML", 
+      drop.unused.levels = FALSE,
+      data = control_train)
 
-control_train %>% 
-  mutate(.fitted = predict(gamm4_mod[[2]], newdata = control_train)) %>% 
-  group_by(site, field_season) %>% 
-  mutate(delta_wl = cumsum(replace_na(delta_wl, 0)),
-         .fitted = cumsum(replace_na(.fitted, 0))) %>% 
-  ggplot(aes(x = doy,
-             y = .fitted)) +
-  geom_line() +
-  geom_line(aes(y = delta_wl),
+gmm_scaled_dos_arma <- 
+  gamm(delta_wl ~ s(scaled_dos) + t2(pet_hs_cm, precip_2day_cm), 
+       random = list(field_season_fct = ~scaled_dos + pet_hs_cm +precip_2day_cm,
+                     site_fct = ~scaled_dos + pet_hs_cm +precip_2day_cm), 
+       data = control_train,
+       correlation = corARMA(form = ~scaled_dos|site/field_season, p = 1, q = 1))
+
+gmm_full_cross <- 
+  gamm4(delta_wl ~ t2(scaled_dos, pet_hs_cm, precip_2day_cm), 
+        random = ~(scaled_dos | site/field_season) + (pet_hs_cm | site/field_season) + (precip_2day_cm | site/field_season), 
+        data = control_train)
+
+gmm_lagged_wl <- 
+  gamm4(delta_wl ~ t2(lagged_wl, pet_hs_cm, precip_2day_cm), 
+        random = ~(lagged_wl | site/field_season) + (pet_hs_cm | site/field_season) + (precip_2day_cm | site/field_season), 
+        data = control_train)
+
+gmm_drivers_only <- 
+  gamm4(delta_wl ~ t2(pet_hs_cm, precip_2day_cm), 
+        random = ~ (pet_hs_cm | site/field_season) + (precip_2day_cm | site/field_season), 
+        data = control_train)
+
+gmm_1day_precip <- 
+  gamm4(delta_wl ~ t2(pet_hs_cm, precip_cm), 
+        random = ~ (pet_hs_cm | site/field_season) + (precip_cm | site/field_season), 
+        data = control_train)
+
+par(mfcol = c(2, 3), ps = 24)
+plot(gmm_full[[2]], cex = 3, scale = 0)
+plot(gmm_scaled_dos[[2]], scale = 0)
+plot(gmm_drivers_only[[2]], scale = 0)
+par(mfcol = c(2, 3))
+plot(gmm_full[[2]], scale = 0)
+plot(gmm_scaled_dos[[2]], scale = 0)
+plot.new()
+plot(gmm_drivers_only[[2]], scale = 0)
+par(mfcol = c(1, 1))
+
+
+# Generating predicted water levels needs to account for maximum wetland water
+# levels. Will have to figure out a way to represent maximum water level in the
+# future wetlands
+
+# This should be allowed to peak above max for 1 day
+predict_wl <- 
+  function(d, wl){
+    stopifnot(length(d) == length(wl))
+    # stopifnot(any(is.na(d)))
+    
+    max_wl <- 
+      # max(wl, na.rm = TRUE)
+      quantile(wl, probs = 0.99, na.rm = TRUE, names = FALSE)
+    
+    min_ind <- min(which(!is.na(wl)))
+    
+    wl_out <- 
+      wl[min_ind]
+    
+    new_wl <- 
+      numeric(length(d))
+    
+    new_wl[min_ind] <- wl_out
+    
+    for(i in (min_ind + 1):length(d)){
+      
+      max_diff <- 
+        max_wl - wl_out
+      
+      d_adj <- 
+        min(c(d[i], max_diff))
+      
+      wl_out <- 
+        wl_out + d_adj
+      
+      new_wl[i] <- wl_out
+    }
+    new_wl
+  }
+
+
+predict_lagged_wl <- 
+  function(mod, df){
+    stopifnot(all(c("water_level_cm", "precip_2day_cm", "lagged_wl", "sample_week", "pet_hs_cm") %in% names(control_train)))
+    
+    wl <- 
+      df$water_level_cm
+    
+    max_wl <- 
+      # max(wl, na.rm = TRUE)
+      quantile(wl, probs = 0.99, na.rm = TRUE, names = FALSE)
+    
+    min_ind <- min(which(!is.na(wl)))
+    
+    wl_out <- 
+      wl[min_ind]
+    
+    new_wl <- 
+      numeric(nrow(df))
+    
+    new_wl[min_ind] <- wl_out
+    
+    for(i in (min_ind + 1):nrow(df)){
+      
+      new_data <- 
+        df[i, ]
+      
+      new_data$lagged_wl <- 
+        wl_out
+      
+      wl_out <- 
+        predict(mod, newdata = new_data)
+      
+      new_wl[i] <- 
+        min(c(wl_out, max_wl))
+    }
+    new_wl
+  }
+
+
+# Evaluate Models ---------------------------------------------------------
+
+###### 
+# Improve predict_wl() to allow temporary exceedence of max_wl
+
+# Predict water level change
+control_train[, pred_delta_wl := predict(mod_g_dwl_full, newdata = control_train)]
+# Predict wetland water levels
+control_train[, pred_water_level_cm := predict_wl(pred_delta_wl, water_level_cm), 
+              by = .(field_season, site)]
+
+ggplot(data = control_train,
+       aes(x = dos)) +
+  geom_line(aes(y = pred_water_level_cm)) +
+  geom_line(aes(y = water_level_cm),
             linetype = "dotted") +
-  facet_grid(field_season ~ site, 
-             scales = "free") +
-  theme_minimal()
+  facet_wrap(~field_season + site,
+             scales = "free_y")
 
-control_train[dos == 0]
+control_test[, pred_delta_wl := predict(mod_g_dwl, newdata = control_test)]
+# Predict wetland water levels
+control_test[, pred_water_level_cm := predict_wl(pred_delta_wl, water_level_cm), 
+              by = .(field_season, site)]
+
+ggplot(data = control_test,
+       aes(x = dos)) +
+  geom_line(aes(y = pred_water_level_cm)) +
+  geom_line(aes(y = water_level_cm),
+            linetype = "dotted") +
+  facet_wrap(~field_season + site,
+             scales = "free_y")
+
 
 # Model & extract residuals
 
