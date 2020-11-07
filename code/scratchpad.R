@@ -1,5 +1,8 @@
 source("code/climate_packages.R")
 
+
+# Functions ---------------------------------------------------------------
+
 safe_lm <- 
   possibly(lm, NA)
 
@@ -82,953 +85,6 @@ min_na <-
     
     min(x, na.rm = TRUE)
   }
-
-
-# External Met Data -------------------------------------------------------
-
-# Add in Hargreaves PET
-# Constant for PET calculation
-lambda_MJ_kg <- 
-  2.45
-
-daily_ex_met <- 
-  ex_met[, .(mean_temp_c = mean_na(air_temperature_c), 
-             min_temp_c = min_na(air_temperature_c), 
-             max_temp_c = max_na(air_temperature_c), 
-             observed_rad_MJ_m2 = sum_na(solar_rad_MJ_m2_hr), 
-             etr_cm_d = sum_na(etr_cm_hr),
-             pet_hs_cm_summed = sum_na(pet_hs_cm_hr)), 
-         by = .(sample_date = as.Date(sample_time, tz = "EST"))]
-
-ha_coefs <- 
-  hacal(lat = 46.440278,
-        days = daily_ex_met$sample_date,
-        rad_mea = daily_ex_met$observed_rad_MJ_m2,
-        tmax = daily_ex_met$max_temp_c,
-        tmin = daily_ex_met$min_temp_c)
-
-daily_ex_met[, doy := yday(sample_date)]
-daily_ex_met[, ext_rad_MJ_m2 := extrat(doy, radians(46.440278))$ExtraTerrestrialSolarRadiationDaily]
-daily_ex_met[, ha_rad_MJ_m2 := ha(sample_date, 
-                                  lat = 46.440278, 
-                                  lon = -89.826667, 
-                                  ext_rad_MJ_m2, 
-                                  A = ha_coefs[["Ha"]], 
-                                  B = ha_coefs[["Hb"]], 
-                                  Tmax = max_temp_c, 
-                                  Tmin = min_temp_c)]
-daily_ex_met[, 
-             `:=`(exrad_pet_hs_cm = 0.1 * 0.0023 * ext_rad_MJ_m2 / lambda_MJ_kg * (mean_temp_c + 17.8) * sqrt(max_temp_c - min_temp_c), 
-                  harad_pet_hs_cm = 0.1 * 0.0023 * ha_rad_MJ_m2 / lambda_MJ_kg * (mean_temp_c + 17.8) * sqrt(max_temp_c - min_temp_c),
-                  obsrad_pet_hs_cm = 0.1 * 0.0023 * observed_rad_MJ_m2 / lambda_MJ_kg * (mean_temp_c + 17.8) * sqrt(max_temp_c - min_temp_c))]
-
-
-
-# Load Data ---------------------------------------------------------------
-
-precip <- 
-  fread("data/precipitation_daily.csv",
-        select = c(site = "character",
-                   sample_date = "Date",
-                   filled_precip_cm = "numeric"),
-        key = c("site", "sample_date"))
-
-setnames(precip, "filled_precip_cm", "precip_cm")
-
-hourly_precip <- 
-  fread("data/precipitation_hourly.csv",
-        select = c(site = "character",
-                   sample_time = "character",
-                   precip_cm = "numeric"))
-
-hourly_precip[, sample_time := ymd_hms(sample_time, tz = "EST")]
-
-setkey(hourly_precip, site, sample_time)
-
-sub_hourly_precip <- 
-  fread("data/precipitation_fifteen_minutes.csv",
-        select = c(site = "character",
-                   sample_time = "character",
-                   precip_cm = "numeric"))
-
-sub_hourly_precip[, sample_time := ymd_hms(sample_time, tz = "EST")]
-
-setkey(sub_hourly_precip, site, sample_time)
-
-melt <- 
-  fread("data/daily_snowmelt.csv", 
-        select = c(site = "character", 
-                   sample_date = "Date", 
-                   melt_cm = "numeric"),
-        key = c("site", "sample_date"))
-
-# Need melt for all sites. For not just using max predicted melt
-melt <- 
-  melt[, .(melt_cm = mean_na(melt_cm)), by = .(sample_date)]
-
-# I haven't accounted for some melt periods having interception removed
-precip[melt,
-       `:=`(melt_cm = i.melt_cm,
-            precip_cm = precip_cm + i.melt_cm),
-       on = "sample_date"]
-
-water_levels <- 
-  fread("data/well_levels.csv",
-        select = c(site = "character",
-                   sample_time = "character",
-                   water_level_cm = "numeric",
-                   air_temperature_c = "numeric",
-                   data_source = "character"))
-
-water_levels[, sample_time := ymd_hms(sample_time, tz = "EST")]
-water_levels[, sample_date := as.Date(sample_time, tz = "EST")]
-water_levels[, sample_year := year(sample_date)]
-
-
-setkey(water_levels, "site", "sample_date")
-
-water_balance <- 
-  water_levels[precip,
-               precip_cm := precip_cm]
-
-water_balance[hourly_precip,
-              h_precip_cm := i.precip_cm,
-              on = c("site", "sample_time")]
-
-water_balance[sub_hourly_precip,
-              sh_precip_cm := i.precip_cm,
-              on = c("site", "sample_time")]
-
-water_balance[, 
-             Dl_cm := shift(water_level_cm, -1) - water_level_cm,
-             by = .(site, sample_year)]
-
-
-
-site_info <- 
-  fread("data/site_info.csv", 
-        select = c("site", "study", "treatment"), 
-        colClasses = "character",
-        key = "site")
-
-water_balance[site_info,
-             `:=`(treatment = i.treatment,
-                  study = i.study)]
-
-water_balance[, treatment_period := set_treatment_period(sample_date, study = study)]
-
-# Shorthand for control sites and pre-treatment treated sites
-water_balance[, site_status := ifelse(treatment_period == "Pre-treatment" | site == "Control",
-                                      "Control",
-                                      treatment)]
-
-# Set growing season
-water_balance[, season := fifelse(month(sample_date) %in% 6:8 |
-                                    (month(sample_date) == 5 & mday(sample_date) > 15) |
-                                    (month(sample_date) == 9 & mday(sample_date) <= 15),
-                                  "growing",
-                                  "dormant")]
-
-daily_water_balance <- 
-  water_balance[,.(site_status = first(site_status),
-                   season = first(season),
-                   treatment = first(treatment),
-                   i_water_level_cm = first(water_level_cm),
-                   min_water_level_cm = min_na(water_level_cm),
-                   median_water_level_cm = median_na(water_level_cm),
-                   max_water_level_cm = max_na(water_level_cm),
-                   Dl_cm = max_na(water_level_cm) - min_na(water_level_cm),
-                   Dl_signed_cm = sign(which.max(water_level_cm) - which.min(water_level_cm)) * (max_na(water_level_cm) - min_na(water_level_cm)),
-                   Dl_time_range_s = (which.max(water_level_cm) - which.min(water_level_cm)) * 900,
-                   gross_precip_cm = first(precip_cm),
-                   Ds_cm = last(water_level_cm) - first(water_level_cm)),
-                by = .(site, sample_date)]
-
-interception <- 
-  daily_water_balance[,.(treatment = first(treatment),
-                         mod = list(safe_lm(Ds_cm ~ gross_precip_cm))),
-                      by = .(site, site_status, season)]
-
-interception[, c("intercept", "slope") := map_dfr(mod, safe_coef)]
-interception[, i_cm := -intercept / slope]
-
-interception[, i_cm := ifelse(is.na(i_cm), mean_na(i_cm), i_cm),
-          by = .(site_status)]
-
-interception[i_cm < 0, i_cm := 0]
-
-
-daily_water_balance[interception, 
-                    `:=`(i_cm = i.i_cm,
-                         net_precip_cm = pmax(0, gross_precip_cm - i.i_cm)),
-                    on = c("site", "site_status", "season")]
-
-daily_water_balance[, precip_intensity_cm_hr := net_precip_cm / (Dl_time_range_s / 3600)]
-
-# McLaughlin ESy ----------------------------------------------------------
-
-rr_dat <- 
-  water_balance[, 
-                .(site,
-                  sample_time,
-                  sample_year,
-                  site_status,
-                  season,
-                  Dl_cm,
-                  water_level_cm,
-                  gross_precip_cm = sh_precip_cm)]
-                
-                # .(site_status = first(site_status),
-                #     season = first(season),
-                #     sample_year = first(sample_year),  
-                #     Dl_cm = last(water_level_cm) - first(water_level_cm),
-                #     water_level_cm = first(water_level_cm),
-                #     gross_precip_cm = first(sh_precip_cm)),
-                # by = .(site, sample_time = floor_date(sample_time, "1 hour"))]
-
-rr_dat[interception, 
-       i_cm := i.i_cm, 
-       on = c("site", "site_status", "season")]
-
-rr_dat[, status := fifelse(gross_precip_cm > 0, "wet", "dry")]
-
-rr_dat[!is.na(status), 
-       run_length := rep(rle(status)$lengths, times = rle(status)$lengths),
-       by = .(site, sample_year)]
-
-# Define storms by precip separated by 4 hours of dry
-rr_dat[, storm := fifelse(status == "dry" & run_length > 32,
-                              "dry", 
-                              "storm")]
-
-rr_dat[is.na(gross_precip_cm), storm := "dry"]
-
-rr_dat[, storm_id := rleid(storm)]
-
-rr_dat[, cumulative_gross_precip_cm := cumsum(gross_precip_cm),
-       by = .(storm_id)]
-
-rr_dat[, cumulative_net_precip_cm := cumulative_gross_precip_cm - i_cm]
-rr_dat[cumulative_net_precip_cm < 0,
-       cumulative_net_precip_cm := 0]
-
-rr_dat[, storm := fifelse(cumulative_net_precip_cm > 0,
-                          "storm", 
-                          "dry")]
-
-rr_dat[, storm_id := rleid(storm)]
-
-rr_dat[, cumulative_Dl_cm := cumsum(Dl_cm),
-       by = .(storm_id)]
-
-rr_dat[, Ds_cm := max_na(water_level_cm) - min_na(water_level_cm),
-       by = .(storm_id)]
-
-rr_dat[, esy := cumulative_net_precip_cm / cumulative_Dl_cm]
-rr_dat[, esy_Ds := cumulative_net_precip_cm / Ds_cm]
-
-rr_dat[, elapsed_time_hr := as.numeric(sample_time - min(sample_time)) / 3600 ,
-       by = .(storm_id)]
-rr_dat[, precip_intensity := cumulative_net_precip_cm / elapsed_time_hr]
-
-# There is a declining impact of precip for long precipitation events. The
-# responses of ESy to water level looks like a recession curve within a single 
-# storm
-ggplot(rr_dat[storm == "storm", first(.SD, n = 4 * 3), by = .(storm_id)],
-       aes(x = water_level_cm,
-           y = esy)) +
-  geom_point() + 
-  facet_wrap(~site,
-             scales = "free") +
-  scale_y_log10()
-
-
-ggplot(rr_dat[storm == "storm", last(.SD), by = .(storm_id)],
-       aes(x = water_level_cm,
-           y = esy_Ds)) +
-  geom_point() + 
-  facet_wrap(~site,
-             scales = "free")
-
-# Non-linear Sy -----------------------------------------------------------
-
-# Bad precip estimates
-# sy_dat <-
-#   sy_dat[!(site == "006" & sy > 4 |
-#            site == "111" & sample_date %in% ymd(c("2015-08-09", "2017-07-06", "2018-07-12")) |
-#            site == "009" & sy > 1.5)]
-# 
-# 
-# nl_sy <- 
-#   sy_dat[24 * precip_intensity_cm_hr > i_cm]
-# 
-# nl_sy[,
-#        init_b := .SD[water_level_cm <= quantile(water_level_cm, 0.1, na.rm = TRUE),
-#                      mean_na(sy)],
-#        by = .(site)]
-# 
-# nl_sy[,
-#        init_c := .SD[sy == max_na(sy),
-#                        mean_na(water_level_cm)],
-#        by = .(site)]
-# 
-# nl_sy[,
-#        init_m := 1 / init_c]
-# 
-# nl_mods <-
-#   nl_sy[,
-#          .(mod = list(nls(sy ~ b + m ** (water_level_cm - c),
-#                             start = list(b = unique(init_b), m = 1.25,  c = unique(init_c)),
-#                             # maxit = 100,
-#                             control = nls.control(warnOnly = TRUE),
-#                             na.action = na.exclude,
-#                             data = .SD))),
-#          by = .(site)]
-# #
-# nl_mods[, c("b", "m", "c") := map_dfr(mod, coef)]
-# 
-# nl_sy[nl_mods, pred_sy := i.b + i.m ** (water_level_cm - i.c), on = "site"]
-# 
-# ggplot(nl_sy,
-#        aes(x = water_level_cm, y = sy)) +
-#   geom_point() +
-#   geom_line(aes(y = pred_sy), color = "red") +
-#   geom_smooth(method = glmrob,
-#               formula = y ~ x + I(x^2),
-#               se = FALSE,
-#               method.args = list(family = Gamma(inverse))) +
-#   facet_wrap(~site, scales = "free")
-
-# GLM Sy ------------------------------------------------------------------
-# Haven't looked at combining multi-day precip events. Or removing days with 
-# preceeding precipitation
-
-sy_dat <- 
-  daily_water_balance[net_precip_cm > 0 & season == "growing", 
-                      .(site,
-                        season,
-                        sample_date,
-                        water_level_cm = min_water_level_cm,
-                        i_cm = first(i_cm),
-                        Ds_cm,
-                        Dl_signed_cm,
-                        Dl_time_range_s,
-                        net_precip_cm,
-                        precip_intensity_cm_hr)]
-
-sy_dat[, sy := net_precip_cm / Dl_signed_cm]
-
-# Less than 1.1 to remove problem points from bad precip estimates
-# I was clipping out sy > 1.1 because there were some bad precip estimates. I
-# have found and corrected most of those and only have ~2 questionable esimates
-# of sy now. Some storms still show no actual response (or a muted responsed) 
-# and so Dwt goes down over the course of the day
-# sy_dat <- 
-#   sy_dat[sy > 0]
-
-sy_dat <- 
-  sy_dat[!(site == "157" & water_level_cm < -50) &
-           !(site %in% c("006", "009") & sy > 3)]
-
-# Clip some extremely high water levels
-sy_dat[, upper_x := median_na(water_level_cm) + 1.28 * mad(water_level_cm, na.rm = TRUE),
-       by = .(site)]
-sy_dat <-
-  sy_dat[water_level_cm <= upper_x]
-
-# Sy needs to be adjusted for precip intensity, which is derived as net precip
-# divided by the time difference between min and max water levels
-
-ggplot(sy_dat,
-       aes(x = precip_intensity_cm_hr,
-           y = sy)) +
-  geom_point() +
-  facet_wrap(~site, scales = "free")
-
-# Rather than adjust for intensity, we can remove low-intensity/small storms and
-# it strengthens the exponential/gamma fit 
-ggplot(sy_dat[sy > 0],
-       aes(x = water_level_cm,
-           y = sy)) +
-  geom_point() + 
-  geom_point(data = sy_dat[24*precip_intensity_cm_hr > i_cm],
-             color = "red") + 
-  geom_smooth(method = glm,
-              method.args = list(family = Gamma(inverse)),
-              se = FALSE, 
-              formula = y ~ x + I(x^2)) + 
-  geom_smooth(data = sy_dat[24*precip_intensity_cm_hr > i_cm], 
-              method = glm, 
-              method.args = list(family = Gamma(inverse)), 
-              se = FALSE, 
-              linetype = "dotted",
-              formula = y ~ x + I(x^2)) + 
-  facet_wrap(~site, scales = "free")
-
-# Remove small/low intensity storms
-sy_dat <- 
-  sy_dat[24*precip_intensity_cm_hr > i_cm]
-
-# sy_intense_mods <-
-#   sy_dat[, .(mod = list(glmrob(sy ~ 0 + I(intensity_cm_hr^0.5),
-#                                family = Gamma(identity)))),
-#          by =]
-
-# sy_dat[, 
-#        adjusted_sy := predict(glmrob(sy ~ I(intensity_cm_hr^-1),
-#                                      family = gaussian(log)), 
-#                               type = "response",
-#                               newdata = .SD),
-#        by = .(site)]
-# 
-# sy_dat[, sy_ratio := sy / adjusted_sy]
-
-# # The ratio of sy:adjusted_sy shows a much closer to exponential relationship.
-# # But not sure how to use that as sy in the flow/ET calculations
-# ggplot(sy_dat,
-#        aes(x = water_level_cm,
-#            y = sy_ratio)) + 
-#   geom_point() +
-#   geom_smooth(method = glmrob,
-#               method.args = list(family = Gamma(inverse)),
-#               se = FALSE,
-#               formula = y ~ x,
-#               color = "blue") +
-#   facet_wrap(~site, 
-#              scales = "free")
-
-# Low intensity & high intensity curves for ESy. Intensity threshold is found
-# by looking at the variance of the residuals/intensity
-# options(future.fork.enable = TRUE)
-# plan(multiprocess, workers = 4)
-# mods <- 
-#   future_map_dfr(split(sy_dat[, .(site, intensity_cm_hr, resid = (adjusted_sy - sy)/intensity_cm_hr)], 
-#                        by = "site"), 
-#                  ~.x[, .(mod = list(mcp(list(resid ~ 1, ~ sigma(1)), data = .x)))])
-# plan(sequential)
-# 
-# ggplot(sy_dat[mods[, .(site, cp)], on = "site"],
-#        aes(x = water_level_cm,
-#            y = sy)) + 
-#   geom_point(aes(color = intensity_cm_hr < cp)) +
-#   geom_smooth(data = sy_dat[mods[, .(site, cp)], on = "site"][!(intensity_cm_hr < cp & water_level_cm > -20)],
-#               method = robustbase::glmrob,
-#               method.args = list(family = Gamma(inverse)),
-#               se = FALSE,
-#               color = "black",
-#               formula = y ~ x) +
-#   
-#   geom_smooth(data = sy_dat[mods[, .(site, cp)], on = "site"][!(intensity_cm_hr > cp & water_level_cm > -20)],
-#               method = robustbase::glmrob,
-#               method.args = list(family = Gamma(inverse)),
-#               se = FALSE,
-#               color = "black",
-#               linetype = "dashed",
-#               formula = y ~ x) +
-#   geom_smooth(data = sy_dat[water_level_cm < upper_x], 
-#               method = robustbase::glmrob,
-#               method.args = list(family = Gamma(inverse)),
-#               se = FALSE,
-#               formula = y ~ x + I(x^2),
-#               linetype = "dashed",
-#               color = "blue") +
-#   facet_wrap(~site, 
-#              scales = "free")
-
-ggplot(sy_dat,
-       aes(x = water_level_cm,
-           y = sy)) +
-  geom_point() + 
-  geom_smooth(method = robustbase::glmrob,
-              method.args = list(family = Gamma(inverse)),
-              se = FALSE,
-              formula = y ~ x,
-            color = "blue") +
-  geom_smooth(method = robustbase::glmrob,
-              method.args = list(family = Gamma(inverse)),
-              se = FALSE,
-              formula = y ~ x + I(x^2),
-            linetype = "dashed",
-            color = "blue") +
-  facet_wrap(~site, scales = "free")
-
-
-
-# sy_dat <- 
-#   sy_dat[!(site == "156" & water_level_cm > 30)]
-
-# Large storms result in Hortonian overland flow, which likely pulses streamflow,
-# resulting in lower delta WL. This means Sy is lower than would be predicted for
-# the same amount of precip at a lower intensity. This could potentially be 
-# remedied by looking at storm events
-
-# GLM performs better than NL approach as measured by RMSE of daily ET vs PET
-# Additionally quadratic GLM works better than linear
-
-# RMSE of ET, PET for GLMs:
-  # With outliers of et greater than 0.5 removed:
-  # site   uni_rmse  quad_rmse
-  # 006 0.10449259 0.09904485
-  # 009 0.09186648 0.09197557
-  # 053 0.09173676 0.09185025
-  # 077 0.09910674 0.09971839
-  # 111 0.09228345 0.09273795
-  # 113 0.11032220 0.11062702
-  # 119 0.10024449 0.08804028
-  # 135 0.10593098 0.10539962
-  # 139 0.09841121 0.09712307
-  # 140 0.11733474 0.11720316
-  # 151 0.10111083 0.09981528
-  # 152 0.11195858 0.11091667
-  # 156 0.09877201 0.08868542
-  # 157 0.09595529 0.09685958
-
-  # Without outliers removed:
-  # site   uni_rmse  quad_rmse
-  # 006 1.04136006 0.12778260
-  # 009 0.12049691 0.12106574
-  # 053 0.12071625 0.10568511
-  # 077 0.17703904 0.18321488
-  # 111 0.10690248 0.09273795
-  # 113 0.28465484 0.11225210
-  # 119 0.80264890 0.08804028
-  # 135 0.34114639 0.14128561
-  # 139 0.25580621 0.12745262
-  # 140 0.39746485 0.15926680
-  # 151 0.37738213 0.10801099
-  # 152 0.11967333 0.11240844
-  # 156 0.86780250 0.09194840
-  # 157 0.09960029 0.10404289
-
-# R^2 of square-root transformed PET and calculated ET
-# flow_eval[, .(uni_rmse = cor(et_uni_cm_d, sqrt(pet_cm_d), 
-#                              use = "pairwise.complete",
-#                              method = "spearman")^2, 
-#               quad_rmse = cor(et_quad_cm_d, pet_cm_d, 
-#                               use = "pairwise.complete",
-#                               method = "spearman")^2),
-#           by = .(site)]
-
-    # site   uni_rmse  quad_rmse
-    # 006 0.03701899 0.04797261
-    # 009 0.23565416 0.23575935
-    # 053 0.15123796 0.16354319
-    # 077 0.07540678 0.07455430
-    # 111 0.19127962 0.19395045
-    # 113 0.09179230 0.10021615
-    # 119 0.15100786 0.19678138
-    # 135 0.13064624 0.12077897
-    # 139 0.08497514 0.07668538
-    # 140 0.09795278 0.10035826
-    # 151 0.11715590 0.11919963
-    # 152 0.17469229 0.18107918
-    # 156 0.21186710 0.22485594
-    # 157 0.17138341 0.15422581
-
-# Fit Models
-# Visually the high model and the quad model show the best forms for et_index ~ water_level_cm
-# Need to evaulate RMSE of ET:PET of low/no flow water levels to tell which 
-# accutaly performs better. Also comparing the ET:PET > 1 with streamflow at the
-# paired watersheds would be good
-# ggplot(daily_flows, 
-#        aes(x = water_level_cm, y = et_index)) + 
-#   geom_point() + 
-#   facet_wrap(~site, scales = "free") + 
-#   scale_y_log10() + 
-#   labs(title = "uni sy", 
-#        caption = "Ratio of ET:PET as a function of water level. When ET:PET > 1,
-#        or greater than it's usual median value (or maybe there's a linear trend
-#        there), we can assume streamflow is the excess." )
-#   geom_hline(aes(yintercept = 1))
-
-sy_mods <- 
-  sy_dat[, # between(net_precip_cm, 0.5, 1), 
-         .(mod = list(glmrob(sy ~ water_level_cm,
-                             family = Gamma(inverse))),
-           mod_quad = list(glmrob(sy ~ water_level_cm + I(water_level_cm^2),
-                                  family = Gamma(inverse))) #,
-           # mod_high = list(glmrob(sy ~ water_level_cm,
-           #                         family = Gamma(inverse),
-           #                        data = .SD[intensity_cm_hr > mods[site == .BY[[1]], cp]])),
-           # mod_low = list(glmrob(sy ~ water_level_cm,
-           #                       family = Gamma(inverse),
-           #                       data = .SD[intensity_cm_hr < mods[site == .BY[[1]], cp]])),
-           # mod_ratio = list(glmrob(sy_ratio ~ water_level_cm,
-           #                         family = Gamma(inverse)))
-           ),
-         by = .(site)]
-
-
-sy_dat[site %in% sy_mods$site, 
-       `:=`(pred_sy = predict(sy_mods[.BY[[1]], mod[[1]], on = "site"], 
-                          newdata = .SD,
-                          type = "response"),
-            quad_sy = predict(sy_mods[.BY[[1]], mod_quad[[1]], on = "site"], 
-                              newdata = .SD,
-                              type = "response") #,
-            # high_sy = predict(sy_mods[.BY[[1]], mod_high[[1]], on = "site"], 
-            #                   newdata = .SD,
-            #                   type = "response"),
-            # low_sy = predict(sy_mods[.BY[[1]], mod_low[[1]], on = "site"], 
-            #                   newdata = .SD,
-            #                   type = "response")
-            ), 
-       by = .(site)]
-
-# sy_dat[, `:=`(pred_sy = pmin(1, pred_sy),
-#               quad_sy = pmin(1, quad_sy))]
-
-ggplot(sy_dat,
-       aes(x = water_level_cm,
-           y = sy)) +
-  geom_point() + 
-  geom_line(aes(y = pred_sy),
-            color = "blue") +
-  geom_line(aes(y = quad_sy),
-            linetype = "dashed",
-            color = "blue") +
-  # geom_line(aes(y = low_sy),
-  #           linetype = "dotted",
-  #           color = "blue") +
-  facet_wrap(~site, scales = "free")
-
-# It may be worth using the non-linear models which have an asymptote at low
-# water levels. The quadratic form could result in extremely low estimates of
-# sy when predicting outside the water level range of sy dat
-
-# Daily water balance from McLaughlin, 2019 -------------------------------
-# water_balance[interception,
-#               `:=`(i_cm = i.i_cm,
-#                    net_precip_cm = pmax(0, precip_cm - i.i_cm)),
-#               on = c("site", "site_status", "season")]
-
-daily_water_balance[daily_ex_met,
-                    `:=`(exrad_pet_hs_cm = i.exrad_pet_hs_cm,
-                         harad_pet_hs_cm = i.harad_pet_hs_cm,
-                         obsrad_pet_hs_cm = i.obsrad_pet_hs_cm),
-                    on = c("sample_date")]
-
-daily_water_balance[site %in% sy_mods$site, 
-                    sy := predict(sy_mods[.BY[[1]], mod_quad[[1]], on = "site"], 
-                                  newdata = .SD[, .(water_level_cm = i_water_level_cm)],
-                                  type = "response"), 
-                    by = .(site)]
-
-daily_water_balance[, 
-                    net_flow := Ds_cm * sy - net_precip_cm + harad_pet_hs_cm,
-                    by = .(site, sample_date)]
-
-ggplot(daily_water_balance[sy_dat[, unique(.SD), .SDcols = c("site", "upper_x")], on = "site"][i_water_level_cm < upper_x],
-       aes(x = i_water_level_cm,
-           y = net_flow)) +
-  geom_point() +
-  facet_wrap(~site, 
-             scales = "free")
-
-# Separate Flows ----------------------------------------------------------
-
-water_balance[site %in% sy_mods$site, 
-              sy := predict(sy_mods[.BY[[1]], mod_quad[[1]], on = "site"], 
-                            newdata = .SD,
-                            type = "response"), 
-              by = .(site)]
-
-# # Add asymptote for sy at low water levels:
-# water_balance[sy_dat[,
-#                      .(lower_thresh = quantile(water_level_cm, 0.1, na.rm = TRUE),
-#                        b = .SD[water_level_cm <= quantile(water_level_cm, 0.1, na.rm = TRUE),
-#                                mean_na(sy)]),
-#                      by = .(site)],
-#               sy := fifelse(water_level_cm < i.lower_thresh,
-#                             i.b,
-#                             sy),
-#               on = "site"]
-
-dat <- 
-  water_balance[, .(data = list(.SD)),
-                by = .(site)]
-
-
-dat[, data := map(data, calculate_detrended_g)]
-dat[, data := map(data, calculate_delta_s)]
-dat[, data := map(data, calculate_et)]
-dat[, data := map(data, adjust_water_balance)]
-
-
-flows <- 
-  dat[, data[[1]], by = .(site)]
-
-hourly_flows <- 
-  flows[, 
-        .(sy = mean_na(sy),
-          water_level_cm = mean_na(water_level_cm),
-          precip_cm = first(precip_cm),
-          Dl_cm = sum(Dl_cm),
-          i_water_level_cm = first(water_level_cm),
-          f_water_level_cm = last(water_level_cm),
-          corrected_gamma_m = mean_na(corrected_gamma_m),
-          corrected_Gamma_cm_s = mean_na(corrected_Gamma_cm_s),
-          g_cm_hr = 4 * mean_na(corrected_net_in_cm_s),
-          et_cm_hr = 4 * mean_na(corrected_et_cm_s)),
-        by = .(site, sample_time = floor_date(sample_time, "hour"))]
-
-# Check that water balance and water level change match
-ggplot(hourly_flows[, .(site, 
-                        sample_time, 
-                        sy, 
-                        Dl_cm,
-                        WB = (g_cm_hr - et_cm_hr) / sy)], 
-       aes(x = Dl_cm, y = WB)) + 
-  geom_abline() + 
-  geom_point() + 
-  facet_wrap(~site, scales = "free")
-
-
-hourly_flows[ex_met, 
-             `:=`(etr_cm_hr = i.etr_cm_hr,
-                  pet_hs_cm_hr = i.pet_hs_cm_hr),
-             on = "sample_time"]
-
-hourly_flows[, et_resid := et_cm_hr - etr_cm_hr]
-hourly_flows[, et_index := et_cm_hr/etr_cm_hr]
-
-daily_flows <- 
-  hourly_flows[, 
-               .(sy = mean_na(sy),
-                 water_level_cm = min_na(water_level_cm), 
-                 Dl_cm = last(f_water_level_cm) - first(i_water_level_cm),
-                 precip_cm = first(precip_cm),
-                 etr_cm_d = sum_na(etr_cm_hr), 
-                 g_cm_d = sum_na(g_cm_hr),
-                 et_cm_d = sum_na(et_cm_hr)), 
-               by = .(site, sample_date = as.Date(sample_time, tz = "EST"))]
-
-# Check that water balance and water level change match
-ggplot(daily_flows[, .(site, 
-                        sample_date, 
-                        sy, 
-                        Dl_cm,
-                        WB = (g_cm_d - et_cm_d) / sy)], 
-       aes(x = Dl_cm, y = WB)) + 
-  geom_abline() + 
-  geom_point() + 
-  facet_wrap(~site, scales = "free")
-
-daily_flows[water_balance, 
-            `:=`(treatment = i.treatment, 
-                 treatment_period = i.treatment_period,
-                 site_status = i.site_status), 
-            on = c("site", "sample_date")]
-
-daily_flows[daily_ex_met,
-  `:=`(obsrad_pet_hs_cm = i.obsrad_pet_hs_cm,
-       pet_hs_cm_summed = i.pet_hs_cm_summed,
-       harad_pet_hs_cm = i.harad_pet_hs_cm,
-       exrad_pet_hs_cm = i.exrad_pet_hs_cm),
-  on = "sample_date"]
-
-daily_flows[daily_water_balance,
-            `:=`(i_cm = i.i_cm,
-                 net_precip_cm = i.net_precip_cm),
-            on = c("site", "sample_date")]
-
-daily_flows[, `:=`(et_resid = et_cm_d - harad_pet_hs_cm,
-                   et_index = et_cm_d / harad_pet_hs_cm)]
-
-ggplot(daily_flows[precip_cm == 0 & site_status == "Control"],
-       aes(y = et_cm_d, 
-           x = harad_pet_hs_cm)) + 
-  geom_point() + 
-  geom_smooth(method = lmrob,
-              formula = y ~ 0 + x) +
-  facet_wrap(~site, scales = "free")
-
-ggplot(daily_flows[precip_cm == 0 & site_status == "Control"], 
-       aes(x = water_level_cm, y = et_resid)) + 
-  geom_point() + 
-  facet_wrap(~site, scales = "free")
-
-# Adjust Flows ------------------------------------------------------------
-# The nls() models fit below are not final! They need to be improved.
-
-
-ggplot(daily_flows[precip_cm == 0 & et_resid < 5], 
-       aes(x = water_level_cm, y = et_resid)) + 
-  geom_point() + 
-  geom_smooth(method = nlrob, formula = y ~ b + m * exp(c*x), 
-              se = FALSE, 
-              method.args = list(start = list(b = -0.1, m = 0.2, c = 0.1), 
-                                 maxit = 200,
-                                 control = nls.control(maxiter = 500, minFactor = 2^(-16)))) +
-  facet_wrap(~site, scales = "free")
-
-flow_adjust_mods <- 
-  daily_flows[sy_dat[, .(upper_x = first(upper_x)), by = .(site)], 
-              on = "site"
-              ][precip_cm == 0 & water_level_cm < upper_x]
-
-flow_adjust_mods <- 
-  flow_adjust_mods[, .(dat = list(.SD)), keyby = .(site)]
-
-flow_adjust_mods[, mod := map(dat, 
-                              ~nls(et_resid ~ b + m * exp(c*water_level_cm),
-                                    data = .x,
-                                    start = list(b = -0.1, m = 0.2, c = 0.1),
-                                    # maxit = 200,
-                                    control = nls.control(warnOnly = TRUE, maxiter = 500, minFactor = 2^(-16))))]
-
-daily_flows[, flow_cm := predict(flow_adjust_mods[.BY[[1]], mod[[1]]],
-                                 newdata = .SD),
-            by = .(site)]
-
-ggplot(daily_flows[precip_cm == 0 & site_status == "Control"],
-       aes(x = water_level_cm, 
-           y = flow_cm)) + 
-  geom_point() + 
-  facet_wrap(~site, scales = "free")
-
-# Debating doing pmax(0, flow_cm)
-daily_flows[, aet_cm_d := et_cm_d - flow_cm]
-
-ggplot(daily_flows[precip_cm == 0 & site_status == "Control" & aet_cm_d < 1.5],
-       aes(x = harad_pet_hs_cm,
-           y = aet_cm_d)) + 
-  geom_point() + 
-  geom_smooth(method = lmrob,
-              formula = y ~ 0 + x) +
-  facet_wrap(~site, scales = "free")
-
-# R-squared of ET estimation
-daily_flows[precip_cm == 0 & site_status == "Control", 
-            .(mod = list(lmrob(aet_cm_d ~ 0 + harad_pet_hs_cm))), 
-            by = .(site)][, `:=`(slope = map_dbl(mod, ~coef(.x)[[1]]), 
-                                 r_squared = map_dbl(mod, ~summary(.x)$adj.r.squared),
-                                 p_value = map_dbl(mod, ~(summary(.x)$coefficients)[4]),
-                                 rmse_cm = map_dbl(mod, ~sqrt(mean_na(resid(.x)^2))),
-                                 rmse_pct = map_dbl(mod, ~sqrt(mean_na((resid(.x)/fitted(.x))^2))))][]
-
-# site         mod     slope r_squared       p_value   rmse_cm  rmse_pct
-# 009 <lmrob[23]> 1.0468900 0.8075816  1.816937e-60 0.1517488  2.733062
-# 053 <lmrob[23]> 0.7229603 0.7679042  3.822383e-33 0.1486921 18.708524
-# 077 <lmrob[23]> 0.8961368 0.6121542  9.104044e-27 0.3261004  5.657638
-# 111 <lmrob[23]> 0.8305789 0.7343130  1.637171e-86 0.2093083  2.357422
-# 113 <lmrob[23]> 0.9326998 0.8234367 4.068339e-139 0.2098048  3.859579
-# 119 <lmrob[23]> 1.1374668 0.7416650  1.103770e-44 0.2151114  1.802269
-# 135 <lmrob[23]> 0.8733030 0.7535042 4.053265e-121 1.0305379  6.601660
-# 139 <lmrob[23]> 1.2030189 0.7758504  1.013224e-24 0.2289345  3.522902
-# 140 <lmrob[23]> 1.0052801 0.8731178  4.770734e-80 0.1931104  4.473873
-# 151 <lmrob[23]> 1.0016261 0.6794711  1.336575e-35 6.5952237 43.204789
-# 152 <lmrob[23]> 0.9053358 0.8835780 7.342773e-179 0.1295101  2.166442
-# 156 <lmrob[23]> 1.0722171 0.8106684  6.811327e-60 0.1843767  2.289339
-# 157 <lmrob[23]> 0.7809795 0.6439957  8.888347e-83 0.2089187  2.952013
-
-
-
-# daily_flows[, outflow := ]
-
-
-ggplot(daily_flows, 
-       aes(x = water_level_cm, y = et_index)) + 
-  geom_point() + 
-  facet_wrap(~site, scales = "free") + 
-  scale_y_log10() + 
-  labs(caption = "Ratio of ET:PET as a function of water level. When ET:PET > 1, or greater than it's usual median value (or maybe there's a linear trend there), we can assume streamflow is the excess.") +
-geom_hline(aes(yintercept = 1))
-
-
-
-# R-squared of ET estimation
-daily_flows[precip_cm == 0 & site_status == "Control", 
-            .(mod = list(lmrob(et_cm_d ~ harad_pet_hs_cm))), 
-            by = .(site)][, `:=`(slope = map_dbl(mod, ~coef(.x)[[1]]), 
-                                 r_squared = map_dbl(mod, ~summary(.x)$adj.r.squared))][]
-
-
-ggplot(daily_flows[precip_cm == 0 & site_status == "Control"],
-       aes(y = et_cm_d, 
-           x = harad_pet_hs_cm)) + 
-  geom_point() + 
-  geom_smooth(method = lmrob,
-              formula = y ~ 0 + x) +
-  facet_wrap(~site, scales = "free")
-
-# Net Flows
-ggplot(daily_flows[water_balance[, .(sy = mean(sy)), 
-                                 by = .(site, sample_date)], 
-                   on = c("site", "sample_date")][,
-                     net_flow := Dl_cm * sy - net_precip_cm + pet_hs_cm][], 
-       aes(x = water_level_cm, 
-           y = net_flow)) + 
-  geom_point() + 
-  facet_wrap(~site, scales = "free")
-
-
-
-ggplot(daily_flows[precip_cm == 0 & site_status == "Control"],
-       aes(x = water_level_cm, 
-           y = et_resid)) + 
-  geom_point() + 
-  # geom_hline(data = daily_flows[precip_cm == 0 & (treatment == "Control" | treatment_period == "Pre-treatment"),
-  #                               .(et_resid = median_na(et_resid)),
-  #                               by = .(site)],
-  #            aes(yintercept = et_resid)) +
-  facet_wrap(~site, scales = "free")
-
-ggplot(daily_flows[precip_cm == 0 & site_status == "Control"],
-       aes(x = water_level_cm, 
-           y = et_index)) +
-  geom_point() +
-  geom_hline(aes(yintercept = 1)) +
-  facet_wrap(~site,
-             scales = "free")
-
-
-# Constant for PET calculation
-lambda_MJ_kg <-
-  2.45
-
-ex_met <-
-  cbind(fread("../Data/Raw/Downloaded/mesowest_met/WKFM4.2019-12-31.csv",
-              select = c(1, 2, 4, 5, 6, 8, 9, 10, 11, 13),
-              skip = 12,
-              col.names = c("station_id", "sample_time", "air_temperature_c",
-                            "relative_humidity", "wind_speed_m_s",
-                            "wind_gust_m_s", "solar_rad_w_m2", "precip_mm",
-                            "wind_peak_m_s", "dew_point_temperature_c")),
-        setnames(data.table(t(fread("../Data/Raw/Downloaded/mesowest_met/WKFM4.2019-12-31.csv",
-                                    skip = 6,
-                                    nrows = 3,
-                                    header = FALSE,
-                                    sep = ":")[, 2])),
-                 c("latitude", "longitude", "elevation_m")))
-
-ex_met[, sample_time := sample_time - 60]
-
-ex_met[, `:=`(sample_time = setattr(sample_time, "tzone", "EST"),
-              elevation_m = elevation_m / 3.2808,
-              solar_rad_MJ_m2_hr = solar_rad_w_m2 * 3600 * 1e-6,
-              solar_rad_w_m2 = NULL)]
-
-ex_met[, etr_cm_hr := 0.1 * water::hourlyET(data.frame(wind = wind_speed_m_s,
-                                                       RH = relative_humidity,
-                                                       temp = air_temperature_c,
-                                                       radiation = solar_rad_MJ_m2_hr,
-                                                       height = 6.1,
-                                                       lat= latitude,
-                                                       long = longitude,
-                                                       elev = elevation_m),
-                                            DOY = yday(sample_time),
-                                            hours = hour(sample_time),
-                                            ET = "ETr",
-                                            long.z = longitude)]
-
-ex_met[, etr_cm_hr := pmax(0, etr_cm_hr)]
-
-# Get min and max temp by using the previous and next hour
-# ex_met[, pet_hs_cm_hr := 0.1 * 0.0023 * solar_rad_MJ_m2_hr / lambda_MJ_kg * (air_temperature_c + 17.8) * sqrt(air_temperature_c + sd(c(shift(air_temperature_c, 1), air_temperature_c, shift(air_temperature_c, -1)), na.rm = TRUE) - (air_temperature_c - sd(c(shift(air_temperature_c, 1), air_temperature_c, shift(air_temperature_c, -1)), na.rm = TRUE))),
-ex_met[, pet_hs_cm_hr := 0.1 * 0.0023 * solar_rad_MJ_m2_hr / lambda_MJ_kg * (air_temperature_c + 17.8) * sqrt(max_na(c(shift(air_temperature_c, 1), air_temperature_c, shift(air_temperature_c, -1))) - min_na(c(shift(air_temperature_c, 1), air_temperature_c, shift(air_temperature_c, -1)))),
-       by = .(year(sample_time))]
-ex_met[, pet_hs_cm_hr := pmax(0, pet_hs_cm_hr)]
 
 calculate_detrended_g <- 
   function(data){
@@ -1270,13 +326,13 @@ adjust_water_balance <-
     data[corrected_et_cm_s < 0,
          `:=`(corrected_net_in_cm_s = corrected_net_in_cm_s - corrected_et_cm_s,
               corrected_et_cm_s = corrected_et_cm_s - corrected_et_cm_s)]
-  
+    
     data[corrected_net_in_cm_s < 0,
          `:=`(corrected_et_cm_s = corrected_et_cm_s - corrected_net_in_cm_s,
               corrected_net_in_cm_s = corrected_net_in_cm_s - corrected_net_in_cm_s)]
     
     data[]
-    }
+  }
 
 three_point_slope <- 
   function(x, y){
@@ -1313,4 +369,927 @@ rolling_slope <-
     
     (m1 + m2) / 2
   }
+
+
+
+
+
+# External Met Data -------------------------------------------------------
+
+# Constant for PET calculation
+lambda_MJ_kg <- 
+  2.45
+
+ex_met <-
+  cbind(fread("../Data/Raw/Downloaded/mesowest_met/WKFM4.2019-12-31.csv",
+              select = c(1, 2, 4, 5, 6, 8, 9, 10, 11, 13),
+              skip = 12,
+              col.names = c("station_id", "sample_time", "air_temperature_c",
+                            "relative_humidity", "wind_speed_m_s",
+                            "wind_gust_m_s", "solar_rad_w_m2", "precip_mm",
+                            "wind_peak_m_s", "dew_point_temperature_c")),
+        setnames(data.table(t(fread("../Data/Raw/Downloaded/mesowest_met/WKFM4.2019-12-31.csv",
+                                    skip = 6,
+                                    nrows = 3,
+                                    header = FALSE,
+                                    sep = ":")[, 2])),
+                 c("latitude", "longitude", "elevation_m")))
+
+ex_met[, sample_time := sample_time - 60]
+
+ex_met[, `:=`(sample_time = setattr(sample_time, "tzone", "EST"),
+              elevation_m = elevation_m / 3.2808,
+              solar_rad_MJ_m2_hr = solar_rad_w_m2 * 3600 * 1e-6,
+              solar_rad_w_m2 = NULL)]
+
+ex_met[, etr_cm_hr := 0.1 * water::hourlyET(data.frame(wind = wind_speed_m_s,
+                                                       RH = relative_humidity,
+                                                       temp = air_temperature_c,
+                                                       radiation = solar_rad_MJ_m2_hr,
+                                                       height = 6.1,
+                                                       lat= latitude,
+                                                       long = longitude,
+                                                       elev = elevation_m),
+                                            DOY = yday(sample_time),
+                                            hours = hour(sample_time),
+                                            ET = "ETr",
+                                            long.z = longitude)]
+
+ex_met[, etr_cm_hr := pmax(0, etr_cm_hr)]
+
+# Get min and max temp by using the previous and next hour
+# ex_met[, pet_hs_cm_hr := 0.1 * 0.0023 * solar_rad_MJ_m2_hr / lambda_MJ_kg * (air_temperature_c + 17.8) * sqrt(air_temperature_c + sd(c(shift(air_temperature_c, 1), air_temperature_c, shift(air_temperature_c, -1)), na.rm = TRUE) - (air_temperature_c - sd(c(shift(air_temperature_c, 1), air_temperature_c, shift(air_temperature_c, -1)), na.rm = TRUE))),
+ex_met[, pet_hs_cm_hr := 0.1 * 0.0023 * solar_rad_MJ_m2_hr / lambda_MJ_kg * (air_temperature_c + 17.8) * sqrt(max_na(c(shift(air_temperature_c, 1), air_temperature_c, shift(air_temperature_c, -1))) - min_na(c(shift(air_temperature_c, 1), air_temperature_c, shift(air_temperature_c, -1)))),
+       by = .(year(sample_time))]
+ex_met[, pet_hs_cm_hr := pmax(0, pet_hs_cm_hr)]
+
+# Add in Hargreaves PET
+
+daily_ex_met <- 
+  ex_met[, .(mean_temp_c = mean_na(air_temperature_c), 
+             min_temp_c = min_na(air_temperature_c), 
+             max_temp_c = max_na(air_temperature_c), 
+             observed_rad_MJ_m2 = sum_na(solar_rad_MJ_m2_hr), 
+             etr_cm_d = sum_na(etr_cm_hr),
+             pet_hs_cm_summed = sum_na(pet_hs_cm_hr)), 
+         by = .(sample_date = as.Date(sample_time, tz = "EST"))]
+
+ha_coefs <- 
+  hacal(lat = 46.440278,
+        days = daily_ex_met$sample_date,
+        rad_mea = daily_ex_met$observed_rad_MJ_m2,
+        tmax = daily_ex_met$max_temp_c,
+        tmin = daily_ex_met$min_temp_c)
+
+daily_ex_met[, doy := yday(sample_date)]
+daily_ex_met[, ext_rad_MJ_m2 := extrat(doy, radians(46.440278))$ExtraTerrestrialSolarRadiationDaily]
+daily_ex_met[, ha_rad_MJ_m2 := ha(sample_date, 
+                                  lat = 46.440278, 
+                                  lon = -89.826667, 
+                                  ext_rad_MJ_m2, 
+                                  A = ha_coefs[["Ha"]], 
+                                  B = ha_coefs[["Hb"]], 
+                                  Tmax = max_temp_c, 
+                                  Tmin = min_temp_c)]
+daily_ex_met[, 
+             `:=`(exrad_pet_hs_cm = 0.1 * 0.0023 * ext_rad_MJ_m2 / lambda_MJ_kg * (mean_temp_c + 17.8) * sqrt(max_temp_c - min_temp_c), 
+                  harad_pet_hs_cm = 0.1 * 0.0023 * ha_rad_MJ_m2 / lambda_MJ_kg * (mean_temp_c + 17.8) * sqrt(max_temp_c - min_temp_c),
+                  obsrad_pet_hs_cm = 0.1 * 0.0023 * observed_rad_MJ_m2 / lambda_MJ_kg * (mean_temp_c + 17.8) * sqrt(max_temp_c - min_temp_c))]
+
+
+
+# Load Data ---------------------------------------------------------------
+
+precip <- 
+  fread("data/precipitation_daily.csv",
+        select = c(site = "character",
+                   sample_date = "Date",
+                   filled_precip_cm = "numeric"),
+        key = c("site", "sample_date"))
+
+setnames(precip, "filled_precip_cm", "precip_cm")
+
+hourly_precip <- 
+  fread("data/precipitation_hourly.csv",
+        select = c(site = "character",
+                   sample_time = "character",
+                   precip_cm = "numeric"))
+
+hourly_precip[, sample_time := ymd_hms(sample_time, tz = "EST")]
+
+setkey(hourly_precip, site, sample_time)
+
+sub_hourly_precip <- 
+  fread("data/precipitation_fifteen_minutes.csv",
+        select = c(site = "character",
+                   sample_time = "character",
+                   precip_cm = "numeric"))
+
+sub_hourly_precip[, sample_time := ymd_hms(sample_time, tz = "EST")]
+
+setkey(sub_hourly_precip, site, sample_time)
+
+melt <- 
+  fread("data/daily_snowmelt.csv", 
+        select = c(site = "character", 
+                   sample_date = "Date", 
+                   melt_cm = "numeric"),
+        key = c("site", "sample_date"))
+
+# Need melt for all sites. For not just using max predicted melt
+melt <- 
+  melt[, .(melt_cm = mean_na(melt_cm)), by = .(sample_date)]
+
+# I haven't accounted for some melt periods having interception removed
+precip[melt,
+       `:=`(melt_cm = i.melt_cm,
+            precip_cm = precip_cm + i.melt_cm),
+       on = "sample_date"]
+
+water_levels <- 
+  fread("data/well_levels.csv",
+        select = c(site = "character",
+                   sample_time = "character",
+                   water_level_cm = "numeric",
+                   air_temperature_c = "numeric",
+                   data_source = "character"))
+
+water_levels[, sample_time := ymd_hms(sample_time, tz = "EST")]
+water_levels[, sample_date := as.Date(sample_time, tz = "EST")]
+water_levels[, sample_year := year(sample_date)]
+
+
+setkey(water_levels, "site", "sample_date")
+
+water_balance <- 
+  water_levels[precip,
+               precip_cm := precip_cm]
+
+water_balance[hourly_precip,
+              h_precip_cm := i.precip_cm,
+              on = c("site", "sample_time")]
+
+water_balance[sub_hourly_precip,
+              sh_precip_cm := i.precip_cm,
+              on = c("site", "sample_time")]
+
+water_balance[, 
+             Ds_cm := shift(water_level_cm, -1) - water_level_cm,
+             by = .(site, sample_year)]
+
+
+
+site_info <- 
+  fread("data/site_info.csv", 
+        select = c("site", "study", "treatment"), 
+        colClasses = "character",
+        key = "site")
+
+water_balance[site_info,
+             `:=`(treatment = i.treatment,
+                  study = i.study)]
+
+water_balance[, treatment_period := set_treatment_period(sample_date, study = study)]
+
+# Shorthand for control sites and pre-treatment treated sites
+water_balance[, site_status := ifelse(treatment_period == "Pre-treatment" | site == "Control",
+                                      "Control",
+                                      treatment)]
+
+# Set growing season
+water_balance[, season := fifelse(month(sample_date) %in% 6:8 |
+                                    (month(sample_date) == 5 & mday(sample_date) > 15) |
+                                    (month(sample_date) == 9 & mday(sample_date) <= 15),
+                                  "growing",
+                                  "dormant")]
+
+daily_water_balance <- 
+  water_balance[,.(site_status = first(site_status),
+                   season = first(season),
+                   treatment = first(treatment),
+                   i_water_level_cm = first(water_level_cm),
+                   min_water_level_cm = min_na(water_level_cm),
+                   median_water_level_cm = median_na(water_level_cm),
+                   max_water_level_cm = max_na(water_level_cm),
+                   Dl_cm = max_na(water_level_cm) - min_na(water_level_cm),
+                   Dl_signed_cm = sign(which.max(water_level_cm) - which.min(water_level_cm)) * (max_na(water_level_cm) - min_na(water_level_cm)),
+                   Dl_time_range_s = (which.max(water_level_cm) - which.min(water_level_cm)) * 900,
+                   gross_precip_cm = first(precip_cm),
+                   Ds_cm = last(water_level_cm) - first(water_level_cm)),
+                by = .(site, sample_date)]
+
+interception <- 
+  daily_water_balance[,.(treatment = first(treatment),
+                         mod = list(safe_lm(Ds_cm ~ gross_precip_cm))),
+                      by = .(site, site_status, season)]
+
+interception[, c("intercept", "slope") := map_dfr(mod, safe_coef)]
+interception[, i_cm := -intercept / slope]
+
+interception[, i_cm := ifelse(is.na(i_cm), mean_na(i_cm), i_cm),
+          by = .(site_status)]
+
+interception[i_cm < 0, i_cm := 0]
+
+
+daily_water_balance[interception, 
+                    `:=`(i_cm = i.i_cm,
+                         net_precip_cm = pmax(0, gross_precip_cm - i.i_cm)),
+                    on = c("site", "site_status", "season")]
+
+daily_water_balance[, precip_intensity_cm_hr := net_precip_cm / (Dl_time_range_s / 3600)]
+
+# McLaughlin ESy ----------------------------------------------------------
+
+rr_dat <- 
+  water_balance[, 
+                .(site,
+                  sample_time,
+                  sample_year,
+                  site_status,
+                  season,
+                  water_level_cm,
+                  Ds_cm, 
+                  gross_precip_cm = sh_precip_cm)]
+                
+# Set precip status as wet/dry
+rr_dat[, status := fifelse(gross_precip_cm > 0, "wet", "dry")]
+
+# If precip is NA set storm to 'dry' to calculate run lengths correctly
+rr_dat[is.na(gross_precip_cm), status := "dry"]
+
+# Get run lengths of wet/dry
+rr_dat[, 
+       precip_run_length := rep(rle(status)$lengths, times = rle(status)$lengths),
+       by = .(site, sample_year)]
+
+# Define storms by precip separated by 4 hours of dry
+rr_dat[, storm := fifelse(status == "dry" & precip_run_length > 32,
+                          "dry", 
+                          "storm")]
+
+# Give storms an id
+rr_dat[, storm_id := paste(.BY[[1]], .BY[[2]], rleid(storm), sep = "-"), 
+       by = .(site, sample_year)]
+
+# Calculate running cumulative gross precip for each storm
+rr_dat[, cumulative_gross_precip_cm := cumsum(gross_precip_cm),
+       by = .(storm_id)]
+
+# Add interception
+rr_dat[interception,
+       i_cm := i.i_cm,
+       on = c("site", "site_status", "season")]
+
+# Calculate cumulative net precip by removing interception losses
+rr_dat[, cumulative_net_precip_cm := cumulative_gross_precip_cm - i_cm]
+
+# Remove negative net precip values
+rr_dat[, cumulative_net_precip_cm := pmax(0, cumulative_net_precip_cm)]
+
+# Change periods of cumulative net precip to 'dry'
+rr_dat[cumulative_net_precip_cm == 0,
+       storm := "dry"]
+
+# Recalculate storm ID based on net_precip storms
+rr_dat[, storm_id := paste(.BY[[1]], .BY[[2]], rleid(storm), sep = "-"), 
+       by = .(site, sample_year)]
+
+# Calculate cumulative change in water level
+rr_dat[, cumulative_Ds_cm := cumsum(Ds_cm),
+       by = .(storm_id)]
+
+# Calculate elapsed time and total storm length
+rr_dat[, elapsed_time_hr := as.numeric(difftime(sample_time, min(sample_time), units = "hours")),
+       by = .(storm_id)]
+rr_dat[, storm_length_hr := max(elapsed_time_hr),
+       by = .(storm_id)]
+
+# Add preceding dry period length
+rr_dat[, preceding_dry_hr := shift(storm_length_hr, 1)]
+rr_dat[, preceding_dry_hr := first(preceding_dry_hr), 
+       by = .(storm_id)]
+
+# Calculate Esy
+rr_dat[, esy := cumulative_net_precip_cm / cumulative_Ds_cm]
+
+# Calculate precip intensity 
+rr_dat[, precip_intensity := cumulative_net_precip_cm / elapsed_time_hr]
+
+# There is a declining impact of precip for long precipitation events. The
+# responses of ESy to water level looks like a recession curve within a single 
+# storm
+ggplot(rr_dat[storm == "storm", first(.SD, n = 4 * 3), by = .(storm_id)],
+       aes(x = water_level_cm,
+           y = esy)) +
+  geom_point() + 
+  facet_wrap(~site,
+             scales = "free") +
+  scale_y_log10()
+
+
+ggplot(rr_dat[storm == "storm", last(.SD), by = .(storm_id)],
+       aes(x = water_level_cm,
+           y = esy)) +
+  geom_point() + 
+  facet_wrap(~site,
+             scales = "free")
+
+# Non-linear Sy -----------------------------------------------------------
+
+# Bad precip estimates
+# sy_dat <-
+#   sy_dat[!(site == "006" & sy > 4 |
+#            site == "111" & sample_date %in% ymd(c("2015-08-09", "2017-07-06", "2018-07-12")) |
+#            site == "009" & sy > 1.5)]
+# 
+# 
+# nl_sy <- 
+#   sy_dat[24 * precip_intensity_cm_hr > i_cm]
+# 
+# nl_sy[,
+#        init_b := .SD[water_level_cm <= quantile(water_level_cm, 0.1, na.rm = TRUE),
+#                      mean_na(sy)],
+#        by = .(site)]
+# 
+# nl_sy[,
+#        init_c := .SD[sy == max_na(sy),
+#                        mean_na(water_level_cm)],
+#        by = .(site)]
+# 
+# nl_sy[,
+#        init_m := 1 / init_c]
+# 
+# nl_mods <-
+#   nl_sy[,
+#          .(mod = list(nls(sy ~ b + m ** (water_level_cm - c),
+#                             start = list(b = unique(init_b), m = 1.25,  c = unique(init_c)),
+#                             # maxit = 100,
+#                             control = nls.control(warnOnly = TRUE),
+#                             na.action = na.exclude,
+#                             data = .SD))),
+#          by = .(site)]
+# #
+# nl_mods[, c("b", "m", "c") := map_dfr(mod, coef)]
+# 
+# nl_sy[nl_mods, pred_sy := i.b + i.m ** (water_level_cm - i.c), on = "site"]
+# 
+# ggplot(nl_sy,
+#        aes(x = water_level_cm, y = sy)) +
+#   geom_point() +
+#   geom_line(aes(y = pred_sy), color = "red") +
+#   geom_smooth(method = glmrob,
+#               formula = y ~ x + I(x^2),
+#               se = FALSE,
+#               method.args = list(family = Gamma(inverse))) +
+#   facet_wrap(~site, scales = "free")
+
+# GLM Sy ------------------------------------------------------------------
+# Haven't looked at combining multi-day precip events. Or removing days with 
+# preceeding precipitation
+
+sy_dat <- 
+  daily_water_balance[net_precip_cm > 0 & season == "growing", 
+                      .(site,
+                        season,
+                        sample_date,
+                        water_level_cm = min_water_level_cm,
+                        i_cm = first(i_cm),
+                        Ds_cm,
+                        Dl_signed_cm,
+                        Dl_time_range_s,
+                        net_precip_cm,
+                        precip_intensity_cm_hr)]
+
+sy_dat[, sy := net_precip_cm / Dl_signed_cm]
+
+# Less than 1.1 to remove problem points from bad precip estimates
+# I was clipping out sy > 1.1 because there were some bad precip estimates. I
+# have found and corrected most of those and only have ~2 questionable esimates
+# of sy now. Some storms still show no actual response (or a muted responsed) 
+# and so Dwt goes down over the course of the day
+
+# Do one of these two removals
+# # Remove sy_dat less than 0 (for low/high models)
+# sy_dat <-
+#   sy_dat[sy > 0]
+
+sy_dat <-
+  sy_dat[24*precip_intensity_cm_hr > i_cm]
+
+
+sy_dat <- 
+  sy_dat[!(site == "157" & water_level_cm < -50) &
+           !(site %in% c("006", "009") & sy > 3)]
+
+# Clip some extremely high water levels
+sy_dat[, upper_x := median_na(water_level_cm) + 1.28 * mad(water_level_cm, na.rm = TRUE),
+       by = .(site)]
+sy_dat <-
+  sy_dat[water_level_cm <= upper_x]
+
+# Sy needs to be adjusted for precip intensity, which is derived as net precip
+# divided by the time difference between min and max water levels
+
+ggplot(sy_dat,
+       aes(x = precip_intensity_cm_hr,
+           y = sy)) +
+  geom_point() +
+  facet_wrap(~site, scales = "free")
+
+# Rather than adjust for intensity, we can remove low-intensity/small storms and
+# it strengthens the exponential/gamma fit 
+ggplot(sy_dat[sy > 0],
+       aes(x = water_level_cm,
+           y = sy)) +
+  geom_point() + 
+  geom_point(data = sy_dat[24*precip_intensity_cm_hr > i_cm],
+             color = "red") + 
+  geom_smooth(method = glm,
+              method.args = list(family = Gamma(inverse)),
+              se = FALSE, 
+              formula = y ~ x + I(x^2)) + 
+  geom_smooth(data = sy_dat[24*precip_intensity_cm_hr > i_cm], 
+              method = glm, 
+              method.args = list(family = Gamma(inverse)), 
+              se = FALSE, 
+              linetype = "dotted",
+              formula = y ~ x + I(x^2)) + 
+  facet_wrap(~site, scales = "free")
+
+
+ggplot(sy_dat,
+       aes(x = water_level_cm,
+           y = sy)) +
+  geom_point() + 
+  geom_smooth(method = robustbase::glmrob,
+              method.args = list(family = Gamma(inverse)),
+              se = FALSE,
+              formula = y ~ x,
+            color = "blue") +
+  geom_smooth(method = robustbase::glmrob,
+              method.args = list(family = Gamma(inverse)),
+              se = FALSE,
+              formula = y ~ x + I(x^2),
+            linetype = "dashed",
+            color = "blue") +
+  facet_wrap(~site, scales = "free")
+
+
+
+# sy_dat <- 
+#   sy_dat[!(site == "156" & water_level_cm > 30)]
+
+# Large storms result in Hortonian overland flow, which likely pulses streamflow,
+# resulting in lower delta WL. This means Sy is lower than would be predicted for
+# the same amount of precip at a lower intensity. This could potentially be 
+# remedied by looking at storm events
+
+# GLM performs better than NL approach as measured by RMSE of daily ET vs PET
+# Additionally quadratic GLM works better than linear
+
+# RMSE of ET, PET for GLMs:
+  # With outliers of et greater than 0.5 removed:
+  # site   uni_rmse  quad_rmse
+  # 006 0.10449259 0.09904485
+  # 009 0.09186648 0.09197557
+  # 053 0.09173676 0.09185025
+  # 077 0.09910674 0.09971839
+  # 111 0.09228345 0.09273795
+  # 113 0.11032220 0.11062702
+  # 119 0.10024449 0.08804028
+  # 135 0.10593098 0.10539962
+  # 139 0.09841121 0.09712307
+  # 140 0.11733474 0.11720316
+  # 151 0.10111083 0.09981528
+  # 152 0.11195858 0.11091667
+  # 156 0.09877201 0.08868542
+  # 157 0.09595529 0.09685958
+
+  # Without outliers removed:
+  # site   uni_rmse  quad_rmse
+  # 006 1.04136006 0.12778260
+  # 009 0.12049691 0.12106574
+  # 053 0.12071625 0.10568511
+  # 077 0.17703904 0.18321488
+  # 111 0.10690248 0.09273795
+  # 113 0.28465484 0.11225210
+  # 119 0.80264890 0.08804028
+  # 135 0.34114639 0.14128561
+  # 139 0.25580621 0.12745262
+  # 140 0.39746485 0.15926680
+  # 151 0.37738213 0.10801099
+  # 152 0.11967333 0.11240844
+  # 156 0.86780250 0.09194840
+  # 157 0.09960029 0.10404289
+
+# R^2 of square-root transformed PET and calculated ET
+# flow_eval[, .(uni_rmse = cor(et_uni_cm_d, sqrt(pet_cm_d), 
+#                              use = "pairwise.complete",
+#                              method = "spearman")^2, 
+#               quad_rmse = cor(et_quad_cm_d, pet_cm_d, 
+#                               use = "pairwise.complete",
+#                               method = "spearman")^2),
+#           by = .(site)]
+
+    # site   uni_rmse  quad_rmse
+    # 006 0.03701899 0.04797261
+    # 009 0.23565416 0.23575935
+    # 053 0.15123796 0.16354319
+    # 077 0.07540678 0.07455430
+    # 111 0.19127962 0.19395045
+    # 113 0.09179230 0.10021615
+    # 119 0.15100786 0.19678138
+    # 135 0.13064624 0.12077897
+    # 139 0.08497514 0.07668538
+    # 140 0.09795278 0.10035826
+    # 151 0.11715590 0.11919963
+    # 152 0.17469229 0.18107918
+    # 156 0.21186710 0.22485594
+    # 157 0.17138341 0.15422581
+
+# Fit Models
+# Visually the high model and the quad model show the best forms for et_index ~ water_level_cm
+# Need to evaulate RMSE of ET:PET of low/no flow water levels to tell which 
+# accutaly performs better. Also comparing the ET:PET > 1 with streamflow at the
+# paired watersheds would be good
+# ggplot(daily_flows, 
+#        aes(x = water_level_cm, y = et_index)) + 
+#   geom_point() + 
+#   facet_wrap(~site, scales = "free") + 
+#   scale_y_log10() + 
+#   labs(title = "uni sy", 
+#        caption = "Ratio of ET:PET as a function of water level. When ET:PET > 1,
+#        or greater than it's usual median value (or maybe there's a linear trend
+#        there), we can assume streamflow is the excess." )
+#   geom_hline(aes(yintercept = 1))
+
+sy_mods <- 
+  sy_dat[, # between(net_precip_cm, 0.5, 1), 
+         .(mod = list(glmrob(sy ~ water_level_cm,
+                             family = Gamma(inverse))),
+           mod_quad = list(glmrob(sy ~ water_level_cm + I(water_level_cm^2),
+                                  family = Gamma(inverse)))
+           # ,mod_high = list(glmrob(sy ~ water_level_cm,
+           #                         family = Gamma(inverse),
+           #                        data = .SD[24*precip_intensity_cm_hr >= i_cm])),
+           # mod_low = list(glmrob(sy ~ water_level_cm,
+           #                       family = Gamma(inverse),
+           #                       data = .SD[24*precip_intensity_cm_hr < i_cm]))
+           # mod_ratio = list(glmrob(sy_ratio ~ water_level_cm,
+           #                         family = Gamma(inverse)))
+           ),
+         by = .(site)]
+
+
+sy_dat[site %in% sy_mods$site, 
+       `:=`(pred_sy = predict(sy_mods[.BY[[1]], mod[[1]], on = "site"], 
+                          newdata = .SD,
+                          type = "response"),
+            quad_sy = predict(sy_mods[.BY[[1]], mod_quad[[1]], on = "site"], 
+                              newdata = .SD,
+                              type = "response"),
+            high_sy = predict(sy_mods[.BY[[1]], mod_high[[1]], on = "site"],
+                              newdata = .SD,
+                              type = "response"),
+            low_sy = predict(sy_mods[.BY[[1]], mod_low[[1]], on = "site"],
+                              newdata = .SD,
+                              type = "response")
+            ), 
+       by = .(site)]
+
+# sy_dat[, `:=`(pred_sy = pmin(1, pred_sy),
+#               quad_sy = pmin(1, quad_sy))]
+
+ggplot(sy_dat,
+       aes(x = water_level_cm,
+           y = sy)) +
+  geom_point() + 
+  geom_line(aes(y = pred_sy),
+            color = "blue") +
+  geom_line(aes(y = quad_sy),
+            linetype = "dashed",
+            color = "blue") +
+  geom_line(aes(y = low_sy),
+            linetype = "dotted",
+            color = "blue") +
+  facet_wrap(~site, scales = "free")
+
+# It may be worth using the non-linear models which have an asymptote at low
+# water levels. The quadratic form could result in extremely low estimates of
+# sy when predicting outside the water level range of sy dat
+
+# Daily water balance from McLaughlin, 2019 -------------------------------
+# water_balance[interception,
+#               `:=`(i_cm = i.i_cm,
+#                    net_precip_cm = pmax(0, precip_cm - i.i_cm)),
+#               on = c("site", "site_status", "season")]
+
+daily_water_balance[daily_ex_met,
+                    `:=`(exrad_pet_hs_cm = i.exrad_pet_hs_cm,
+                         harad_pet_hs_cm = i.harad_pet_hs_cm,
+                         obsrad_pet_hs_cm = i.obsrad_pet_hs_cm),
+                    on = c("sample_date")]
+
+daily_water_balance[site %in% sy_mods$site, 
+                    sy := predict(sy_mods[.BY[[1]], mod_quad[[1]], on = "site"], 
+                                  newdata = .SD[, .(water_level_cm = i_water_level_cm)],
+                                  type = "response"), 
+                    by = .(site)]
+
+daily_water_balance[, 
+                    net_flow := Ds_cm * sy - net_precip_cm + harad_pet_hs_cm,
+                    by = .(site, sample_date)]
+
+ggplot(daily_water_balance[sy_dat[, unique(.SD), .SDcols = c("site", "upper_x")], on = "site"][i_water_level_cm < upper_x],
+       aes(x = i_water_level_cm,
+           y = net_flow)) +
+  geom_point() +
+  facet_wrap(~site, 
+             scales = "free")
+
+# Separate Flows ----------------------------------------------------------
+
+water_balance[site %in% sy_mods$site, 
+              sy := predict(sy_mods[.BY[[1]], mod_quad[[1]], on = "site"], 
+                            newdata = .SD,
+                            type = "response"), 
+              by = .(site)]
+
+# # Add asymptote for sy at low water levels:
+# water_balance[sy_dat[,
+#                      .(lower_thresh = quantile(water_level_cm, 0.1, na.rm = TRUE),
+#                        b = .SD[water_level_cm <= quantile(water_level_cm, 0.1, na.rm = TRUE),
+#                                mean_na(sy)]),
+#                      by = .(site)],
+#               sy := fifelse(water_level_cm < i.lower_thresh,
+#                             i.b,
+#                             sy),
+#               on = "site"]
+
+dat <- 
+  water_balance[, .(data = list(.SD)),
+                by = .(site, sample_year)]
+
+
+dat[, data := map(data, calculate_detrended_g)]
+dat[, data := map(data, calculate_delta_s)]
+dat[, data := map(data, calculate_et)]
+dat[, data := map(data, adjust_water_balance)]
+
+
+flows <- 
+  dat[, data[[1]], by = .(site, sample_year)]
+
+hourly_flows <- 
+  flows[, 
+        .(sy = mean_na(sy),
+          water_level_cm = mean_na(water_level_cm),
+          precip_cm = first(precip_cm),
+          Ds_cm = sum(Ds_cm),
+          i_water_level_cm = first(water_level_cm),
+          f_water_level_cm = last(water_level_cm),
+          corrected_gamma_m = mean_na(corrected_gamma_m),
+          corrected_Gamma_cm_s = mean_na(corrected_Gamma_cm_s),
+          g_cm_hr = sum_na(corrected_net_in_cm_s),
+          et_cm_hr = sum_na(corrected_et_cm_s)),
+        by = .(site, sample_time = floor_date(sample_time, "hour"))]
+
+# Check that water balance and water level change match
+ggplot(hourly_flows[, .(site, 
+                        sample_time, 
+                        sy, 
+                        Ds_cm = Ds_cm * sy,
+                        WB = (g_cm_hr - et_cm_hr))], 
+       aes(x = Ds_cm, y = WB)) + 
+  geom_abline() + 
+  geom_point() + 
+  facet_wrap(~site, scales = "free")
+
+
+hourly_flows[ex_met, 
+             `:=`(etr_cm_hr = i.etr_cm_hr,
+                  pet_hs_cm_hr = i.pet_hs_cm_hr),
+             on = "sample_time"]
+
+hourly_flows[, et_resid := et_cm_hr - etr_cm_hr]
+hourly_flows[, et_index := et_cm_hr/etr_cm_hr]
+
+daily_flows <- 
+  hourly_flows[, 
+               .(sy = mean_na(sy),
+                 water_level_cm = min_na(water_level_cm), 
+                 Ds_cm = last(f_water_level_cm) - first(i_water_level_cm),
+                 precip_cm = first(precip_cm),
+                 etr_cm_d = sum_na(etr_cm_hr), 
+                 g_cm_d = sum_na(g_cm_hr),
+                 et_cm_d = sum_na(et_cm_hr)), 
+               by = .(site, sample_date = as.Date(sample_time, tz = "EST"))]
+
+# Check that water balance and water level change match
+ggplot(daily_flows[, .(site, 
+                       sample_date, 
+                       sy, 
+                       Ds_cm = Ds_cm * sy,
+                       WB = g_cm_d - et_cm_d)], 
+       aes(x = Ds_cm, y = WB)) + 
+  geom_abline() + 
+  geom_point() + 
+  facet_wrap(~site, scales = "free")
+
+daily_flows[water_balance, 
+            `:=`(treatment = i.treatment, 
+                 treatment_period = i.treatment_period,
+                 site_status = i.site_status,
+                 season = i.season), 
+            on = c("site", "sample_date")]
+
+daily_flows[daily_ex_met,
+  `:=`(obsrad_pet_hs_cm = i.obsrad_pet_hs_cm,
+       pet_hs_cm_summed = i.pet_hs_cm_summed,
+       harad_pet_hs_cm = i.harad_pet_hs_cm,
+       exrad_pet_hs_cm = i.exrad_pet_hs_cm),
+  on = "sample_date"]
+
+daily_flows[daily_water_balance,
+            `:=`(i_cm = i.i_cm,
+                 net_precip_cm = i.net_precip_cm),
+            on = c("site", "sample_date")]
+
+daily_flows[, `:=`(et_resid = et_cm_d - obsrad_pet_hs_cm,
+                   et_index = et_cm_d / obsrad_pet_hs_cm)]
+
+ggplot(daily_flows[precip_cm == 0 & site_status == "Control"],
+       aes(y = et_cm_d, 
+           x = harad_pet_hs_cm)) + 
+  geom_point() + 
+  geom_smooth(method = lmrob,
+              formula = y ~ 0 + x) +
+  facet_wrap(~site, scales = "free")
+
+ggplot(daily_flows[precip_cm == 0 & site_status == "Control"], 
+       aes(x = water_level_cm, y = et_index)) + 
+  geom_point() + 
+  facet_wrap(~site, scales = "free")
+
+# Adjust Flows ------------------------------------------------------------
+# The nls() models fit below are not final! They need to be improved.
+
+
+ggplot(daily_flows[precip_cm == 0 & et_resid < 5], 
+       aes(x = water_level_cm, y = et_resid)) + 
+  geom_point() + 
+  geom_smooth(method = nlrob, formula = y ~ b + m * exp(c*x), 
+              se = FALSE, 
+              method.args = list(start = list(b = -0.1, m = 0.2, c = 0.1), 
+                                 maxit = 200,
+                                 control = nls.control(maxiter = 500, minFactor = 2^(-16)))) +
+  facet_wrap(~site, scales = "free")
+
+flow_adjust_mods <- 
+  daily_flows[sy_dat[, .(upper_x = first(upper_x)), by = .(site)], 
+              on = "site"
+              ][precip_cm == 0]
+
+flow_adjust_mods <- 
+  flow_adjust_mods[, .(dat = list(.SD)), keyby = .(site)]
+
+flow_adjust_mods[, mod := map(dat, 
+                              ~nlrob(et_resid ~ b + water_level_cm + m * exp(c*water_level_cm),
+                                    data = .x,
+                                    start = list(b = -0.1, m = 0.2, c = 0.1),
+                                    na.action = na.exclude,
+                                    # maxit = 200,
+                                    control = nls.control(warnOnly = TRUE, maxiter = 500, minFactor = 2^(-16))))]
+
+daily_flows[, flow_cm := predict(flow_adjust_mods[.BY[[1]], mod[[1]]],
+                                 newdata = .SD),
+            by = .(site)]
+
+ggplot(daily_flows[precip_cm == 0 & site_status == "Control"],
+       aes(x = water_level_cm, 
+           y = flow_cm)) + 
+  geom_point() + 
+  facet_wrap(~site, scales = "free")
+
+daily_flows[, aet_cm_d := et_cm_d - flow_cm]
+
+daily_flows[, sample_month := month(sample_date)]
+
+ggplot(daily_flows[precip_cm == 0 & site_status == "Control" & aet_cm_d < 1.5],
+       aes(x = obsrad_pet_hs_cm,
+           y = aet_cm_d,
+           color = as.factor(sample_month))) + 
+  geom_point() + 
+  geom_abline() +
+  geom_smooth(method = lmrob,
+              formula = y ~ 0 + x,
+              se = FALSE) +
+  facet_wrap(~site, scales = "free")
+
+# R-squared of ET estimation
+daily_flows[precip_cm == 0 & site_status == "Control", 
+            .(mod = list(lmrob(aet_cm_d ~ 0 + harad_pet_hs_cm))), 
+            by = .(site)][, `:=`(slope = map_dbl(mod, ~coef(.x)[[1]]), 
+                                 r_squared = map_dbl(mod, ~summary(.x)$adj.r.squared),
+                                 p_value = map_dbl(mod, ~(summary(.x)$coefficients)[4]),
+                                 rmedianse_cm = map_dbl(mod, ~sqrt(median(resid(.x)^2))),
+                                 rmedianse_pct = map_dbl(mod, ~100 * sqrt(median((resid(.x)/fitted(.x))^2))))][]
+
+# Removing Sy from all low intensity storms (harad for resid calcuation. Rerun with obsrad)
+# site         mod     slope r_squared       p_value   rmse_cm  rmse_pct
+# 009 <lmrob[23]> 1.0468900 0.8075816  1.816937e-60 0.1517488  2.733062
+# 053 <lmrob[23]> 0.7229603 0.7679042  3.822383e-33 0.1486921 18.708524
+# 077 <lmrob[23]> 0.8961368 0.6121542  9.104044e-27 0.3261004  5.657638
+# 111 <lmrob[23]> 0.8305789 0.7343130  1.637171e-86 0.2093083  2.357422
+# 113 <lmrob[23]> 0.9326998 0.8234367 4.068339e-139 0.2098048  3.859579
+# 119 <lmrob[23]> 1.1374668 0.7416650  1.103770e-44 0.2151114  1.802269
+# 135 <lmrob[23]> 0.8733030 0.7535042 4.053265e-121 1.0305379  6.601660
+# 139 <lmrob[23]> 1.2030189 0.7758504  1.013224e-24 0.2289345  3.522902
+# 140 <lmrob[23]> 1.0052801 0.8731178  4.770734e-80 0.1931104  4.473873
+# 151 <lmrob[23]> 1.0016261 0.6794711  1.336575e-35 6.5952237 43.204789
+# 152 <lmrob[23]> 0.9053358 0.8835780 7.342773e-179 0.1295101  2.166442
+# 156 <lmrob[23]> 1.0722171 0.8106684  6.811327e-60 0.1843767  2.289339
+# 157 <lmrob[23]> 0.7809795 0.6439957  8.888347e-83 0.2089187  2.952013
+
+# Removing only negative Sy
+# site         mod     slope r_squared       p_value   rmse_cm  rmse_pct
+# 009 <lmrob[23]> 1.0762209 0.8139123  4.611856e-66 0.1587956  3.527756
+# 053 <lmrob[23]> 0.8123119 0.7845350  3.553563e-40 0.1456170 18.855250
+# 077 <lmrob[23]> 1.0496294 0.7384602  1.277528e-40 0.2407469  4.326870
+# 111 <lmrob[23]> 0.8717127 0.7658312  4.112514e-92 0.2053895  2.240297
+# 113 <lmrob[23]> 0.7447574 0.8255592 3.271574e-136 0.1312721  3.421390
+# 119 <lmrob[23]> 1.1289198 0.6791274  1.116394e-38 0.2304309  1.856575
+# 135 <lmrob[23]> 0.9778028 0.8108758 2.796589e-149 0.3391158  2.419453
+# 139 <lmrob[23]> 1.1896962 0.7935207  1.672269e-27 0.2082007  3.322835
+# 140 <lmrob[23]> 0.7330046 0.8626001  4.489006e-80 0.1787243  4.544009
+# 151 <lmrob[23]> 0.9955179 0.7437711  4.851038e-35 0.2272365  5.416622
+# 152 <lmrob[23]> 0.9341568 0.8948362 9.721541e-190 0.1228548  2.269515
+# 156 <lmrob[23]> 1.1766212 0.8359266  7.862597e-66 0.1912364  2.016008
+# 157 <lmrob[23]> 0.8869471 0.6754919  8.550353e-90 0.2120567  2.226756
+
+
+# Check Flow Against Flume Stage ------------------------------------------
+
+flume <- 
+  fread("../Data/Raw/Manually_Entered/well_and_flume_measurements.csv",
+        select = c(site = "numeric", location = "character", 
+                   sample_date = "character", manual_level = "numeric", 
+                   value_unit = "character"))
+
+flume[, sample_date := mdy(sample_date)]
+flume[, site := sprintf("%03d", site)]
+flume <- flume[location == "fl"]
+flume[value_unit == "ft", manual_level := manual_level * 25.4]
+
+daily_flows[flume, 
+            flume_stage_cm := i.manual_level,
+            on = c("site", "sample_date")]
+
+## LOOK AT 2013 FLUME STAGE
+daily_flows[, flume_stage_cm := ifelse(year(sample_date) == 2013, 
+                                       0.1 * flume_stage_cm, 
+                                       flume_stage_cm)]
+
+
+daily_flows[, offset_flow := flow_cm - min_na(flow_cm), by = .(site)]
+
+ggplot(daily_flows[!is.na(flume_stage_cm) & flow_cm < 20],
+       aes(x = flow_cm,
+           y = flume_stage_cm,
+           color = site_status)) +
+  geom_point() +
+  facet_wrap(~ site,
+             scales = "free")
+
+daily_flows[!is.na(flume_stage_cm), 
+            .(mod = list(lmrob(flume_stage_cm ~ 0 + offset_flow))), 
+            by = .(site)][, `:=`(slope = map_dbl(mod, ~coef(.x)[[1]]), 
+                                 r_squared = map_dbl(mod, ~summary(.x)$adj.r.squared),
+                                 p_value = map_dbl(mod, ~(summary(.x)$coefficients)[4]),
+                                 rmedianse_cm = map_dbl(mod, ~sqrt(median(resid(.x)^2))),
+                                 rmedianse_pct = map_dbl(mod, ~100 * sqrt(median((resid(.x)/fitted(.x))^2))))][]
+
+
+
+
+
+# Net Inflow Drivers ------------------------------------------------------
+
+daily_flows[, cumulative_precip_cm := cumsum(precip_cm),
+            by = .(site, year(sample_date))]
+
+daily_flows[, cumulative_pet_cm := cumsum(obsrad_pet_hs_cm),
+            by = .(site, year(sample_date))]
+
+daily_flows[, water_availability := cumulative_precip_cm - cumulative_pet_cm]
+daily_flows[, water_index := cumulative_pet_cm / cumulative_precip_cm]
+
+
+ggplot(daily_flows[!is.na(g_cm_d) & !is.na(water_index) & precip_cm == 0],
+       aes(x = water_index,
+           y = g_cm_d)) +
+  geom_point() + 
+  facet_wrap(~site,
+             scales = "free")
 
