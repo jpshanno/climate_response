@@ -1,0 +1,165 @@
+---
+title: "Integrating the Effects of Climate Change and Invasive Species on Wetland Ecohydrology to Evaluate Management Options"
+subtitle: ""
+author: "Joe Shannon"
+institute: "College of Forest Resources and Environmental Science,</br>Michigan Technological University"
+date: "AGU Fall Meeting 2020"
+output:
+  xaringan::moon_reader:
+    css: [xaringan-themer.css]
+    self_contained: false
+    lib_dir: libs
+    nature:
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+options(htmltools.dir.version = FALSE)
+library(tidyverse)
+library(lubridate)
+library(jpshanno)
+load_liberation_fonts()
+```
+
+```{r theming, include = FALSE}
+library(xaringanthemer)
+style_mono_light(base_color = "#1c5253",
+                 background_color = "#FFF",
+                 # footnote_font_size = "0.6em",
+                 header_h1_font_size = "45px",
+                 header_h2_font_size = "35px",
+                 header_h3_font_size = "25px",
+                 extra_css = list("li" = list("margin" = "0.75em 0")))
+```
+## Presentation Overview
+Not just an outline of the presentation (Should be graphical: flowchart like
+showing map of MI/Ash Importance, zoom in on wetlands, show three big drivers (EAB, Climate,
+Mgmt), end with question about what it means). 
+Present broad methodology overview 'I ran *statistical wetland
+simulations* under current climate and future climate conditions to study the
+interactions of invasive species, climate change, and forest management
+decisions on forested wetland ecosystems'
+
+---
+## Problem Context
+### Black Ash
+.pull-left[
+- Northern deciduous hardwood well adapted to wet/flood conditions  
+- Dominant hardwood in northern forested wetlands
+- Culturally important for indigienous communies
+]
+.pull-right[
+**PICTURE OF BLACK ASH WETLAND**
+**MAP OF Ash IV**
+]
+
+---
+count:false
+## Problem Context
+
+### Black Ash & Emerald Ash Borer (EAB)
+
+.pull-left[
+- Invasive wood-borer
+- First found in SE Michigan, USA in 2002
+- Now in XXX states & provinces
+- Impacts all North American ash
+]
+.pull-right[
+**PICTURE OF EAB**
+**FILL IN STATES IN ASH IV MAP SHOWING DETECTS**
+]
+
+---
+count:false
+## Problem Context
+
+### Black Ash & EAB & Climate
+
+.pull-left[
+- Increased Precip Variability
+- Decreased Summer Precip
+- Decreased snowcover
+]
+.pull-right[
+**figure from Byun or Nataro**
+]
+
+---
+## Where Does this Leave Us?
+
+**IMAGES OF FORESTED WETLAND, HERBACEOUS/SHRUB RESPONSE, & SEEDINGLINGS/PLANTING**
+
+???
+Talk about Iverson here?
+
+---
+## Data Collection
+.pull-left[
+- 14 black ash wetlands in Western Upper Peninsula of Michigan (map of Great Lakes)
+- 2012 water level monitoring began
+- Winter 2013-2014 simulated EAB infestation 
+- Found decreased water level drawdown & increased late summer water levels
+- Strong local/intermediate groundwater signal well into/through the growing season
+]
+
+.pull-right[
+**Figures from sapflux & water level papers**
+]
+
+---
+## Wetland Water Level Model Methodology
+- Model daily water level change
+- Statistical Model Based on Daily precip, minimum temperature, maximum temperature
+- Model derivation flowchart:  
+sy_mod  
+intercept -> precip_rise -> gross_inflows  
+PET : water availability on days without rain -> gross_outflows  
+streamflow -> 
+
+---
+## Wetland Model Validation
+- Might be able to do validations based on simulations from observed data
+- 
+
+---
+## Climate Data Background
+- GFDL-CM3  
+- Figure from @byun-2018  
+- LOCA downscaled daily projections  
+- Future climate used years from 2070-2099  
+- Selected 100 pixel time series from the study area to serve as 3000 annual 
+weather sequences  
+
+---
+# Results under Current Climate
+
+---
+# Results under Future Climate
+- Define wetland morphology groups
+
+---
+# Comparison of Results
+- Compare within treatment between climates  
+- Compare difference between treatments given climate  
+- Any wet year vs dry year differences?
+- Need to at least have basic met differences between simulations if any 
+water level differences are present
+
+---
+## Future Work
+- Bookend climate simulation selection - Current selection represents more
+sensitive model and least control on emissions. Next will represent less
+sensitive model  
+- Improve Model through Rigorous Validation  
+- Move from LOCA-projected daily values to spatially-explicit SWG with forcing
+from LOCA-projections  
+- Transition from discrete models to a distribution of possible parameters to 
+capture a wider range of variation
+- Compare my work with Iverson
+
+???
+- Improve from water_availability (need to get it from January 1st)
+- Incorporate ARIMA components
