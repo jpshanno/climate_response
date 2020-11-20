@@ -625,7 +625,7 @@ ggplot(daily_water_balance[dry_days == 1 & site_status == "Control" & storm_prec
 # Water Budget ------------------------------------------------------------
 
 # Inflows | Outflows
-# --------|---------
+#   --    |    --
 # Precip  | Interception
 # GW      | Precip Recession
 # Melt    | ET
@@ -636,11 +636,7 @@ ggplot(daily_water_balance[dry_days == 1 & site_status == "Control" & storm_prec
 # Melt Model
 
 # Working in Water Level Space
-# = fifelse(month(sample_date) %in% 6:8 |
-#             (month(sample_date) == 5 & mday(sample_date) > 15) |
-#             (month(sample_date) == 9 & mday(sample_date) <= 15),
-#           "growing",
-#           "dormant")
+
 water_budget <- 
   daily_water_balance[between(month(sample_date), 6, 10), 
                       .(sample_date, 
@@ -777,6 +773,7 @@ wb_mods <-
 # Precip rise mod ---------------------------------------------------------
 # For future model this could be improved by using quantile regression to get at
 # the change variance of response to storm size
+# Check high rise values against hyetograph to see if they are from well bottom-outs
 ggplot(water_budget[net_precip_cm > 0 & Dl_signed_cm > 0],
        aes(x = net_precip_cm,
            y = Dl_signed_cm,
@@ -803,12 +800,14 @@ wb_mods[,
 # Residual Check
 ggplot(data = water_budget[net_precip_cm > 0 & Dl_signed_cm > 0, 
                            .(net_precip_cm, 
+                             site,
                              std_resid = as.numeric(scale(predict(wb_mods[.BY[[1]], precip_rise[[1]]], newdata = .SD) - Ds_cm))), 
                            by = .(site_status)],
        aes(x = net_precip_cm,
            y = std_resid)) + 
   geom_point(alpha = 0.4) +
-  facet_wrap(~site_status, 
+  geom_smooth(method = "lm") +
+  facet_wrap(~site, 
              scales = "free")
 
 
@@ -850,6 +849,12 @@ wb_mods[,
                                   ~lmer(Ds_cm ~ I(harad_pet_hs_cm^0.5) + I(harad_pet_hs_cm^0.5):cos(pi * water_availability) + (I(harad_pet_hs_cm^0.5) + I(harad_pet_hs_cm^0.5):cos(pi * water_availability) || site),
                                          data = .x[dry_days > 3 & net_precip_cm == 0]))]
 
+# Need to look at drivers of residual error from PET-only model. That may allow
+# me to identify net inflow
+
+# A quantile regression along a lower quantile would estimate maximum drawdown.
+# The netflow model may then be able to better capture net inflow
+
 # Check Fit
 ggplot(data = water_budget[dry_days > 3 & net_precip_cm == 0,
                            .(harad_pet_hs_cm,
@@ -882,6 +887,7 @@ ggplot(data = water_budget[dry_days > 3 & net_precip_cm == 0,
              scales = "free")
 
 # Residual Check
+# 113 & 119 have obsrad_pet_hs_cm off the charts compare to the other sites
 ggplot(data = water_budget[dry_days > 3 & net_precip_cm == 0,
                            .(obsrad_pet_hs_cm,
                              site,
@@ -891,8 +897,7 @@ ggplot(data = water_budget[dry_days > 3 & net_precip_cm == 0,
            y = std_resid)) +
   geom_point(alpha = 0.4) +
   geom_smooth(method = "lm") +
-  facet_wrap(~site,
-             scales = "free")
+  facet_wrap(~site)
 
 ggplot(data = water_budget[dry_days > 3 & net_precip_cm == 0,
                            .(obsrad_pet_hs_cm,
@@ -1411,6 +1416,15 @@ full_predict <-
 
 # Test Full Prediction ----------------------------------------------------
 
+# Just tried:
+# Adding cum_precip_m to PET predictors in place of water_availability <- need to check NA status
+# Net flow models changed to y ~ m1*x + m**(x + c) with weights = nobs. This better
+# captured net inflow at lower water levels
+# full_predict had to be updated to include m1 and cum_precip_m
+# 113 stepdown of Ds ~ PET at low water levels may be the result of an Sy model
+# issue. Look for sites with bad residuals at lower water levels. These may be
+# the result of Sy mode issues
+
 water_budget[daily_ex_met,
             `:=`(min_temp_c = i.min_temp_c,
                  max_temp_c = i.max_temp_c,
@@ -1430,7 +1444,7 @@ water_budget[,
                                                          mean_temp_c)]),
              by = .(site, sample_year)]
 
-YEAR <- 2014
+YEAR <- 2012
 ggplot(water_budget[sample_year == YEAR],
        aes(x = sample_date,
            color = site_status)) +
