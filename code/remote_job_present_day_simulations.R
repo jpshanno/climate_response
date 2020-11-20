@@ -197,13 +197,17 @@ present_sequences[, mean_temp_c := (tmin + tmax) / 2]
 present_sequences <- 
   present_sequences[between(month(sample_date), 6, 10)]
 
-present_sequences <- 
-  water_budget[, .(dat = list(present_sequences)), 
-    by = .(site, site_status)]
+present_sequences <-
+  CJ(site_status = c("Control", "Ash Cut", "Girdle"),
+     site = c("077", "151", "156"))[, .(dat = list(present_sequences)), by = .(site, site_status)]
 
 present_sequences <- 
   present_sequences[, dat[[1]], by = .(site, site_status)]
 
+present_sequences[starting_values[, .(water_level_cm = median(water_level_cm)), by = .(site)],
+                 start_level_cm := i.water_level_cm,
+                 on = "site"]
+cat("\n  Running Simulations \n")
 set.seed(1234)
 simulations <- 
   split(present_sequences, 
@@ -214,6 +218,7 @@ simulations <-
         "interception", "precip_rise", "pet", "flow", "esy") :=
         full_predict(hydrology_model = x$site,
                      site_status = x$site_status,
+                     initial.wl = x$start_level_cm,
                      weather = .SD[, 
                                    .(doy, 
                                      gross_precip_cm = precip / 10,
@@ -221,12 +226,12 @@ simulations <-
                                      max_temp_c = tmax,
                                      mean_temp_c)],
                      components = TRUE,
-                     random.effects = NULL)]
+                     random.effects = NA)]
   },
   mc.cores = 16) %>% 
   rbindlist()
 
-saveRDS(simulations, "simulations_1980-2009_100x.rds")
-fwrite(simulations, "simulations_1980-2009_100x.csv")
+saveRDS(simulations, "simulations_fixed_effects_1980-2009.rds")
+fwrite(simulations, "simulations_fixed_effects_1980-2009.csv")
 RPushbullet::pbPost("note", "Present Day Simulations Complete")
 

@@ -192,22 +192,23 @@ full_predict <-
 future_sequences <- 
   fread("weather_sequences_gfdl-cm3_2070-2099.csv")
 
-future_sequences
-water_budget
-
 future_sequences[, mean_temp_c := (tmin + tmax) / 2]
 
 future_sequences <- 
   future_sequences[between(month(sample_date), 6, 10)]
 
-future_sequences <- 
-  water_budget[, .(dat = list(future_sequences)), 
-    by = .(site, site_status)]
-
-future_sequences
+future_sequences <-
+  CJ(site_status = c("Control", "Ash Cut", "Girdle"),
+     site = c("077", "151", "156"))[, .(dat = list(future_sequences)), by = .(site, site_status)]
 
 future_sequences <- 
   future_sequences[, dat[[1]], by = .(site, site_status)]
+
+future_sequences[starting_values[, .(water_level_cm = median(water_level_cm)), by = .(site)],
+                 start_level_cm := i.water_level_cm,
+                 on = "site"]
+
+cat("\n  Running Simulations \n")
 
 set.seed(1234)
 simulations <- 
@@ -219,6 +220,7 @@ simulations <-
         "interception", "precip_rise", "pet", "flow", "esy") :=
         full_predict(hydrology_model = x$site,
                      site_status = x$site_status,
+                     initial.wl = x$start_level_cm,
                      weather = .SD[, 
                                    .(doy, 
                                      gross_precip_cm = precip / 10,
@@ -226,13 +228,12 @@ simulations <-
                                      max_temp_c = tmax,
                                      mean_temp_c)],
                      components = TRUE,
-                     random.effects = NULL)]
+                     random.effects = NA)]
   },
   mc.cores = 16) %>% 
   rbindlist()
 
-saveRDS(simulations, "simulations_2070-2099.rds")
-fwrite(simulations, "simulations_2070-2099.csv")
-RPushbullet::pbPost("note", "Simulations Complete")
+saveRDS(simulations, "simulations_fixed_effects_2070-2099.rds")
+fwrite(simulations, "simulations_fixed_effects_2070-2099.csv")
+RPushbullet::pbPost("note", "Future Simulations Complete")
 
-RPushbullet::pbPost("note", "Simulations Complete")
