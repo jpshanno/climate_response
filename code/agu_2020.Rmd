@@ -17,21 +17,29 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
 options(htmltools.dir.version = FALSE)
-library(tidyverse)
+library(purrr)
+library(data.table)
 library(lubridate)
 library(jpshanno)
+library(ggplot2)
+library(sf)
 load_liberation_fonts()
 ```
 
 ```{r theming, include = FALSE}
 library(xaringanthemer)
-style_mono_light(base_color = "#1c5253",
+style_mono_light(base_color = "#5982A0",
                  background_color = "#FFF",
                  # footnote_font_size = "0.6em",
                  header_h1_font_size = "45px",
                  header_h2_font_size = "35px",
                  header_h3_font_size = "25px",
-                 extra_css = list("li" = list("margin" = "0.75em 0")))
+                 extra_css = list("li" = list("margin" = "0.75em 0"),
+                                  ".left-column" = list("padding-right" = "5%"),
+                                  ".cite" = list("position" = "absolute",
+                                                 "bottom" = "1.5em",
+                                                 "padding-right" = "4em",
+                                                 "font-size" = "0.5em")))
 ```
 ## Presentation Overview
 Not just an outline of the presentation (Should be graphical: flowchart like
@@ -43,49 +51,109 @@ interactions of invasive species, climate change, and forest management
 decisions on forested wetland ecosystems'
 
 ---
-## Problem Context
-### Black Ash
-.pull-left[
+.left-column[
+## Black Ash
+]
+
 - Northern deciduous hardwood well adapted to wet/flood conditions  
 - Dominant hardwood in northern forested wetlands
-- Culturally important for indigienous communies
-]
-.pull-right[
-**PICTURE OF BLACK ASH WETLAND**
-**MAP OF Ash IV**
-]
+- Important ecologic, hydrologic, and cultural resource
+
+```{r, fig.asp=0.7, fig.out=10, fig.align="left"} 
+states <- 
+  read_sf("../data/spatial/State_Borders.geojson")
+
+states$has_eab <- 
+  !(states$state %in% c("alabama", "north dakota"))
+
+provinces <- 
+  read_sf("../data/spatial/Canadian_Provinces.geojson")
+
+ash_range <- 
+  read_sf("../data/spatial/littles_range_black_ash.gpkg")
+
+ggplot() +
+  geom_sf(data = states,
+          fill = "gray99") +
+  geom_sf(data = provinces,
+          fill = "gray99") +
+  geom_sf(data = ash_range,
+          fill = "#7DA05080",
+          color = NA) +
+  guides(fill = guide_legend(title = NULL, )) +
+  coord_sf(xlim = c(-100, -60), 
+           ylim = c(35, 55)) +
+  theme(panel.background = element_rect(fill = "gray80",
+                                        color = "gray20"),
+        panel.border = element_rect(fill = NA,
+                                    color = "gray20",
+                                    size = rel(1.5)),
+        panel.grid = element_blank())
+```
+*Black ash range shown in green*
 
 ---
 count:false
-## Problem Context
-
-### Black Ash & Emerald Ash Borer (EAB)
-
-.pull-left[
-- Invasive wood-borer
-- First found in SE Michigan, USA in 2002
-- Now in XXX states & provinces
-- Impacts all North American ash
+.left-column[
+## Black Ash
+## & EAB
 ]
-.pull-right[
-**PICTURE OF EAB**
-**FILL IN STATES IN ASH IV MAP SHOWING DETECTS**
-]
+- Emerald Ash Borer (EAB), an invasive wood-borer that impacts all North American ash
+- First detected in southeast Michigan, USA in 2002
+- Now in 40 states & provinces
+
+```{r, fig.asp=0.7, fig.out=10, fig.align="left"}
+ggplot() +
+  geom_sf(data = states,
+          fill = ifelse(states$has_eab, "gray50", "gray99")) +
+  geom_sf(data = provinces,
+          fill = "gray50") +
+  geom_sf(data = ash_range,
+          fill = "#7DA05080",
+          color = NA) +
+  guides(fill = guide_legend(title = NULL, )) +
+  coord_sf(xlim = c(-100, -60), 
+           ylim = c(35, 55)) +
+  theme(panel.background = element_rect(fill = "gray80",
+                                        color = "gray20"),
+        panel.border = element_rect(fill = NA,
+                                    color = "gray20",
+                                    size = rel(1.5)),
+        panel.grid = element_blank())
+```
+*Black ash range in green, states & provinces with EAB detections dark gray*
 
 ---
 count:false
-## Problem Context
 
-### Black Ash & EAB & Climate
+.left-column[
+## Black Ash 
+## & EAB 
+## & Climate
+]
 
-.pull-left[
-- Increased Precip Variability
-- Decreased Summer Precip
-- Decreased snowcover
+**Great Lakes Regional Changes**
+- 3.5-8 $^oC$ increase in annual temperatures & 0-25% increase in annual precipitation  
+- Temperature increase more dramatic in winter
+- Precipitation increasing in winter & spring, decreasing in the summer
+- Changes will impact black ash habitat suitability
+
+
+```{r, out.width="70%", fig.align="center"}
+knitr::include_graphics("../resources/black_ash_iv_change_reformed.png")
+```
+
+.cite[
+Map adapted from Prasad, AM; Iverson, LR; Peters, MP; Matthews, SN. 2014. Climate change tree atlas. Northern Research Station, U.S. Forest Service, Delaware, OH. http://www.nrs.fs.fed.us/atlas.
 ]
-.pull-right[
-**figure from Byun or Nataro**
-]
+
+???
+
+remark.macros.scale = function (percentage) {
+  var url = this;
+  return '<img src="' + url + '" style="width: ' + percentage + '" />';
+};
+:scale 50%](../resources/black_ash_iv_change_reformed.jpeg)
 
 ---
 ## Where Does this Leave Us?
@@ -99,10 +167,10 @@ Talk about Iverson here?
 ## Data Collection
 .pull-left[
 - 14 black ash wetlands in Western Upper Peninsula of Michigan (map of Great Lakes)
-- 2012 water level monitoring began
-- Winter 2013-2014 simulated EAB infestation 
-- Found decreased water level drawdown & increased late summer water levels
-- Strong local/intermediate groundwater signal well into/through the growing season
+- Site monitoring began in 2012
+- Simulated EAB infestation in winter 2013-2014
+- Treatment decreased water level drawdown & increased late summer water levels
+- Strong local/intermediate groundwater (snow-dominated) signal through the growing season
 ]
 
 .pull-right[
@@ -110,14 +178,11 @@ Talk about Iverson here?
 ]
 
 ---
-## Wetland Water Level Model Methodology
-- Model daily water level change
-- Statistical Model Based on Daily precip, minimum temperature, maximum temperature
-- Model derivation flowchart:  
-sy_mod  
-intercept -> precip_rise -> gross_inflows  
-PET : water availability on days without rain -> gross_outflows  
-streamflow -> 
+## Wetland Water Level Model
+
+```{r, out.width="95%", fig.align="center"}
+knitr::include_graphics("../output/Conceptual_Water_Level_Model.jpg")
+```
 
 ---
 ## Wetland Model Validation
@@ -125,8 +190,22 @@ streamflow ->
 - 
 
 ---
-## Climate Data Background
-- GFDL-CM3  
+## Future Climate Weather Series
+.pull-left[
+- GFDL-CM3, RCP 8.5
+- 2070-2099
+- Daily time-step precipitation and min/max temperature over $\frac{1}{16}^{\mathsf{o}}$ grid through LOCA (Localized Constructed Analogs) downscaling
+- Sample of 100 grid cells within the study region for a total of 3000 years of simulated
+weather conditions
+]
+.pull-right[
+**FIGURE?**
+Byun, 2018
+]
+
+???
+Current selection is for a sensitive model under the most ?extreme?
+representative concentration pathway
 - Figure from @byun-2018  
 - LOCA downscaled daily projections  
 - Future climate used years from 2070-2099  
@@ -135,9 +214,17 @@ weather sequences
 
 ---
 # Results under Current Climate
+- Run each site under control & treatment models
+**FOUR PANELS OF BEST PERFORMING MODELS88
+```{r}
+simulations[, .(pred_wl = median(wl)), by = .(site, site_status, doy)][simulations1980[, .(wl1980 = mean(wl)), by = .(site, site_status, doy)], pred_wl1980 := wl1980, on = c("site", "site_status", "doy")] %>% ggplot(aes(x = doy)) + geom_line(aes(y = pred_wl), color = "red")  + geom_line(aes(y = pred_wl1980), color = "blue") + facet_wrap(~site + site_status, scales = "free")
+```
 
 ---
 # Results under Future Climate
+
+
+???
 - Define wetland morphology groups
 
 ---
@@ -147,6 +234,11 @@ weather sequences
 - Any wet year vs dry year differences?
 - Need to at least have basic met differences between simulations if any 
 water level differences are present
+
+---
+# Compare Climate Sequences
+
+
 
 ---
 ## Future Work
@@ -159,6 +251,7 @@ from LOCA-projections
 - Transition from discrete models to a distribution of possible parameters to 
 capture a wider range of variation
 - Compare my work with Iverson
+- Incorporate snow melt timing into drawdown
 
 ???
 - Improve from water_availability (need to get it from January 1st)
