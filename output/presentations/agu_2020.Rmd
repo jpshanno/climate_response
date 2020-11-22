@@ -1,0 +1,586 @@
+---
+title: "Integrating the Effects of Climate Change and Invasive Species on Wetland Ecohydrology to Evaluate Management Options"
+subtitle: ""
+author: "Joe Shannon"
+institute: "College of Forest Resources and Environmental Science,</br>Michigan Technological University"
+date: "AGU Fall Meeting 2020"
+output:
+  xaringan::moon_reader:
+    css: [xaringan-themer.css]
+    self_contained: false
+    seal: false
+    lib_dir: libs
+    nature:
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: true
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      cache = TRUE,
+                      fig.showtext = TRUE)
+options(htmltools.dir.version = FALSE)
+library(purrr)
+library(data.table)
+library(lubridate)
+library(jpshanno)
+library(ggplot2)
+library(sf)
+library(parallel)
+library(sirad)
+library(ggforce)
+library(patchwork)
+load_liberation_fonts()
+```
+
+```{r theming, include = FALSE}
+library(xaringanthemer) 
+style_mono_light(base_color = "#5982A0",
+                 background_color = "#FFF",
+                 # footnote_font_size = "0.6em",
+                 header_h1_font_size = "45px",
+                 header_h2_font_size = "35px",
+                 header_h3_font_size = "25px",
+                 extra_css = list("li" = list("margin" = "0.75em 0"),
+                                  ".left-column" = list("padding-right" = "5%"),
+                                  ".cite" = list("position" = "absolute",
+                                                 "bottom" = "1.5em",
+                                                 "padding-right" = "4em",
+                                                 "font-size" = "0.5em")))
+
+write("@media print {
+  .has-continuation {
+    display: block !important;
+  }
+}", "xaringan-themer.css",
+append = TRUE)
+```
+class: inverse, center, middle
+
+# Integrating the Effects of Climate Change and Invasive Species on Wetland Ecohydrology to Evaluate Management Options
+### Joe Shannon<sup>1</sup>, Matt Van Grinsven<sup>2</sup>, Fengjing Liu<sup>1</sup>, Randy Kolka<sup>3</sup>
+### AGU Fall Meeting 2020
+
+1 - College of Forest Resources and Environmental Science, Michigan Technological University  
+2 - Earth Environmental and Geographical Sciences, Northern Michigan University  
+3 - USDA US Forest Service, Northern Research Station
+
+
+???
+## Presentation Overview
+Not just an outline of the presentation (Should be graphical: flowchart like
+showing map of MI/Ash Importance, zoom in on wetlands, show three big drivers (EAB, Climate,
+Mgmt), end with question about what it means). 
+Present broad methodology overview 'I ran *statistical wetland
+simulations* under current climate and future climate conditions to study the
+interactions of invasive species, climate change, and forest management
+decisions on forested wetland ecosystems'
+
+---
+.left-column[
+## Black Ash
+]
+
+- Northern deciduous hardwood adapted to flooded conditions  
+- Dominant hardwood in northern forested wetlands
+- Important ecologic, hydrologic, and cultural resource
+
+```{r black-ash-map, fig.asp=0.7, fig.out=10, fig.align="left"} 
+states <- 
+  read_sf("../../data/spatial/State_Borders.geojson")
+
+states$has_eab <- 
+  !(states$state %in% c("alabama", "north dakota"))
+
+provinces <- 
+  read_sf("../../data/spatial/Canadian_Provinces.geojson")
+
+ash_range <- 
+  read_sf("../../data/spatial/littles_range_black_ash.gpkg")
+
+ggplot() +
+  geom_sf(data = states,
+          fill = "gray99") +
+  geom_sf(data = provinces,
+          fill = "gray99") +
+  geom_sf(data = ash_range,
+          fill = "#7DA05080",
+          color = NA) +
+  guides(fill = guide_legend(title = NULL, )) +
+  coord_sf(xlim = c(-100, -60), 
+           ylim = c(35, 55)) +
+  theme_xaringan() +
+  theme(panel.background = element_rect(fill = "gray80",
+                                        color = "gray20"),
+        panel.border = element_rect(fill = NA,
+                                    color = "gray20",
+                                    size = rel(1.5)),
+        panel.grid = element_blank())
+```
+*Black ash range shown in green*
+
+---
+count:false
+.left-column[
+## Black Ash
+## & EAB
+]
+- Emerald Ash Borer (EAB), an invasive wood-borer
+- First detected in southeast Michigan, USA in 2002
+- Impacts all North American ash. Now in 40 states & provinces
+
+```{r eab-map, fig.asp=0.7, fig.out=10, fig.align="left"}
+ggplot() +
+  geom_sf(data = states,
+          fill = ifelse(states$has_eab, "gray50", "gray99")) +
+  geom_sf(data = provinces,
+          fill = "gray50") +
+  geom_sf(data = ash_range,
+          fill = "#7DA05080",
+          color = NA) +
+  guides(fill = guide_legend(title = NULL, )) +
+  coord_sf(xlim = c(-100, -60), 
+           ylim = c(35, 55)) +
+  theme_xaringan() +
+  theme(panel.background = element_rect(fill = "gray80",
+                                        color = "gray20"),
+        panel.border = element_rect(fill = NA,
+                                    color = "gray20",
+                                    size = rel(1.5)),
+        panel.grid = element_blank())
+```
+*Black ash range in green, states & provinces with detected EAB in dark gray*
+
+---
+count:false
+
+.left-column[
+## Black Ash 
+## & EAB 
+## & Climate
+]
+
+**Great Lakes Regional Changes**
+- 3.5-8<sup>o</sup>C increase in annual temperatures & 0-25% increase in annual precipitation  
+- Temperature increases more dramatic in winter
+- Precipitation increasing in winter & spring, decreasing in the summer
+- Changes will impact black ash habitat suitability
+
+
+```{r tree-atlas-maps, out.width="70%", fig.align="center"}
+knitr::include_graphics("img/black_ash_iv_change_reformed.png")
+```
+
+.cite[
+Map adapted from Prasad, AM; Iverson, LR; Peters, MP; Matthews, SN. 2014. Climate change tree atlas. Northern Research Station, U.S. Forest Service, Delaware, OH. http://www.nrs.fs.fed.us/atlas.
+]
+
+???
+
+<!-- --- -->
+<!-- ## Where Does this Leave Us? -->
+
+<!-- **IMAGES OF FORESTED WETLAND, HERBACEOUS/SHRUB RESPONSE, & SEEDINGLINGS/PLANTING** -->
+
+<!-- ??? -->
+<!-- Talk about Iverson here? -->
+
+---
+## Field Data Collection
+.pull-left[
+- 14 black ash wetlands in Western Upper Peninsula of Michigan
+
+- Monitored from 2012 with simulated EAB infestation in winter 2013-2014
+
+- Two gauged watersheds with 6" Parshall flume
+
+```{r study-map, out.width="75%", fig.align = "center"}
+knitr::include_graphics("img/Overview_Map_Color.png")
+```
+]
+
+.pull-right[
+```{r treatment-picture, out.width="75%", fig.align = "center"}
+knitr::include_graphics("img/icy_ash_cut.jpg")
+```
+
+```{r girdle-picture, out.width="75%", fig.align = "center"}
+knitr::include_graphics("img/girdle.jpg")
+```
+]
+
+---
+## Field Data Results
+- Treatment decreased water level drawdown & increased late season levels
+```{r draw-down-figure, out.width="70%", fig.align = "center"}
+knitr::include_graphics("img/Water_Level_Drawdown.jpeg")
+```
+
+- Strong local groundwater signal through the growing season
+
+```{r water-source-figure, out.width="70%", fig.align = "center"}
+knitr::include_graphics("img/Source_Water_Contributions.jpeg")
+```
+
+.cite[Figures adapted from Van Grinsven, _et al_ (2017)]
+
+---
+## Wetland Water Level Model
+
+- Statistical model to predicting daily water level change
+- Linear mixed models for each treatment status with site as the random effect
+
+Modeled Parameter | Driver | Purpose
+--- | ---
+Ecosystem Specific Yield (ESy) | Rainfall to $\Delta$ Water Level Ratio | Scale inputs to ground water response
+Interception | Gross Precipitation | Reduce gross precipitation based on canopy status
+Precipitation Rise | Net Precipitation | Water level response to precipitation inputs
+Potential Evapotranspiration (PET) | PET & Cumulative degree days | Water level response to PET pressure
+Net flow | Water level & residual $\Delta$ Water Level | Groundwater in/outflows and streamflow
+
+---
+## Water Level Model
+
+```{r water-level-model, out.width="95%", fig.align="center"}
+knitr::include_graphics("img/Conceptual_Water_Level_Model.jpg")
+```
+
+---
+## Wetland Model Validation
+
+```{r create-water-budget}
+invisible(lapply(list.files("../../tmp/models", full.names = TRUE), function(x){assign(gsub(".rds", "", basename(x)), readRDS(x), envir = .GlobalEnv)}))
+
+lambda_MJ_kg <- 
+  2.45
+
+water_budget <- 
+  wb_mods[, dat[[1]], by = .(site_status)] %>% 
+  split(by = c("site", "sample_year")) %>% 
+  mclapply(function(x){
+    x[!is.na(water_level_cm), 
+      predicted_wl_cm := full_predict(site_status = site_status, 
+                                      hydrology_model = site,
+                                      initial.wl = first(water_level_cm),
+                                      weather = .SD[, .(doy = yday(sample_date),
+                                                        gross_precip_cm = raw_precip,
+                                                        cum_dd,
+                                                        min_temp_c,
+                                                        max_temp_c,
+                                                        mean_temp_c)])]
+  },
+  mc.cores = 4) %>% 
+  rbindlist()
+```
+
+.pull-left[
+```{r water-level-error, message=FALSE, warning=FALSE, eval = FALSE}
+# ggplot(water_budget[sample_year %in% c(2012, 2013, 2017, 2018) & site %in% c("077", "119", "140", "156"), 
+#                     .(sample_date = sample_date - years(.BY[[2]]),
+#                       error_pct = (predicted_wl_cm - water_level_cm) / diff(range(water_level_cm, na.rm = TRUE))),
+#                     by = .(site, sample_year)],
+#        aes(x = sample_date)) +
+#     geom_line(aes(y = error_pct,
+#                   color = site)) +
+#     facet_wrap(~factor(sample_year), 
+#                ncol = 2,
+#                scales = "free") +
+#   theme_xaringan() +
+#   theme(strip.background = element_blank())
+library(patchwork)
+library(ggforce)
+
+split(water_budget[sample_year %in% c(2012, 2013, 2017, 2018) & site %in% c("077", "140", "156"), 
+                   .(sample_date = sample_date - years(.BY[[2]]),
+                     Ds = c(NA, diff(water_level_cm)),
+                     pred_Ds = c(NA, diff(predicted_wl_cm))),
+                   by = .(site, sample_year)],
+      by = "site") %>% 
+  map(~wrap_elements(ggplot(.x,
+                            aes(x = Ds,
+                                y = pred_Ds)) + 
+                       geom_point() +
+                       geom_abline() +
+                       labs(title = fcase(.x$site[1] == "077", "Threshold",
+                                          .x$site[1] == "140", "Flowthrough",
+                                          .x$site[1] == "156", "Closed"),
+                            y = expression(Predicted~Delta~Water~Level~(cm)),
+                            x = expression(Observed~Delta~Water~Level~(cm))) +
+                       facet_zoom(xy = between(Ds, -2, 2),
+                                  horizontal = FALSE))) %>% 
+  reduce(`+`)
+```
+<!-- *Predicted water level change relative to observed water level change* -->
+- Control site conditions had the most variable prediction errors between sites
+and years
+- Errors indicate a more sensitive drawdown model component is necessary
+
+]
+
+.pull-right[
+```{r prediction-mad}
+ggplot(model_evaluation,
+       aes(x = site_status,
+           y = abs(mad))) +
+  geom_boxplot() +
+  scale_y_continuous(labels = scales::percent) + 
+  labs(y = "Median Absolute Error\n(Observed - Predicted)",
+       x = NULL) +
+  theme_xaringan()
+```
+*Median absolute error of the predicted daily change in water level as a 
+percent of observed water level*
+]
+
+---
+## Future Climate Weather Series
+.pull-left[
+GCM | Scenario | Period
+--- | --- | ---
+GFDL-CM3 | RCP 8.5 | 2070-2099
+
+**LOCA Downscaling**
+- Localized Constructed Analogs
+- Daily projections over $\frac{1}{16}^{\mathsf{o}}$ grid
+- Precipitation and min/max temperature
+- 3000 annual weather sequences (30 years, 100 sampled grid cells)
+]
+.pull-right[
+```{r load-simulations}
+fut_weather <- 
+  fread("../../output/tabular/weather_sequences_gfdl-cm3_2070-2099.csv")
+
+pres_weather <- 
+  fread("../../output/tabular/weather_sequences_gfdl-cm3_1980-2009.csv")
+
+fut_dat <- 
+  readRDS("../../output/tabular/simulations_2070-2099.rds")[
+    site %in% c("077", "140", "156")][,
+    `:=`(treatment_period = fifelse(site_status == "Control", "Control", "Treatment"),
+         site = fcase(site == "077", "Threshold",
+                      site == "140", "Flowthrough",
+                      site == "156", "Closed"))
+  ]
+
+pres_dat <- 
+  readRDS("../../output/tabular/simulations_1980-2009.rds")[
+    site %in% c("077", "140", "156")][,
+    `:=`(treatment_period = fifelse(site_status == "Control", "Control", "Treatment"),
+         site = fcase(site == "077", "Threshold",
+                      site == "140", "Flowthrough",
+                      site == "156", "Closed"))
+  ]
+```
+
+```{r weather-time-series, fig.height=10}
+
+ggplot(fut_weather[seq_ID %in% sample(seq_ID, 8)],
+       aes(x = doy)) +
+  geom_line(aes(y = tmin),
+            color = "#5982A0") +
+  geom_line(aes(y = tmax),
+            color = "#9B5249") +
+  geom_col(aes(y = precip),
+           fill = "gray70",
+           color = NA) +
+  facet_wrap(~seq_ID,
+             ncol = 2) +
+  labs(y = "Temperature (C) / Precipitation (mm)",
+       x = "Day of Year") +
+  theme_xaringan(title_font_size = 36,
+                 text_font_size = 24) +
+  theme(strip.background = element_blank(),
+        strip.text = element_blank())
+```
+]
+
+???
+Current selection is for a sensitive model under the most ?extreme?
+representative concentration pathway
+- Figure from @byun-2018  
+- LOCA downscaled daily projections  
+- Future climate used years from 2070-2099  
+- Selected 100 pixel time series from the study area to serve as 3000 annual 
+weather sequences  
+
+---
+## Future Climate Weather Series
+
+```{r create-seasonal-weather}
+seasonal_weather <- 
+  rbind(
+    melt(fut_weather[, sample_month := month(as.Date(doy, origin = "2071-01-01"))
+    ][, season := fcase(sample_month %in% c(1, 2, 12), "Winter",
+                        sample_month %in% c(3, 4, 5), "Spring",
+                        sample_month %in% c(6, 7, 8), "Summer",
+                        sample_month %in% c(9:11), "Fall")
+    ][, .(Precipitation = sum(precip),
+          `Min Temperature` = median(tmin),
+          `Max Temperature` = median(tmax)),
+      by = .(season, seq_ID)], 
+    id.vars = c("season", "seq_ID"))[, time := "2070-2099"],
+    melt(pres_weather[, sample_month := month(as.Date(doy, origin = "2071-01-01"))
+    ][, season := fcase(sample_month %in% c(1, 2, 12), "Winter",
+                        sample_month %in% c(3, 4, 5), "Spring",
+                        sample_month %in% c(6, 7, 8), "Summer",
+                        sample_month %in% c(9:11), "Fall")
+    ][, .(Precipitation = sum(precip), 
+          `Min Temperature` = median(tmin),
+          `Max Temperature` = median(tmax)),
+      by = .(season, seq_ID)], 
+    id.vars = c("season", "seq_ID"))[, time := "1980-2009"])
+
+seasonal_weather[, season := factor(season, 
+                                    levels = c("Winter", "Spring", "Summer", "Fall"),
+                                    labels = c("Winter", "Spring", "Summer", "Fall"))]
+```
+
+```{r seasonal-climate-summary, fig.width=10, fig.asp=0.5, fig.align = "center"}
+ggplot(seasonal_weather,
+       aes(x = season, 
+           y = value, 
+           fill = time)) + 
+  geom_boxplot() + 
+  facet_wrap(~variable, 
+             scales = "free") +
+  labs(y = "Temperature (C) /\nPrecipitation (mm)") +
+  guides(fill = guide_legend(title = NULL)) + 
+  theme_xaringan(title_font_size = 24,
+                 text_font_size = 16) +
+  theme(legend.position = "bottom",
+        axis.title.x = element_blank(),
+        strip.background = element_blank())
+```
+*Seasonal summary of 3000 annual weather projections extracted from the LOCA-derived estimates.*
+
+---
+## Drawdown Patterns
+
+```{r calculate-median-water-levels}
+median_wls <- 
+  rbind(fut_dat[, .(treatment_period, 
+                    water_level_cm = median(wl),
+                    time_period = "2070-2099"), 
+                by = .(site, site_status, sample_date = as.Date(sample_date) - years(year(sample_date)))],
+        pres_dat[, .(treatment_period, 
+                     water_level_cm = median(wl),
+                     time_period = "1980-2009"), 
+                 by = .(site, site_status, sample_date = as.Date(sample_date) - years(year(sample_date)))]) 
+```
+
+```{r drawdown-results, fig.width=9, fig.asp = 0.75, fig.align = "center"}
+ggplot(median_wls,
+       aes(x = sample_date)) + 
+  geom_line(aes(y = water_level_cm,
+                color = time_period)) +
+  facet_grid(site ~ treatment_period,
+             scales = "free_y") +
+  labs(x = NULL, 
+       y = "Water Level (cm)") +
+  guides(color = guide_legend(title = NULL)) +
+  theme_xaringan() +
+  theme(strip.background = element_blank(),
+        legend.position = "bottom")
+```
+*Median daily water level for 3000 simulations for representative sites of three
+common black ash wetland morphologies*
+
+
+???
+- Define wetland morphology groups
+## Comparison of Results
+- Compare within treatment between climates  
+- Compare difference between treatments given climate  
+- Any wet year vs dry year differences?
+- Need to at least have basic met differences between simulations if any 
+water level differences are present
+
+---
+## Occurence of Surface Water
+
+```{r daily-ecdf}
+
+ecdfs <- 
+  rbind(fut_dat[, 
+                .(wl_ecdf = list(ecdf(wl)),
+                  time_period = "2070-2099"), 
+                by = .(site, 
+                       treatment_period, 
+                       sample_date = as.Date(sample_date) - years(year(sample_date)))],
+        pres_dat[, 
+                 .(wl_ecdf = list(ecdf(wl)),
+                   time_period = "1980-2009"), 
+                 by = .(site, 
+                        treatment_period, 
+                        sample_date = as.Date(sample_date) - years(year(sample_date)))])
+
+ecdfs[, p_less_than_zero := map_dbl(ecdfs$wl_ecdf, exec, 0)]
+ecdfs[, p_more_than_zero := 1 - p_less_than_zero]
+```
+
+```{r inundation-probability, fig.width=9, fig.asp = 0.75, fig.align = "center"}
+ggplot(ecdfs,
+       aes(x = sample_date,
+           y = p_more_than_zero,
+           color = time_period)) +
+  geom_line() +
+  labs(x = NULL,
+       y = "P(Water Level >= 0)") +
+  facet_grid(site ~ treatment_period,
+             scales = "free_y") +
+  guides(color = guide_legend(title = NULL)) +
+  theme_xaringan() +
+  theme(strip.background = element_blank(),
+        legend.position = "bottom")
+```
+*Probability of flooded conditions on a given day of the growing season*
+
+---
+## Conclusion/Implications
+**Water Level Drawdown**
+- Forested sites are expected to be drier relative to current climate conditions
+- Non-forested sites will remain wet, with the potential for increased drawdown
+later in the growing season
+- Water level difference will increase through the growing season until fall 
+water level rebound
+
+**Occurrence of Inundation**
+- Likely to see reduced inundation in the forested sites under future climate scenarios
+- Potentially less inundation in late season in future climate scenarios
+
+---
+## Future Work
+**Model Improvements**
+- Test impact of snow accumulation and melt timing
+- Explicitly incorporate groundwater inputs via diurnal water level analysis
+
+**Simulations**
+- Simulate future conditions with a low-sensitivity model to provide bookend 
+scenarios
+- Transition from LOCA-projected daily values to spatially-explicit stochastic
+weather generator with climate forcing
+- Transition from discrete site-level models to continuous distribution of 
+potential responses for more generalized results
+
+**Analysis**
+- Compare projected hydrology with previous work on climate-adapted ash 
+replacements (Iverson, _et al_, 2016)
+
+
+???
+- Consider two-stage flow model
+- Improve Model through Rigorous Validation  
+- Improve from water_availability (need to get it from January 1st)
+- Incorporate ARIMA components
+- Try not training the model on 2012 and see how the predictions do
+- Incorporate snow. Snowfall looks low in 2012
+- Add a second flow model that's just a lmrob() regression of the flow~water_level (rather than the current exponential model)
+- It looks like PET models incorporate inflow, that may be why some of the sites
+have such bad performance in 2012 & 2013. They are unexpected disconnected from
+GW in 2012, or have prolonged connection in 2013
+
+---
+##Acknowledgements
+
+
+**LOGOS & NAMES**
