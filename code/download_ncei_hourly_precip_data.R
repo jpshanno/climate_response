@@ -39,8 +39,8 @@ hpdn <-
 
 hpdn[, c("record_start", "record_end") := tstrsplit(POR_Date_Range, "-")]
 
-hpdn[, c("record_start", "record_end") := map(list(record_start, record_end),
-                                              ymd)]
+hpdn[, c("record_start", "record_end") := lapply(list(record_start, record_end),
+                                                 ymd)]
 
 hpdn[, distance_km := geodist(hpdn, center_coords, measure = "geodesic")[, 1] / 1000]
 
@@ -81,10 +81,15 @@ if(!dir.exists(output_dir)){
   dir.create(output_dir)
 }
 
-# Download the files
-download.file(selected_hpdn$access_url,
-              selected_hpdn$filename)
+# Check for existing files
+existing_files <- 
+  !file.exists(selected_hpdn$filename)
 
+# Download any missing files
+if(sum(existing_files) > 0){
+  download.file(selected_hpdn$access_url[existing_files],
+                selected_hpdn$filename[existing_files])
+}
 
 
 # Load & Format Data ------------------------------------------------------
@@ -218,6 +223,75 @@ if(interactive()){
     facet_wrap(~water_year)
 }
 
+
+station_distances <- 
+  geodist(station_info, 
+          measure = "geodesic") / 1000
+
+dimnames(station_distances) <- 
+  list(station_info$station_name,
+       station_info$station_name)
+
+station_weights <- 
+  ifelse(station_distances == 0,
+         0,
+         1 / station_distances^3)
+
+
+
+# IDW Fill missing data ---------------------------------------------------
+library(purrr)
+idw <- 
+  station_info[, 
+               .(daily_dat = list(copy(daily_hpd[station_name != .BY[[1]]])[, site := .BY[[1]]]),
+                 hourly_dat = list(copy(hourly_hpd[station_name != .BY[[1]]])[, site := .BY[[1]]])), 
+               by = .(station_name)]
+
+idw[, daily_dat := lapply(daily_dat, function(x){x[, weights := station_weights[, first(site)][x$station_name]]})]
+idw[, hourly_dat := lapply(hourly_dat, function(x){x[, weights := station_weights[, first(site)][x$station_name]]})]
+
+idw[, daily_dat := lapply(daily_dat, function(x){x[, .(precip_idw_cm = weighted.mean(precip_cm, weights, na.rm = TRUE)), by = .(sample_date)]})]
+idw[, hourly_dat := lapply(hourly_dat, function(x){x[, .(precip_idw_cm = weighted.mean(precip_cm, weights, na.rm = TRUE)), by = .(sample_time)]})]
+
+daily_hpd[idw[, daily_dat[[1]], by = .(station_name)],
+          precip_idw_cm := i.precip_idw_cm,
+          on = c("station_name", "sample_date")]
+
+hourly_hpd[idw[, hourly_dat[[1]], by = .(station_name)],
+          precip_idw_cm := i.precip_idw_cm,
+          on = c("station_name", "sample_time")]
+
+if(interactive()){
+  ggplot(hourly_hpd,
+         aes(x = precip_cm,
+             y = precip_idw_cm)) +
+    geom_point() +
+    facet_wrap(~station_name)
+}
+
+if(interactive()){  
+  ggplot(daily_hpd,
+         aes(x = precip_cm,
+             y = precip_idw_cm)) +
+    geom_point() +
+    facet_wrap(~station_name)
+}
+
+if(interactive()){
+  ggplot(hourly_hpd[, .(dtowy, precip_cm, cum_precip_cm = cumsum(fcoalesce(precip_cm, precip_idw_cm))),
+                    by = .(station_name, water_year)]) +
+    geom_line(aes(x = dtowy,
+                  y = cum_precip_cm,
+                  color = station_name),
+              alpha = 0.4) +
+    geom_line(data = daily_hpd[, .(dowy, precip_cm, cum_precip_cm = cumsum(fcoalesce(precip_cm, precip_idw_cm))),
+                               by = .(station_name, water_year)],
+              aes(x = dowy,
+                  y = cum_precip_cm,
+                  color = station_name),
+              linetype = "dashed") +
+    facet_wrap(~water_year)
+}
 
 fwrite(daily_hpd, "output/tabular/ncei_hpd_daily_precipitation.csv")
 fwrite(hourly_hpd, "output/tabular/ncei_hpd_hourly_precipitation.csv")
