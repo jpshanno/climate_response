@@ -14,6 +14,7 @@ output:
       highlightStyle: github
       highlightLines: true
       countIncrementalSlides: true
+      ratio: "16:9"
 ---
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE,
@@ -38,6 +39,7 @@ library(xaringanthemer)
 style_mono_light(base_color = "#5982A0",
                  background_color = "#FFF",
                  # footnote_font_size = "0.6em",
+                 # header_font_family = "Noto Sans",
                  header_h1_font_size = "45px",
                  header_h2_font_size = "35px",
                  header_h3_font_size = "25px",
@@ -46,7 +48,8 @@ style_mono_light(base_color = "#5982A0",
                                   ".cite" = list("position" = "absolute",
                                                  "bottom" = "1.5em",
                                                  "padding-right" = "4em",
-                                                 "font-size" = "0.5em")))
+                                                 "font-size" = "50%"),
+                                  ".small" = list("font-size" = "80%")))
 
 write("@media print {
   .has-continuation {
@@ -58,23 +61,40 @@ append = TRUE)
 class: inverse, center, middle
 
 # Integrating the Effects of Climate Change and Invasive Species on Wetland Ecohydrology to Evaluate Management Options
-### Joe Shannon<sup>1</sup>, Matt Van Grinsven<sup>2</sup>, Fengjing Liu<sup>1</sup>, Randy Kolka<sup>3</sup>
-### AGU Fall Meeting 2020
+### Joe Shannon<sup>1,*</sup>, Matt Van Grinsven<sup>2</sup>, Fengjing Liu<sup>1</sup>, Randy Kolka<sup>3</sup>
+#### AGU Fall Meeting 2020<br>Frontiers in Ecohydrology, H068-08<br>December 9, 2020
 
+.small[
 1 - College of Forest Resources and Environmental Science, Michigan Technological University  
 2 - Earth Environmental and Geographical Sciences, Northern Michigan University  
 3 - USDA US Forest Service, Northern Research Station
+]
+
+<sup>*jpshanno@mtu.edu</sup>
 
 
 ???
-## Presentation Overview
-Not just an outline of the presentation (Should be graphical: flowchart like
-showing map of MI/Ash Importance, zoom in on wetlands, show three big drivers (EAB, Climate,
-Mgmt), end with question about what it means). 
-Present broad methodology overview 'I ran *statistical wetland
-simulations* under current climate and future climate conditions to study the
-interactions of invasive species, climate change, and forest management
-decisions on forested wetland ecosystems'
+Hi, my name is Joe Shannon and I'm going to be sharing my research on how the 
+impacts of climate change and invasive species will interact to control future
+conditions in forested wetlands in black ash wetlands, which are common in 
+northcentral to northeast United States and southeast Canada. My goal with this
+research to better understand the context of a decade long research effort and
+provide improved guidance for resource managers.
+
+---
+##Thank You
+
+Feel free to e-mail (jpshanno@mtu.edu) with questions if you can't make it to the discussion 
+
+```{r out.width="70%", fig.align="center"}
+knitr::include_graphics("img/logos/logos.png")
+```
+
+???
+I want to start off by saying thank you to you for listening to this talk, as 
+well as to the organizations that have supported this research. If you can't 
+make it to the discussion period for this section, feel free to e-mail me if
+you have any questions or comments.
 
 ---
 .left-column[
@@ -85,7 +105,7 @@ decisions on forested wetland ecosystems'
 - Dominant hardwood in northern forested wetlands
 - Important ecologic, hydrologic, and cultural resource
 
-```{r black-ash-map, fig.asp=0.7, fig.out=10, fig.align="left"} 
+```{r black-ash-map, fig.asp=0.7, fig.width=8.5, fig.align="left"} 
 states <- 
   read_sf("../../data/spatial/State_Borders.geojson")
 
@@ -110,17 +130,23 @@ ggplot() +
   coord_sf(xlim = c(-100, -60), 
            ylim = c(35, 55)) +
   theme_xaringan() +
-  theme(panel.background = element_rect(fill = "gray80",
-                                        color = "gray20"),
+  theme(panel.background = element_rect(fill = "#bdcedb"),
         panel.border = element_rect(fill = NA,
                                     color = "gray20",
                                     size = rel(1.5)),
         panel.grid = element_blank())
 ```
-*Black ash range shown in green*
+*Species range of black ash (_Fraxinus nigra_) shown in green*
+
+???
+The wetlands I am studying are forested wetlands dominated by black ash. Black
+ash is a deciduous northern hardwood, that is an important canopy species in
+northern forested wetlands. It can comprise over 90% of the basal area of a
+given wetland. It's dominance in these wetlands gives it an important ecological
+and hydrologic role on the landscape, and for indigineous groups in the region
+it also has a cultural significance as a basket-making material.
 
 ---
-count:false
 .left-column[
 ## Black Ash
 ## & EAB
@@ -129,12 +155,12 @@ count:false
 - First detected in southeast Michigan, USA in 2002
 - Impacts all North American ash. Now in 40 states & provinces
 
-```{r eab-map, fig.asp=0.7, fig.out=10, fig.align="left"}
+```{r eab-map, fig.asp=0.7, fig.width=8.5, fig.align="left"} 
 ggplot() +
   geom_sf(data = states,
-          fill = ifelse(states$has_eab, "gray50", "gray99")) +
+          fill = ifelse(states$has_eab, "gray80", "gray99")) +
   geom_sf(data = provinces,
-          fill = "gray50") +
+          fill = "gray80") +
   geom_sf(data = ash_range,
           fill = "#7DA05080",
           color = NA) +
@@ -142,22 +168,32 @@ ggplot() +
   coord_sf(xlim = c(-100, -60), 
            ylim = c(35, 55)) +
   theme_xaringan() +
-  theme(panel.background = element_rect(fill = "gray80",
-                                        color = "gray20"),
+  theme(panel.background = element_rect(fill = "#bdcedb"),
         panel.border = element_rect(fill = NA,
                                     color = "gray20",
                                     size = rel(1.5)),
         panel.grid = element_blank())
 ```
-*Black ash range in green, states & provinces with detected EAB in dark gray*
+*States & provinces where EAB has been detected (gray)*
+
+???
+Black ash throughout its entire range is now threatened by the emerald ash borer,
+an invasive wood borer. EAB was first discovered in North America in southeast
+Michigan in 2002. It has since spread to 40 states and provinces in the US and
+Canada, and all native North American ash are susceptible. 
 
 ---
-count:false
-
 .left-column[
 ## Black Ash 
 ## & EAB 
 ## & Climate
+
+<br>
+<br>
+<br>
+<br>
+<br>
+*Modeled difference in black ash importance value under high and low sensitivity projections*
 ]
 
 **Great Lakes Regional Changes**
@@ -167,9 +203,11 @@ count:false
 - Changes will impact black ash habitat suitability
 
 
-```{r tree-atlas-maps, out.width="70%", fig.align="center"}
+```{r tree-atlas-maps, out.width="70%", fig.align="left"}
 knitr::include_graphics("img/black_ash_iv_change_reformed.png")
 ```
+
+
 
 .cite[
 Map adapted from Prasad, AM; Iverson, LR; Peters, MP; Matthews, SN. 2014. Climate change tree atlas. Northern Research Station, U.S. Forest Service, Delaware, OH. http://www.nrs.fs.fed.us/atlas.
@@ -177,52 +215,82 @@ Map adapted from Prasad, AM; Iverson, LR; Peters, MP; Matthews, SN. 2014. Climat
 
 ???
 
-<!-- --- -->
-<!-- ## Where Does this Leave Us? -->
+Aside from EAB threatening black ash, these wetlands, and wetlands throughout
+the region face additional stress from climate change induced shifts in 
+temperature and precipitation. These two maps show  US Forest Service work
+shows that suitable habitat for black ash is expected to decrease across its 
+entire due to climate change. The panels show low and high sensitivity climate 
+projections and how the prevalence of black ash will change on the landscape.
+Black ash is expected to decline across it's entire range, with the greatest 
+reductions in northern WI and north centeral MN, where it is currently most 
+common. Across the Great Lakes region, temperatures are expected to increase 4-8
+degrees with more variable estimates for precipitation ranging from very slight
+decreases to about 25% increases. There are seasonal patterns both sets of
+changes, with the greatest warming and expected in the winter and greatest
+precipitation increase expected in the winter and spring. A combination of
+increased temperatures and decreased or flat summer precipitation is expected to
+lead to greater water stress conditions.
 
-<!-- **IMAGES OF FORESTED WETLAND, HERBACEOUS/SHRUB RESPONSE, & SEEDINGLINGS/PLANTING** -->
-
-<!-- ??? -->
-<!-- Talk about Iverson here? -->
 
 ---
 ## Field Data Collection
 .pull-left[
 - 14 black ash wetlands in Western Upper Peninsula of Michigan
 
-- Monitored from 2012 with simulated EAB infestation in winter 2013-2014
+- Monitored from 2012: wetland water levels, outflow (@ 2 sites), vegetation,
+soil gas efflux, nitrogen availability
 
-- Two gauged watersheds with 6" Parshall flume
+- Simulated EAB infestation in winter 2013-2014: Girdle and Ash Cut
 
-```{r study-map, out.width="75%", fig.align = "center"}
-knitr::include_graphics("img/Overview_Map_Color.png")
-```
-]
-
-.pull-right[
-```{r treatment-picture, out.width="75%", fig.align = "center"}
+```{r girdle-picture, out.width="75%", fig.align = "center"}
+# knitr::include_graphics("img/girdle.jpg")
 knitr::include_graphics("img/icy_ash_cut.jpg")
 ```
 
-```{r girdle-picture, out.width="75%", fig.align = "center"}
-knitr::include_graphics("img/girdle.jpg")
-```
 ]
+
+.pull-right[
+```{r study-map, fig.align = "center"}
+knitr::include_graphics("img/Overview_Map_Color.png")
+```
+
+*Black ash wetland study sites on the Ottawa National Forest (above) and a 
+Ash-Cut treatment 7 years post-treatment (left)*
+]
+
+???
+
+My current research is built on 9 years of field research in the western Upper
+Peninsula of Michigan. 14 sites, headwaterwater wetlands which have limited to 
+know surface inlets and often have a intermittent outflow stream. In 2012 we
+instrumented these site for a variety of ecological studies, but most relavent
+here are 2" monitoring wells within each wetland and a two wetlands that are
+gauged with a 6" Parshall flume. In the winter of 2013-2014 we applied one of
+two treatments to two-thirds of the sites, a draw-knife girdle with ash left
+standing, and a treatment where all ash were cut and left on site. The lower 
+diameter limit for girdling and cutting was 2.54cm.
 
 ---
 ## Field Data Results
 - Treatment decreased water level drawdown & increased late season levels
-```{r draw-down-figure, out.width="70%", fig.align = "center"}
+- Strong local groundwater signal through the growing season
+
+```{r draw-down-figure, fig.align = "center"}
 knitr::include_graphics("img/Water_Level_Drawdown.jpeg")
 ```
 
-- Strong local groundwater signal through the growing season
+.cite[Figure adapted from Van Grinsven, _et al_ (2017)]
 
-```{r water-source-figure, out.width="70%", fig.align = "center"}
-knitr::include_graphics("img/Source_Water_Contributions.jpeg")
-```
+???
 
-.cite[Figures adapted from Van Grinsven, _et al_ (2017)]
+To provide context for the modeling work of this project, I want to touch
+briefly on the hydrologic results of the field studies. This figure shows pre-
+and post-treatment wetland mean daily water levels through the growing season,
+normalized to to June 16th water level for comparison. After treatment the rate
+of drawdown was significantly lower, and the late season water levels were
+significantly higher. 
+Isotopic sourcewater analysis also showed a strong groundwater signal throughout
+the growing season in the wetland surface and subsurface water.
 
 ---
 ## Wetland Water Level Model
@@ -232,18 +300,42 @@ knitr::include_graphics("img/Source_Water_Contributions.jpeg")
 
 Modeled Parameter | Driver | Purpose
 --- | ---
-Ecosystem Specific Yield (ESy) | Rainfall to $\Delta$ Water Level Ratio | Scale inputs to ground water response
+Ecosystem Specific Yield (ESy) | Ratio of rainfall to $\Delta$ water level | Scale inputs to ground water response
 Interception | Gross Precipitation | Reduce gross precipitation based on canopy status
 Precipitation Rise | Net Precipitation | Water level response to precipitation inputs
-Potential Evapotranspiration (PET) | PET & Cumulative degree days | Water level response to PET pressure
-Net flow | Water level & residual $\Delta$ Water Level | Groundwater in/outflows and streamflow
+Potential Evapotranspiration | PET & Cumulative degree days | Water level response to PET pressure
+Net flow | Water level & residual $\Delta$ water level | Groundwater in/outflows and streamflow
+
+???
+A statistical model was developed to predict daily water level change from
+meteorologic predictors, which will serve as a basis to evaluate changes under
+future climate conditions. Multiple models are combined to create a single 
+water level prediction, using initial water level, daily minimum and maximum 
+temperature, and gross precipitation as the drivers. An important component of
+the model is ecosystem specific yield, which can be defined as the ratio of 
+water level change to input. In other words how much will water levels rise for
+a given amount of rain, or how much will they fall for a given amount of 
+evapotranspiration. This is often a function of water level, so that as the 
+wetland water level changes, its response to precipitation and evaporative 
+demands changes in magnitude.
 
 ---
 ## Water Level Model
 
-```{r water-level-model, out.width="95%", fig.align="center"}
-knitr::include_graphics("img/Conceptual_Water_Level_Model.jpg")
+```{r water-level-model, out.width="90%", fig.align="center"}
+knitr::include_graphics("img/Conceptual_Water_Level_Model169.jpg")
 ```
+
+???
+When the components are combined into a single model, we end up with this 
+predicitve workflow. I'm not going to walk through it in its entierty, but feel
+free to pause the recording and take a closer look, I'll wait....Oh good, you're
+back. As you can see the water level controls both the ecosystem specific yield,
+and 'excess drawdown', which is primarily streamflow, which increases, often 
+exponentially above a certain stage, with wetland water level. Using an interative
+prediction we can predict water levels throughout the growing season and generate
+a hydrograph.
+
 
 ---
 ## Wetland Model Validation
@@ -311,15 +403,30 @@ split(water_budget[sample_year %in% c(2012, 2013, 2017, 2018) & site %in% c("077
   reduce(`+`)
 ```
 <!-- *Predicted water level change relative to observed water level change* -->
-- Control site conditions had the most variable prediction errors between sites
-and years
-- Errors indicate a more sensitive drawdown model component is necessary
-
+- Ash cut showed highest percent errors
+  - Partially an artefact of lower water level fluctuations within a growing 
+  season
+- Inspection indicate a more sensitive drawdown model component is necessary 
+(Predicted:Observed < 1)
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+*Median absolute error of the predicted daily change in water level as a 
+percent of observed water level*
 ]
 
 .pull-right[
 ```{r prediction-mad}
-ggplot(model_evaluation,
+
+model_evaluation[, treatment := fcase(site %in% c("135", "157", "152", "113", "111"), "Control", site %in% c("053", "077", "156", "009", "139"), "Ash Cut", site %in% c("151", "119", "140", "006"), "Girdle")]
+
+ggplot(model_evaluation[site_status == treatment],
        aes(x = site_status,
            y = abs(mad))) +
   geom_boxplot() +
@@ -328,9 +435,18 @@ ggplot(model_evaluation,
        x = NULL) +
   theme_xaringan()
 ```
-*Median absolute error of the predicted daily change in water level as a 
-percent of observed water level*
+
 ]
+
+???
+This figure shows the median absolute error of predicted change in water level
+as a percentage of observed annual water level fluctuation. You can see that the
+control sites show the most variability and the ash cut sites show the highest
+percent error. Both of these results are expected considering control conditions
+lead to more water level variation between sites, and the ash cut condition led
+to lower wetland water level fluctations within a year. A closer examination of
+the errors shows that a more sensitive drawdown model component would improve
+wetland water level prediction.
 
 ---
 ## Future Climate Weather Series
@@ -344,6 +460,12 @@ GFDL-CM3 | RCP 8.5 | 2070-2099
 - Daily projections over $\frac{1}{16}^{\mathsf{o}}$ grid
 - Precipitation and min/max temperature
 - 3000 annual weather sequences (30 years, 100 sampled grid cells)
+
+<br>
+<br>
+<br>
+<br>
+*Sample climate weather sequences showing T<sub>min</sub> (solid), T<sub>max</sub> (dashed), and precipitation (columns)*
 ]
 .pull-right[
 ```{r load-simulations}
@@ -355,29 +477,24 @@ pres_weather <-
 
 fut_dat <- 
   readRDS("../../output/tabular/simulations_2070-2099.rds")[
-    site %in% c("077", "140", "156")][,
-    `:=`(treatment_period = fifelse(site_status == "Control", "Control", "Treatment"),
-         site = fcase(site == "077", "Threshold",
-                      site == "140", "Flowthrough",
-                      site == "156", "Closed"))
-  ]
+    unique(model_evaluation[, .(site, treatment)]), 
+    treatment := i.treatment, 
+    on = "site"]
 
 pres_dat <- 
   readRDS("../../output/tabular/simulations_1980-2009.rds")[
-    site %in% c("077", "140", "156")][,
-    `:=`(treatment_period = fifelse(site_status == "Control", "Control", "Treatment"),
-         site = fcase(site == "077", "Threshold",
-                      site == "140", "Flowthrough",
-                      site == "156", "Closed"))
-  ]
+    unique(model_evaluation[, .(site, treatment)]), 
+    treatment := i.treatment, 
+    on = "site"]
 ```
 
-```{r weather-time-series, fig.height=10}
+```{r weather-time-series}
 
-ggplot(fut_weather[seq_ID %in% sample(seq_ID, 8)],
+ggplot(fut_weather[seq_ID %in% sample(seq_ID, 6)],
        aes(x = doy)) +
   geom_line(aes(y = tmin),
-            color = "#5982A0") +
+            color = "#5982A0",
+            linetype = "dashed") +
   geom_line(aes(y = tmax),
             color = "#9B5249") +
   geom_col(aes(y = precip),
@@ -395,13 +512,19 @@ ggplot(fut_weather[seq_ID %in% sample(seq_ID, 8)],
 ]
 
 ???
-Current selection is for a sensitive model under the most ?extreme?
-representative concentration pathway
-- Figure from @byun-2018  
-- LOCA downscaled daily projections  
-- Future climate used years from 2070-2099  
-- Selected 100 pixel time series from the study area to serve as 3000 annual 
-weather sequences  
+The current model simulations targeting the end of the century use the GFDL-CM3
+global climate model under RCP-8.5 conditions. This represents a relatively 
+sensitive climate model for the region under the most extreme of the IPCC 
+representative path concentration scenarios. GCM model output is at too coarse
+of a scale to be useful for individual wetland simulations, and so I can musing
+LOCA downscaled daily. This approach uses relationships between simulated current
+conditions and local weather stations to relate the coarse climate model outputs
+to a much finer scale. Specifically I used 1/16 degree outputs of daily minimum
+and maximum temperature and precipitation. These are output at a daily timestep.
+In order to increase the available weather series I selected 100 grid locations
+within the western upper peninsula and utilized thirty years of records from 
+each point. The same dataset and sampling approach was used to select current climate weather 
+series.
 
 ---
 ## Future Climate Weather Series
@@ -410,20 +533,20 @@ weather sequences
 seasonal_weather <- 
   rbind(
     melt(fut_weather[, sample_month := month(as.Date(doy, origin = "2071-01-01"))
-    ][, season := fcase(sample_month %in% c(1, 2, 12), "Winter",
-                        sample_month %in% c(3, 4, 5), "Spring",
-                        sample_month %in% c(6, 7, 8), "Summer",
-                        sample_month %in% c(9:11), "Fall")
+    ][, season := fcase(sample_month %in% c(1, 2, 12), "DJF",
+                        sample_month %in% c(3, 4, 5), "MAM",
+                        sample_month %in% c(6, 7, 8), "JJA",
+                        sample_month %in% c(9:11), "SON")
     ][, .(Precipitation = sum(precip),
           `Min Temperature` = median(tmin),
           `Max Temperature` = median(tmax)),
       by = .(season, seq_ID)], 
     id.vars = c("season", "seq_ID"))[, time := "2070-2099"],
     melt(pres_weather[, sample_month := month(as.Date(doy, origin = "2071-01-01"))
-    ][, season := fcase(sample_month %in% c(1, 2, 12), "Winter",
-                        sample_month %in% c(3, 4, 5), "Spring",
-                        sample_month %in% c(6, 7, 8), "Summer",
-                        sample_month %in% c(9:11), "Fall")
+    ][, season := fcase(sample_month %in% c(1, 2, 12), "DJF",
+                        sample_month %in% c(3, 4, 5), "MAM",
+                        sample_month %in% c(6, 7, 8), "JJA",
+                        sample_month %in% c(9:11), "SON")
     ][, .(Precipitation = sum(precip), 
           `Min Temperature` = median(tmin),
           `Max Temperature` = median(tmax)),
@@ -431,11 +554,11 @@ seasonal_weather <-
     id.vars = c("season", "seq_ID"))[, time := "1980-2009"])
 
 seasonal_weather[, season := factor(season, 
-                                    levels = c("Winter", "Spring", "Summer", "Fall"),
-                                    labels = c("Winter", "Spring", "Summer", "Fall"))]
+                                    levels = c("DJF", "MAM", "JJA", "SON"),
+                                    labels = c("DJF", "MAM", "JJA", "SON"))]
 ```
 
-```{r seasonal-climate-summary, fig.width=10, fig.asp=0.5, fig.align = "center"}
+```{r seasonal-climate-summary, fig.width=14, fig.asp=0.5, fig.align = "center"}
 ggplot(seasonal_weather,
        aes(x = season, 
            y = value, 
@@ -445,48 +568,91 @@ ggplot(seasonal_weather,
              scales = "free") +
   labs(y = "Temperature (C) /\nPrecipitation (mm)") +
   guides(fill = guide_legend(title = NULL)) + 
-  theme_xaringan(title_font_size = 24,
-                 text_font_size = 16) +
+  scale_fill_manual(values = c(`1980-2009` = "#9B5249",
+                               `2070-2099` = "#5982A0")) +
+  theme_xaringan(title_font_size = 36,
+                 text_font_size = 24) +
   theme(legend.position = "bottom",
         axis.title.x = element_blank(),
         strip.background = element_blank())
 ```
 *Seasonal summary of 3000 annual weather projections extracted from the LOCA-derived estimates.*
 
+???
+Earlier I gave a brief overview of the anticipated future climate conditions in 
+the study region. These figures show climate series comparisions for the current
+conditions period (1980-2009) and the future conditions period (2070-2099). We 
+can see that minimum and maximum daily temperatures increase for all seasons
+as expected. Precipitation shows an increase in the winter, spring, and summer, 
+with no change in the fall. The total summer precipitation is also expected to 
+become more variable. 
+
 ---
 ## Drawdown Patterns
 
+.left-column[
+*Median daily water level for 3000 simulations for representative sites of three
+common black ash wetland morphologies*
+]
+
 ```{r calculate-median-water-levels}
 median_wls <- 
-  rbind(fut_dat[, .(treatment_period, 
-                    water_level_cm = median(wl),
+  rbind(fut_dat[, .(water_level_cm = median(wl),
                     time_period = "2070-2099"), 
                 by = .(site, site_status, sample_date = as.Date(sample_date) - years(year(sample_date)))],
-        pres_dat[, .(treatment_period, 
-                     water_level_cm = median(wl),
+        pres_dat[, .(water_level_cm = median(wl),
                      time_period = "1980-2009"), 
                  by = .(site, site_status, sample_date = as.Date(sample_date) - years(year(sample_date)))]) 
 ```
 
-```{r drawdown-results, fig.width=9, fig.asp = 0.75, fig.align = "center"}
-ggplot(median_wls,
+```{r drawdown-results, fig.width=10, fig.asp = 0.75, fig.align = "center"}
+ggplot(median_wls[site %in% c("077", "140", "156"),
+             .(sample_date, water_level_cm, time_period, treatment = ifelse(site_status == "Control", "Control", "Treatment"), site = fcase(site == "077", "Threshold", site == "140", "Flowthrough", site == "156", "Closed"))],
        aes(x = sample_date)) + 
-  geom_line(aes(y = water_level_cm,
-                color = time_period)) +
-  facet_grid(site ~ treatment_period,
+    geom_line(aes(y = water_level_cm,
+                  color = time_period,
+                  linetype = time_period)) +
+  scale_linetype_manual(values = c(`1980-2009` = "solid",
+                                `2070-2099` = "dashed")) +
+  scale_color_manual(values = c(`1980-2009` = "#9B5249",
+                                `2070-2099` = "#5982A0")) +
+  facet_grid(site ~ treatment,
              scales = "free_y") +
   labs(x = NULL, 
        y = "Water Level (cm)") +
-  guides(color = guide_legend(title = NULL)) +
-  theme_xaringan() +
+  guides(color = guide_legend(title = NULL),
+         linetype = guide_legend(title = NULL)) +
+  theme_xaringan(title_font_size = 36,
+                 text_font_size = 24) +  
   theme(strip.background = element_blank(),
         legend.position = "bottom")
 ```
-*Median daily water level for 3000 simulations for representative sites of three
-common black ash wetland morphologies*
-
 
 ???
+
+Now let's get into what happens when we use the current and future climate weather
+series to drive our wetland water level models. I'm showing the results from 
+just three sites for clarity, and I've separated conditions by just control and 
+treatment, with ash cut and girdle treatments shown in the same column (results 
+were similar between the treatments). The three selected sites represent the 
+three types of site morphologies that we observed. While all of our sties were
+headwater wetlands some had distinct inflow sources, often a clear seep, sometimes
+and intermittent stream, there are labled flow through, the Closed sites have
+no inflow, and no surface outlet. The threshold sites have no defined inflow but
+they have a defined intermittent stream or flowpath as a surface outlet. The 
+lines in these figures represent the daily median water level for all 3000 
+simulations of predicted water levels at each of the three sites. The solid red
+line indicates future conditions and dashed blue line represents future conditions.
+You can see that the treated conditions all so reduced water level drawdown 
+relative to the controld conditions, as expected from previous work. Additionally
+the future climate conditions consistently result in lower water levels in both
+the control and treatment conditions. The differences are greatest later in the
+growing season as the additional evaporative demand accumulates, resulting in 
+more drawdown. These results summarize the simulations based on the daily median
+value, but having thousands of simulations also allows us to look at the 
+how likely different water levels are to occur, which can highlight ecologically
+significant expected changes.
+
 - Define wetland morphology groups
 ## Comparison of Results
 - Compare within treatment between climates  
@@ -498,6 +664,10 @@ water level differences are present
 ---
 ## Occurence of Surface Water
 
+.left-column[
+*Probability of flooded conditions on a given day of the growing season*
+]
+
 ```{r daily-ecdf}
 
 ecdfs <- 
@@ -505,69 +675,99 @@ ecdfs <-
                 .(wl_ecdf = list(ecdf(wl)),
                   time_period = "2070-2099"), 
                 by = .(site, 
-                       treatment_period, 
+                       site_status, 
                        sample_date = as.Date(sample_date) - years(year(sample_date)))],
         pres_dat[, 
                  .(wl_ecdf = list(ecdf(wl)),
                    time_period = "1980-2009"), 
                  by = .(site, 
-                        treatment_period, 
+                        site_status, 
                         sample_date = as.Date(sample_date) - years(year(sample_date)))])
 
-ecdfs[, p_less_than_zero := map_dbl(ecdfs$wl_ecdf, exec, 0)]
-ecdfs[, p_more_than_zero := 1 - p_less_than_zero]
+
 ```
 
-```{r inundation-probability, fig.width=9, fig.asp = 0.75, fig.align = "center"}
-ggplot(ecdfs,
+```{r inundation-probability, fig.width = 10, fig.asp = 0.75, fig.align = "center"}
+ecdfs[, p_less_than_zero := map_dbl(ecdfs$wl_ecdf, exec, 0)]
+ecdfs[, p_more_than_zero := 1 - p_less_than_zero]
+
+ggplot(ecdfs[site %in% c("077", "140", "156"),
+             .(sample_date, p_more_than_zero, time_period, treatment = ifelse(site_status == "Control", "Control", "Treatment"), site = fcase(site == "077", "Threshold", site == "140", "Flowthrough", site == "156", "Closed"))],
        aes(x = sample_date,
            y = p_more_than_zero,
-           color = time_period)) +
-  geom_line() +
+           color = time_period,
+           linetype = time_period)) +
+  geom_line(stat = "summary",
+            fun = "median") +
+  scale_linetype_manual(values = c(`1980-2009` = "solid",
+                                `2070-2099` = "dashed")) +
+  scale_color_manual(values = c(`1980-2009` = "#9B5249",
+                                `2070-2099` = "#5982A0")) +
   labs(x = NULL,
        y = "P(Water Level >= 0)") +
-  facet_grid(site ~ treatment_period,
-             scales = "free_y") +
-  guides(color = guide_legend(title = NULL)) +
-  theme_xaringan() +
+  facet_grid(site ~ treatment) +
+  ylim(0, 1) +
+  guides(color = guide_legend(title = NULL),
+         linetype = guide_legend(title = NULL)) +
+  theme_xaringan(title_font_size = 36,
+                 text_font_size = 24) +
   theme(strip.background = element_blank(),
         legend.position = "bottom")
 ```
-*Probability of flooded conditions on a given day of the growing season*
+???
+One such threshold would be to look at how likely it is that we find surface
+water in these wetlands on a given date, which can help guide black ash
+replacement species selection. These plots show the probability that the water
+level is greater that zero on any given day, using the distribution of the 3000
+simulations to esimate. We can see that the likliehood of these sites having
+surface water decreases under future climate scenarios, and are working to
+identify the most ecologically significant water level thresholds to test with
+this methodlogy, but another level of interest would be how often do these sites
+reach the stage of surface water discharge?
 
 ---
-## Conclusion/Implications
-**Water Level Drawdown**
+## Conclusions & Future Work
+**Conclusions**
 - Forested sites are expected to be drier relative to current climate conditions
 - Non-forested sites will remain wet, with the potential for increased drawdown
 later in the growing season
 - Water level difference will increase through the growing season until fall 
 water level rebound
+- Likely to see reduced inundation in forested and unforested sites under future 
+climate scenarios
 
-**Occurrence of Inundation**
-- Likely to see reduced inundation in the forested sites under future climate scenarios
-- Potentially less inundation in late season in future climate scenarios
-
----
-## Future Work
-**Model Improvements**
-- Test impact of snow accumulation and melt timing
+**Additional Model Components**
+- Test the impact of snow accumulation and melt timing
 - Explicitly incorporate groundwater inputs via diurnal water level analysis
 
-**Simulations**
+**Expanded Weather Series**
 - Simulate future conditions with a low-sensitivity model to provide bookend 
 scenarios
 - Transition from LOCA-projected daily values to spatially-explicit stochastic
 weather generator with climate forcing
-- Transition from discrete site-level models to continuous distribution of 
-potential responses for more generalized results
-
-**Analysis**
-- Compare projected hydrology with previous work on climate-adapted ash 
-replacements (Iverson, _et al_, 2016)
 
 
 ???
+
+As you could see from the two previous slides, we expect these sites to become
+drier in the future. The level of drying will vary depending on the site canopy
+condition (forested or unforested), and the local hydrology of the site. Local
+conditions will likely dictate the exact future conditions of an individual
+wetlands, but these results should help guide management decision about
+restoration of forested conditions and species selections. I have plans to
+expand this research prior to publications by exploring the impact of snow,
+which represented a strong component of the groundwater feeding these sites, and
+increasing the number and variation of the simulated weather series through the
+use of a stochastic weather generator driven by predicted future climate
+conditions. Thank you for your time, and I look forward to talking with some of 
+you during the discussion period
+
+
+**Comparative Analysis**
+- Compare projected hydrology with previous work on climate-adapted ash 
+replacements (Iverson, _et al_, 2016)
+
+- Future rainfall markov chain is possible thanks to daily data
 - Consider two-stage flow model
 - Improve Model through Rigorous Validation  
 - Improve from water_availability (need to get it from January 1st)
@@ -579,8 +779,4 @@ replacements (Iverson, _et al_, 2016)
 have such bad performance in 2012 & 2013. They are unexpected disconnected from
 GW in 2012, or have prolonged connection in 2013
 
----
-##Acknowledgements
 
-
-**LOGOS & NAMES**
