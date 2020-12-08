@@ -464,97 +464,52 @@ station_weights <-
 # stations. This requires nesting all data except for a given station
 idw <- 
   station_info[, 
-               .(daily_dat = list(daily_hpd[station_name != .BY[[1]], 
-                                            .(station_name, sample_date, ex_precip_cm = precip_cm)][
-                                              daily_hpd[station_name == .BY[[1]], 
-                                                        .(site = station_name, sample_date, precip_cm)],
-                                              on = "sample_date"]),
-                 hourly_dat = list(hourly_hpd[station_name != .BY[[1]], 
-                                             .(station_name, sample_time, ex_precip_cm = precip_cm)][
-                                               hourly_hpd[station_name == .BY[[1]], 
-                                                         .(site = station_name, sample_time, precip_cm)],
-                                               on = "sample_time"])), 
+               .(daily_dat = list(set(x = copy(daily_hpd[station_name != .BY[[1]]]),
+                                      j = "site",
+                                      value = .BY[[1]])),
+                 hourly_dat = list(set(x = copy(hourly_hpd[station_name != .BY[[1]]]),
+                                       j = "site",
+                                       value = .BY[[1]]))), 
                by = .(station_name)]
 
-idw[, daily_mods := lapply(daily_dat,
-                          function(x){
-                            x[precip_cm > 0, 
-                              .(mod = list(glmrob(precip_cm ~ ex_precip_cm,
-                                             data = .SD,
-                                             family = Gamma(identity)))),
-                              keyby = .(station_name)]
-                          })]
-
-idw[, hourly_mods := lapply(hourly_dat,
-                           function(x){
-                             x[precip_cm > 0, 
-                               .(mod = list(glmrob(precip_cm ~ ex_precip_cm,
-                                              data = .SD,
-                                              family = Gamma(identity)))),
-                               keyby = .(station_name)]
-                           })]
-
 idw[, daily_dat := 
-      mapply(function(dat, mod){
-        dat[, predicted_precip_cm := predict(mod[.BY[[1]], mod[[1]]], 
-                                             newdata = .SD, 
-                                             type = "response"),
-            by = .(station_name)]
-      },
-      daily_dat,
-      daily_mods,
-      SIMPLIFY = FALSE)]
+      lapply(daily_dat,
+             function(x){
+               x$weights <- 
+                 station_weights[, first(x$site)][x$station_name]
+               x
+             })]
 
 idw[, hourly_dat := 
-      mapply(function(dat, mod){
-        dat[, predicted_precip_cm := predict(mod[.BY[[1]], mod[[1]]], 
-                                             newdata = .SD, 
-                                             type = "response"),
-            by = .(station_name)]
-      },
-      hourly_dat,
-      hourly_mods,
-      SIMPLIFY = FALSE)]
+      lapply(hourly_dat,
+             function(x){
+               x$weights <- 
+                 station_weights[, first(x$site)][x$station_name]
+               x
+             })]
 
-idw[, daily_dat := lapply(daily_dat, function(x){x[, weights := station_weights[, first(site)][station_name]]})]
-idw[, hourly_dat := lapply(hourly_dat, function(x){x[, weights := station_weights[, first(site)][station_name]]})]
 
-idw[, daily_dat := lapply(daily_dat, function(x){x[, .(precip_glm_idw_cm = weighted.mean(predicted_precip_cm, weights, na.rm = TRUE),
-                                                       precip_raw_idw_cm = weighted.mean(ex_precip_cm, weights, na.rm = TRUE)), 
-                                                   by = .(sample_date)]})]
-idw[, hourly_dat := lapply(hourly_dat, function(x){x[, .(precip_glm_idw_cm = weighted.mean(predicted_precip_cm, weights, na.rm = TRUE),
-                                                         precip_raw_idw_cm = weighted.mean(ex_precip_cm, weights, na.rm = TRUE)), 
-                                                     by = .(sample_time)]})]
+idw[, daily_dat := 
+      lapply(daily_dat, 
+             function(x){
+               x[, .(precip_idw_cm = weighted.mean(precip_cm, weights, na.rm = TRUE)), 
+                 by = .(sample_date)]})]
+
+idw[, hourly_dat := 
+      lapply(hourly_dat, 
+             function(x){
+               x[, .(precip_idw_cm = weighted.mean(precip_cm, weights, na.rm = TRUE)), 
+                 by = .(sample_time)]})]
 
 daily_hpd[idw[, daily_dat[[1]], by = .(station_name)],
-          `:=`(precip_glm_idw_cm = precip_glm_idw_cm,
-               precip_raw_idw_cm = i.precip_raw_idw_cm),
+          precip_idw_cm := i.precip_idw_cm,
           on = c("station_name", "sample_date")]
 
 hourly_hpd[idw[, hourly_dat[[1]], by = .(station_name)],
-           `:=`(precip_glm_idw_cm = precip_glm_idw_cm,
-                precip_raw_idw_cm = i.precip_raw_idw_cm),
+          precip_idw_cm := i.precip_idw_cm,
           on = c("station_name", "sample_time")]
 
 daily_hpd[, lapply(.SD, modeval, measured = precip_cm, stat = "RMSE"),
-          by = .(station_name),
-          .SDcols = patterns("idw_cm")]
-
-ggplot(daily_hpd,
-       aes(x = precip_cm,
-           y = precip_raw_idw_cm)) +
-  geom_point() +
-  geom_point(aes(y = precip_glm_idw_cm),
-             color = "red",
-             shape = 1) +
-  geom_abline() +
-  ggtitle("GLM + IDW") +
-  facet_wrap(~station_name)
-
-# Really bad performance for hourly data is partly form not finding the best 
-# correlated lags between sites (precip moves so the correlation usually lags by
-# 1-2 hours)
-hourly_hpd[, lapply(.SD, modeval, measured = precip_cm, stat = "RMSE"),
           by = .(station_name),
           .SDcols = patterns("idw_cm")]
 
