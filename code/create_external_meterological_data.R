@@ -579,16 +579,19 @@ temperature_dat <-
                  .(station_name, sample_date, lat, lon, tmin_c, tmax_c), 
                  on = "station_name"])
 
-ggplot(data = temperature_dat,
-       aes(x = tmax_c,
-           y = ..scaled..)) +
-  geom_density() +
-  geom_density(color = NA,
-               alpha = 0.25,
-               aes(fill = fcase(month(sample_date) %in% 3:5, "mam",
-                                month(sample_date) %in% 6:8, "jja",
-                                month(sample_date) %in% 9:11, "son", 
-                                default = "djf")))
+if(interactive()){
+  ggplot(data = temperature_dat,
+         aes(x = tmax_c,
+             y = ..scaled..)) +
+    geom_density() +
+    geom_density(color = NA,
+                 alpha = 0.25,
+                 aes(fill = fcase(month(sample_date) %in% 3:5, "mam",
+                                  month(sample_date) %in% 6:8, "jja",
+                                  month(sample_date) %in% 9:11, "son", 
+                                  default = "djf")))  
+}
+
 
 idw_temp <- 
   station_info[, .(daily_dat = list(set(x = copy(temperature_dat[station_name != .BY[[1]]]),
@@ -620,28 +623,34 @@ daily_hpd[idw_temp[, daily_dat[[1]], by = .(station_name)],
                idw_tmax_c = i.tmax_c),
           on = c("station_name", "sample_date")]
 
-ggplot(daily_hpd,
-       aes(x = obs_tmin_c,
-           y = idw_tmin_c)) +
-  geom_point() +
-  geom_abline(color = "red") +
-  facet_wrap(~station_name)
+if(interactive()){
+  ggplot(daily_hpd,
+         aes(x = obs_tmin_c,
+             y = idw_tmin_c)) +
+    geom_point() +
+    geom_abline(color = "red") +
+    facet_wrap(~station_name)
+}
 
-ggplot(daily_hpd,
-       aes(x = obs_tmax_c,
-           y = idw_tmax_c)) +
-  geom_point() +
-  geom_abline(color = "red") +
-  facet_wrap(~station_name)
+if(interactive()){
+  ggplot(daily_hpd,
+         aes(x = obs_tmax_c,
+             y = idw_tmax_c)) +
+    geom_point() +
+    geom_abline(color = "red") +
+    facet_wrap(~station_name)
+}
 
-ggplot(daily_hpd[!is.na(obs_tmin_c)],
-       aes(x = dowy,
-           y = obs_tmin_c)) +
-  geom_line() +
-  geom_line(aes(y = idw_tmin_c),
-            color = "red",
-            size = rel(0.5)) +
-  facet_grid(water_year~station_name)
+if(interactive()){
+  ggplot(daily_hpd[!is.na(obs_tmin_c)],
+         aes(x = dowy,
+             y = obs_tmin_c)) +
+    geom_line() +
+    geom_line(aes(y = idw_tmin_c),
+              color = "red",
+              size = rel(0.5)) +
+    facet_grid(water_year~station_name)
+}
 
 # Create Final Product ----------------------------------------------------
 
