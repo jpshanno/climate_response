@@ -9,12 +9,18 @@
 ##' @export
 model_interception_loss <- 
   function(data,
-           precip.column) {
+           y,
+           x) {
 
+    stopifnot(length(x)==1)
+    
+    form <- 
+      make_formula(y, x)
+    
     interception <- 
-      data[best_precip_cm > 0,
+      data[data[[x]] > 0,
                           .(treatment = first(treatment),
-                            mod = list(lmrob(Ds_cm ~ best_precip_cm,
+                            mod = list(lmrob(form,
                                              data = .SD,
                                              setting = "KS2014"))),
                           by = .(site, site_status, season)]

@@ -158,3 +158,22 @@ study_path <-
   
 }
 
+##' .. content for \description{} (no empty lines) ..
+##'
+##' .. content for \details{} ..
+##'
+##' @title
+##' @param y
+##' @param ... can be a character vector [c("x1", "x2")] or comma separated x values "x1", "x2"
+##' @return
+##' @author Joe Shannon
+##' @export
+make_formula <- 
+  function(y, ...) {
+    
+    form <- 
+      paste(y, "~", Reduce(function(x, y){paste(x, y, sep = " + ")}, ...))
+    
+    as.formula(form, env = parent.env(environment()))
+    
+  }
