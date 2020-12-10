@@ -2,3 +2,9 @@
 .Rproj.user/*
 resources/GLMGEN-workshop/*
 *.zip
+*.Rproj
+.Rproj.user
+*.nc
+tmp/*
+*.docx
+resources/*
