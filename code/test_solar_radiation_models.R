@@ -17,14 +17,45 @@ ex_met[, dat := lapply(file,
                          cbind(fread(x,
                                      select = 2:4,
                                      skip = 12,
-                                     col.names = c("sample_time", "air_temp_c", "solar_rad_w_m2")),
-                               setnames(data.table(t(fread(x,
-                                                           skip = 6,
-                                                           nrows = 3,
-                                                           header = FALSE,
-                                                           sep = ":")[, 2])),
-                                        c("latitude", "longitude", "elevation_ft")))
+                                     col.names = c("sample_time", "air_temp_c", "solar_rad_w_m2")))
                          })]
+
+ex_met[, c("latitude", "longitude", "elevation_ft") := map_dfr(file,
+                 ~data.table(t(fread(.x,
+                                              skip = 6,
+                                              nrows = 3,
+                                              header = FALSE,
+                                              sep = ":")[, 2])))]
+                 
+ex_met[, tz := get_gmt_tzone(lat = latitude,
+                             lon = longitude)]
+
+ex_met[, tz := vapply(dat,
+                      FUN.VALUE = character(1),
+                      function(x){
+                        
+                        coords <- 
+                          first(x[, .(lat = latitude,
+                                        lon = longitude)])
+                        
+                        tz <- 
+                          tz_lookup_coords(lat = coords$lat,
+                                           lon = coords$lon,
+                                           method = "accurate")
+                        
+                        std_time_offset <- 
+                          subset(tz_list(),
+                                 subset = tz_name == tz & !is_dst,
+                                 select = utc_offset_h,
+                                 drop = TRUE)
+
+                        offset_sign <- 
+                          ifelse(std_time_offset > 0,
+                                 "-",
+                                 "+")
+                        
+                        paste0("Etc/GMT", offset_sign, abs(std_time_offset))
+                      })]
 
 # It looks like the downloaded files do not apply DST at these stations. Assuming
 # that all times are standard, not daylight then.
@@ -39,6 +70,8 @@ tzones <-
           F0708,Etc/GMT+6
           BPLM4,Etc/GMT+5
           WINM4,Etc/GMT+5")
+
+subset(tz_list(), tz_name == do.call(tz_lookup_coords, list(lon = -89.61332, lat = 46.43133, method = "accurate")) & !is_dst, select = utc_offset_h, drop = TRUE)
 
 # Add time zones to each station
 ex_met[tzones, 
