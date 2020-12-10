@@ -23,7 +23,9 @@ prepare_water_levels <-
   setkey(water_levels, "site", "sample_date")
   
   daily_water_levels <- 
-    water_levels[,.(sample_year = first(sample_year),
+    water_levels[,.(doy = yday(.BY[[2]]),
+                    doy_decimal = yday(.BY[[2]]) / 366,
+                    sample_year = first(sample_year),
                     wl_initial_cm = first(water_level_cm),
                     wl_final_cm = last(water_level_cm),
                     wl_min_cm = min_na(water_level_cm),
