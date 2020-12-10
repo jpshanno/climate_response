@@ -18,7 +18,6 @@
 library(data.table)
 library(lubridate)
 library(geodist)
-library(robustbase)
 
 # Set geographic and temporal bounds --------------------------------------
 
