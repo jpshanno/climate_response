@@ -8,3 +8,12 @@ resources/GLMGEN-workshop/*
 tmp/*
 *.docx
 resources/*
+_targets/*
+data/*
+output/figures/*
+output/tabular/*
+output/presentations/*/*
+output/presentations/*pdf
+output/presentations/*html
+output/presentations/*mp4
+output/presentations/*css
