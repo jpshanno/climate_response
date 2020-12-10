@@ -162,23 +162,11 @@ precip <-
   fread("data/precipitation_daily.csv",
         select = c(site = "character",
                    sample_date = "Date",
-                   filled_precip_cm = "numeric"),
+                   obs_precip_cm = "numeric",
+                   idw_precip_cm = "numeric"),
         key = c("site", "sample_date"))
 
-setnames(precip, "filled_precip_cm", "precip_cm")
-
-# Fill in missing precip where possible (should be a weighted mean by each site)
-
-precip_means <- 
-  precip[, .(mean_precip_cm = mean_na(precip_cm)), by = .(sample_date)]
-
-# Fill a few wayward NAs from 2013
-precip_means[between(month(sample_date), 6, 10) & is.na(mean_precip_cm),
-             mean_precip_cm := 0]
-
-precip[precip_means,
-       precip_cm := ifelse(!is.na(precip_cm), precip_cm, i.mean_precip_cm),
-       on = "sample_date"]
+setnames(precip, "idw_precip_cm", "precip_cm")
 
 hourly_precip <- 
   fread("data/precipitation_hourly.csv",
@@ -424,11 +412,11 @@ ggplot(sy_dat,
        aes(x = water_level_cm,
            y = sy)) +
   geom_point() + 
-  geom_line(aes(y = pred_sy),
-            color = "blue") +
-  geom_line(aes(y = quad_sy),
-            linetype = "dashed",
-            color = "blue") +
+  # geom_line(aes(y = pred_sy),
+  #           color = "blue") +
+  # geom_line(aes(y = quad_sy),
+  #           linetype = "dashed",
+  #           color = "blue") +
   geom_line(aes(y = nl_sy),
             linetype = "dotted",
             color = "blue") +
@@ -492,7 +480,7 @@ daily_water_balance[daily_ex_met,
                     on = c("sample_date")]
 
 daily_water_balance[site %in% sy_mods$site, 
-                    sy := predict(sy_mods[.BY[[1]], mod[[1]], on = "site"], 
+                    sy := predict(sy_mods[.BY[[1]], mod_nl[[1]], on = "site"], 
                                   newdata = .SD[, .(water_level_cm = i_water_level_cm)],
                                   type = "response"), 
                     by = .(site)]
@@ -506,13 +494,14 @@ daily_water_balance[sy < 0, sy := 1]
 daily_water_balance[, Ds_actual := sy * Ds_cm]
 
 daily_water_balance[, 
-                    net_flow := Ds_actual - observed_precip_cm + obsrad_pet_hs_cm - net_precip_cm,
+                    net_flow := Ds_actual + obsrad_pet_hs_cm - net_precip_cm,
                     by = .(site, sample_date)]
 
 ggplot(daily_water_balance,
-       aes(x = i_water_level_cm,
+       aes(x = 2 * (i_water_level_cm %/% 2),
            y = net_flow)) +
-  geom_point() +
+  geom_point(stat = "summary", 
+             fun = median) +
   facet_wrap(~site, 
              scales = "free")
 
@@ -753,56 +742,119 @@ water_budget[net_precip_cm == 0, storm_recession_cm := NA_real_]
 
 # Ds Models
 
-water_budget[, doy_decimal := yday(sample_date) / 366]
-water_budget[daily_ex_met, 
-             gdd := (i.max_temp_c + i.min_temp_c) / 2 - 10,
+ggplot(water_budget,
+       aes(x = water_level_cm,
+           y = site_flow)) +
+  geom_point(alpha = 0.25) +
+  geom_point(aes(x = round(water_level_cm, 0)),
+             color = "red",
+             stat = "summary",
+             fun = median) +
+  facet_wrap(~site, 
+             scales = "free")
+
+ggplot(water_budget,
+       aes(x = water_level_cm,
+           y = site_flow)) +
+  geom_point(alpha = 0.25) +
+  geom_smooth(method = "loess",
+              method.args = list(family = "symmetric"),
+              span = 0.25) +
+  facet_wrap(~site, 
+             scales = "free")
+
+water_budget[, .(net_flow = median_na(site_flow)),
+             by = .(site, water_level_cm = round(water_level_cm, 0))] %>% 
+ggplot(aes(x = water_level_cm,
+           y = net_flow)) +
+  geom_point(alpha = 0.25) +
+  geom_smooth(method = "loess",
+              method.args = list(family = "gaus"),
+              span = 0.75) +
+  facet_wrap(~site, 
+             scales = "free")
+
+# Need to look more in to ARIMA info
+water_budget[!is.na(Ds_cm), TSA::runs(Ds_cm), by = .(site, sample_year)] %>% 
+  .[pvalue <= 0.05]
+
+# Need to do CV for span
+
+flow_mods <- 
+  water_budget[!is.na(water_level_cm) & !is.na(site_flow),
+               .(mod = list(loess(site_flow ~ water_level_cm, 
+                             data = .SD,
+                             family = "symmetric",
+                             span = 0.25))),
+               keyby = .(site)]
+  
+water_budget[!is.na(water_level_cm),
+             q_cm := predict(flow_mods[.BY[[1]], mod[[1]]],
+                             newdata = .SD),
+             by = .(site)]
+
+water_budget[daily_ex_met,
+             `:=`(min_temp_c = i.min_temp_c,
+                  max_temp_c = i.max_temp_c,
+                  mean_temp_c = i.mean_temp_c),
              on = "sample_date"]
-water_budget[, cum_gdd := cumsum(gdd),
+
+water_budget[, doy_decimal := yday(sample_date) / 366]
+water_budget[, max_mean_temp := max((max_temp_c + min_temp_c) / 2),
+             by = .(site, sample_year)]
+water_budget[, 
+             `:=`(gdd = (max_temp_c + min_temp_c) / 2 - 10,
+                  degree_days = max_mean_temp - (max_temp_c + min_temp_c) / 2)] # 18.333
+water_budget[, `:=`(cum_gdd = cumsum(gdd),
+                    cum_dd = cumsum(degree_days) / 100),
              by = .(site, sample_year)]
 water_budget[, `:=`(cum_pet_cm = cumsum(ifelse(!is.na(harad_pet_hs_cm), harad_pet_hs_cm, 0)),
                     cum_precip_cm = cumsum(ifelse(!is.na(net_precip_cm), net_precip_cm, 0))),
              by = .(site, sample_year)]
-water_budget[, `:=`(water_availability = (cum_precip_cm - cum_pet_cm) / 100,
+water_budget[, `:=`(water_availability = (cum_precip_cm - cum_pet_cm) / 10,
                     p_pet = cum_precip_cm / cum_pet_cm)]
 
+water_budget[, raw_precip := gross_precip_cm * sy]
+water_budget[, q_adj_Ds_cm := Ds_cm - q_cm]
 
 wb_mods <- 
-  water_budget[, .(dat = list(.SD)), keyby = .(site_status)]
+  water_budget[, .(dat = list(.SD)), keyby = .(site, site_status)]
 
 
 # Precip rise mod ---------------------------------------------------------
 # For future model this could be improved by using quantile regression to get at
 # the change variance of response to storm size
 # Check high rise values against hyetograph to see if they are from well bottom-outs
-ggplot(water_budget[net_precip_cm > 0 & Dl_signed_cm > 0],
-       aes(x = net_precip_cm,
+ggplot(water_budget[gross_precip_cm > 0],
+       aes(x = gross_precip_cm,
            y = Dl_signed_cm,
-           color = site)) +
+           color = site_status)) +
   geom_point() +
+  geom_quantile(quantiles = 0.5) +
   geom_smooth(method = lmrob, 
-              formula = y ~ x,
-              method.args = list(setting = "KS2014"),
-              color = "blue") +
-  facet_wrap(~site_status,
+              method.args = list(setting = "KS2014"), 
+              linetype = "dashed") +
+  facet_wrap(~site,
              scales = "free")
-
-# wb_mods[, 
-#         precip_rise := map(dat,
-#                            ~lmrob(Dl_signed_cm ~ net_precip_cm,
-#                                   data = .x[net_precip_cm > 0 & Dl_signed_cm > 0],
-#                                   setting = "KS2014"))]
 
 wb_mods[,
         precip_rise := map(dat,
-                           ~lmer(Dl_signed_cm ~ net_precip_cm + (net_precip_cm | site),
-                                  data = .x[net_precip_cm > 0 & Dl_signed_cm > 0]))]
+                           ~lmrob(Dl_signed_cm ~ net_precip_cm,
+                                  data = .x[net_precip_cm > 0 & Dl_signed_cm > 0],
+                                  setting = "KS2014"))]
 
-# Residual Check
+# wb_mods[,
+#         precip_rise := map(dat,
+#                            ~rq(Dl_signed_cm ~ net_precip_cm,
+#                                tau = 0.5,
+#                                data = .x[gross_precip_cm > 0]))]
+
+# Residual Check 
+# CHECK AGAINST OTHER DRIVERS TO FIND SEASONAL I COMPONENT
 ggplot(data = water_budget[net_precip_cm > 0 & Dl_signed_cm > 0, 
                            .(net_precip_cm, 
-                             site,
                              std_resid = as.numeric(scale(predict(wb_mods[.BY[[1]], precip_rise[[1]]], newdata = .SD) - Ds_cm))), 
-                           by = .(site_status)],
+                           by = .(site)],
        aes(x = net_precip_cm,
            y = std_resid)) + 
   geom_point(alpha = 0.4) +
@@ -820,12 +872,12 @@ ggplot(data = water_budget[net_precip_cm > 0 & Dl_signed_cm > 0,
 # Single PET Model after Net Flow Adjustment
 # More difference bewteen seasons than between high and low conditions
 ggplot(data = water_budget[dry_days > 3 & net_precip_cm == 0 & site_status == "Control"],
-       aes(x = water_availability,
-           y = Ds_cm)) +
+       aes(x = cum_dd,
+           y = q_adj_Ds_cm)) +
   geom_point(alpha = 0.4,
              aes(color = harad_pet_hs_cm)) +
   geom_smooth(method = lmrob,
-              formula = y ~ x + I(x^2),
+              formula = y ~ I(x^0.5),
               se = FALSE,
               method.args = list(setting = "KS2014")) +
   facet_wrap(~ site,
@@ -833,7 +885,7 @@ ggplot(data = water_budget[dry_days > 3 & net_precip_cm == 0 & site_status == "C
 
 ggplot(data = water_budget[dry_days > 3 & net_precip_cm == 0 & site_status == "Control"],
        aes(x = harad_pet_hs_cm,
-           y = Ds_cm)) +
+           y = q_adj_Ds_cm)) +
   geom_point(alpha = 0.4,
              aes(color = water_availability)) +
   geom_smooth(method = lmrob,
@@ -844,13 +896,61 @@ ggplot(data = water_budget[dry_days > 3 & net_precip_cm == 0 & site_status == "C
              scales = "free")
 
 # Need to fine-tune this model
-wb_mods[, 
-        outflow_pet_single := map(dat,
-                                  ~lmer(Ds_cm ~ I(harad_pet_hs_cm^0.5) + I(harad_pet_hs_cm^0.5):cos(pi * water_availability) + (I(harad_pet_hs_cm^0.5) + I(harad_pet_hs_cm^0.5):cos(pi * water_availability) || site),
-                                         data = .x[dry_days > 3 & net_precip_cm == 0]))]
+# Old Model
+# wb_mods[,
+#         outflow_pet_single := map(dat,
+#                                   ~lmer(Ds_cm ~ I(harad_pet_hs_cm^0.5) + I(harad_pet_hs_cm^0.5):cos(pi * water_availability) + (I(harad_pet_hs_cm^0.5) + I(harad_pet_hs_cm^0.5):cos(pi * water_availability) || site),
+#                                         data = .x[dry_days > 3 & net_precip_cm == 0]))]
+
+# New Model Attempts
+# wb_mods[,
+#         outflow_pet_single := map(dat,
+#                                   ~lmer(Ds_cm ~ I(harad_pet_hs_cm^0.5)*cum_dd + (I(harad_pet_hs_cm^0.5)*cum_dd || site),
+#                                          data = .x[dry_days > 3 & net_precip_cm == 0]))]
 
 # Need to look at drivers of residual error from PET-only model. That may allow
-# me to identify net inflow
+# me to identify net inflow if water_availability doesn't work
+
+# Identify additional driver (use harad_PET only model) to create pred_Ds
+wb_mods[,
+        pet_only := map(dat,
+                        ~lmrob(q_adj_Ds_cm ~ harad_pet_hs_cm,
+                               data = .x[dry_days > 3 & net_precip_cm == 0],
+                               setting = "KS2014"))]
+
+ggplot(data = water_budget[dry_days > 3 & net_precip_cm == 0,
+                           .(harad_pet_hs_cm,
+                             ex_driver = cum_dd,
+                             sample_year,
+                             q_adj_Ds_cm,
+                             pred_Ds = predict(wb_mods[.BY[[1]], pet_only[[1]]], newdata = .SD)),
+                           by = .(site, site_status)],
+       aes(x = ex_driver,
+           y = pred_Ds)) +
+  geom_point(alpha = 0.4,
+             aes(color = site_status)) + 
+  geom_smooth(method = lmrob, 
+              # formula = y ~ x + I(x^2) + I(x^3),
+              formula = y ~ x + cos(pi * x / max(x)) + sin(pi * x / max(x)),
+              method.args = list(),
+              aes(linetype = site_status)) +
+  scale_linetype_manual(values = c("Ash Cut" = "dotted",
+                                   "Control" = "solid",
+                                   "Girdle" = "dotted")) +
+  scale_color_manual(values = c("Ash Cut" = "red",
+                                "Control" = "black",
+                                "Girdle" = "red")) +
+  facet_wrap(~site,
+             scales = "free")
+
+
+wb_mods[,
+        outflow_pet_single := map(dat,
+                                  ~lmrob(q_adj_Ds_cm ~ harad_pet_hs_cm : (cum_dd + I(cum_dd^2) + I(cum_dd^3)),
+                                         data = .x[dry_days > 3 & net_precip_cm == 0],
+                                         control = lmrob.control(setting = "KS2014",
+                                                                 maxit.scale = 500)))]
+
 
 # A quantile regression along a lower quantile would estimate maximum drawdown.
 # The netflow model may then be able to better capture net inflow
@@ -858,31 +958,33 @@ wb_mods[,
 # Check Fit
 ggplot(data = water_budget[dry_days > 3 & net_precip_cm == 0,
                            .(harad_pet_hs_cm,
-                             water_availability,
+                             cum_dd,
                              sample_year,
-                             site,
                              Ds_cm,
                              pred_Ds = predict(wb_mods[.BY[[1]], outflow_pet_single[[1]]], newdata = .SD)),
-                           by = .(site_status)],
-       aes(x = water_availability,
+                           by = .(site, site_status)],
+       aes(x = cum_dd,
            y = Ds_cm)) +
   geom_point(alpha = 0.4) +
-  geom_smooth(aes(y = pred_Ds)) +
+  geom_point(aes(y = pred_Ds),
+             alpha = 0.2,
+             color = "red") +
   facet_wrap(~site,
              scales = "free")
 
 ggplot(data = water_budget[dry_days > 3 & net_precip_cm == 0,
                            .(harad_pet_hs_cm,
-                             water_availability,
+                             cum_dd,
                              sample_year,
-                             site,
                              Ds_cm,
                              pred_Ds = predict(wb_mods[.BY[[1]], outflow_pet_single[[1]]], newdata = .SD)),
-                           by = .(site_status)],
+                           by = .(site, site_status)],
        aes(x = harad_pet_hs_cm,
            y = Ds_cm)) +
   geom_point(alpha = 0.4) +
-  geom_smooth(aes(y = pred_Ds)) +
+  geom_point(aes(y = pred_Ds),
+             alpha = 0.2,
+             color = "red") +
   facet_wrap(~site,
              scales = "free")
 
@@ -899,6 +1001,18 @@ ggplot(data = water_budget[dry_days > 3 & net_precip_cm == 0,
   geom_smooth(method = "lm") +
   facet_wrap(~site)
 
+ggplot(data = water_budget[dry_days > 3 & net_precip_cm == 0,
+                           .(cum_dd,
+                             site,
+                             std_resid = as.numeric(Ds_cm - predict(wb_mods[.BY[[1]], outflow_pet_single[[1]]], newdata = .SD))),
+                           by = .(site_status)],
+       aes(x = cum_dd,
+           y = std_resid)) +
+  geom_point(alpha = 0.4) +
+  geom_smooth(method = "lm") +
+  facet_wrap(~site)
+
+# Residuals over time
 ggplot(data = water_budget[dry_days > 3 & net_precip_cm == 0,
                            .(obsrad_pet_hs_cm,
                              site,
@@ -971,7 +1085,8 @@ ggplot(data = water_budget[,
                            .(residual_flow = median_na(residual_flow), nobs = .N),
                            by = .(site, water_level_cm = round(water_level_cm, 0))],
        aes(x = water_level_cm,
-           y = residual_flow)) + 
+           y = residual_flow,
+           size = nobs)) + 
   geom_point(alpha = 0.4) +
   geom_smooth(method = nls,
               method.args = list(start = list(m = 1.25, c = -20),
@@ -985,13 +1100,15 @@ ggplot(data = water_budget[,
 
 
 # Use this if not using flow_mods above
+# This should have a lower bound on the usable observations to make sure the
+# rise in outflow is sharp enough (look at 157)
 net_flow_mods <-
   water_budget[,
                .(residual_flow = median_na(residual_flow), nobs = .N),
                by = .(site, water_level_cm = round(water_level_cm, 0))]
 
 net_flow_mods <-
-  water_budget[, 
+  net_flow_mods[, 
                 .(mod = list(nls(residual_flow ~ m ** (water_level_cm + c),
                              start = list(m = 1.25, c = 20),
                              control = nls.control(maxiter = 100,
@@ -1012,16 +1129,31 @@ water_budget[, pred_flow := predict(net_flow_mods[.BY[[1]], mod[[1]]],
                                             newdata = .SD),
              by = .(site)]
 
+
+net_flow_mods2 <- 
+  water_budget[,
+               .(residual_flow = median_na(residual_flow), nobs = .N),
+               by = .(site, water_level_cm = round(water_level_cm, 0))]
+
+net_flow_mods2 <- 
+  net_flow_mods2[, .(mod = list(lmrob(residual_flow ~ water_level_cm,
+                                      setting = "KS2014"))),
+                 keyby = .(site)]
+
+water_budget[, pred_flow2 := predict(net_flow_mods2[.BY[[1]], mod[[1]]],
+                                    newdata = .SD),
+             by = .(site)]
+
 ggplot(data = water_budget,
        aes(x = water_level_cm,
            y = residual_flow)) + 
   geom_point(alpha = 0.4) +
-  geom_line(aes(y = pred_flow),
+  geom_line(aes(y = pred_flow + pred_flow2),
             color = "blue") +
   facet_wrap(~ site, 
              scales = "free")
 
-water_budget[, Ds_resid := (pred_in + pred_out - pred_flow) - Ds_cm]
+water_budget[, Ds_resid := (pred_in + pred_out - (pred_flow + pred_flow2)) - Ds_cm]
 
 
 # Need to improve dormant drawdown (probably has to do with streamflow)
@@ -1029,7 +1161,7 @@ split(water_budget[!is.na(net_precip_cm)],
       by = "site_status") %>% 
   map(~wrap_elements(ggplot(.x,
                             aes(x = Ds_cm,
-                                y = pred_Ds_cm)) + 
+                                y = pred_in + pred_out - (pred_flow + pred_flow2))) + 
                        geom_point(aes(color = season)) +
                        geom_abline() +
                        geom_smooth(method = lmrob,
@@ -1063,16 +1195,25 @@ split(water_budget[!is.na(net_precip_cm)],
 
 # Metrics
 
+model_evaluation <- 
+  water_budget[, 
+               .(rmse = caret::RMSE((pred_in + pred_out - pred_flow), Ds_cm, na.rm = TRUE),
+                 r2 = caret::R2((pred_in + pred_out - pred_flow), Ds_cm, na.rm = TRUE),
+                 mad = median_na(((pred_in + pred_out - pred_flow) - Ds_cm) / Ds_cm)),
+               by = .(site_status, site)]
+
+saveRDS(model_evaluation, "tmp/models/model_evaluation.rds")
+
 water_budget[, 
              .(rmse = caret::RMSE((pred_in + pred_out - pred_flow), Ds_cm, na.rm = TRUE),
                r2 = caret::R2((pred_in + pred_out - pred_flow), Ds_cm, na.rm = TRUE),
-               mad = median_na((pred_in + pred_out - pred_flow) / Ds_cm)),
+               mad = median_na(((pred_in + pred_out - pred_flow) - Ds_cm) / Ds_cm)),
              by = .(site_status, season)]
 
 water_budget[between(Ds_cm, -2, 2), 
              .(rmse = caret::RMSE((pred_in + pred_out - pred_flow), Ds_cm, na.rm = TRUE),
                r2 = caret::R2((pred_in + pred_out - pred_flow), Ds_cm, na.rm = TRUE),
-               mad = median_na((pred_in + pred_out - pred_flow) / Ds_cm)),
+               mad = median_na(((pred_in + pred_out - pred_flow) - Ds_cm) / Ds_cm)),
              by = .(site_status, season)]
 # Error Sources
 
@@ -1118,7 +1259,7 @@ ggplot(water_budget[net_precip_cm > 0],
              scales = "free")
 
 
-# Apply Predictions
+# Apply Predictions -------------------------------------------------------
 
 predictions <- 
   water_budget[water_budget[!is.na(water_level_cm), 
@@ -1241,7 +1382,7 @@ saveRDS(sy_mods, "tmp/models/sy_mods.rds")
 saveRDS(starting_values, "tmp/models/starting_values.rds")
 saveRDS(wb_mods, "tmp/models/wb_mods.rds")
 saveRDS(water_budget[, unique(.SD[, .(site, site_status)])], "tmp/models/site_status_combinations.rds")
-
+saveRDS(full_predict, "tmp/models/full_predict.rds")
 
 full_predict <-
   function(site_status, 
@@ -1317,9 +1458,21 @@ full_predict <-
                             "growing",
                             "dormant")]
     
-    dat[interception, 
-        interception_cm := i.i_cm,
-        on = c("site", "site_status", "season")]
+    if(!is.null(random.effects) && is.na(random.effects)){
+      interception <- 
+        interception[, .(i_cm = mean(i_cm)), by = .(site_status, season)]
+      
+      dat[interception, 
+          interception_cm := i.i_cm,
+          on = c("site_status", "season")]
+    } else {
+      
+      dat[interception, 
+          interception_cm := i.i_cm,
+          on = c("site", "site_status", "season")]
+      
+    }
+    
     
     # Generated for Wakefield (could be done spatially with GLM)
     ha_coefs <- 
@@ -1384,6 +1537,7 @@ full_predict <-
                 re.form = random.effects,
                 newdata = data.frame(site = hydrology_model,
                                      harad_pet_hs_cm = i_pet,
+                                     cum_dd = dat$cum_dd[i],
                                      water_availability = i_water_availability))
       
       precip_rise[i] <- 
@@ -1402,6 +1556,11 @@ full_predict <-
       flow[i] <- 
         ifelse(wl[i] > (-offset),
                pmin(flow[i], wl[i] + offset),
+               flow[i])
+      
+      flow[i] <- 
+        ifelse(wl[i] < offset,
+               0,
                flow[i])
       
       wl[i+1] <- wl[i] + precip_rise[i] + pet[i] - flow[i]
@@ -1425,52 +1584,115 @@ full_predict <-
 # issue. Look for sites with bad residuals at lower water levels. These may be
 # the result of Sy mode issues
 
-water_budget[daily_ex_met,
-            `:=`(min_temp_c = i.min_temp_c,
-                 max_temp_c = i.max_temp_c,
-                 mean_temp_c = i.mean_temp_c),
-            on = "sample_date"]
-  
-water_budget[, raw_precip := gross_precip_cm * sy]
+water_budget <- 
+  split(water_budget,
+        by = c("site", "sample_year")) %>% 
+  mclapply(function(x){
+    x[, 
+      full_pred := full_predict(site_status = site_status, 
+                                hydrology_model = site,
+                                initial.wl = first(water_level_cm),
+                                weather = .SD[, .(doy = yday(sample_date),
+                                                  gross_precip_cm = raw_precip,
+                                                  cum_dd,
+                                                  min_temp_c,
+                                                  max_temp_c,
+                                                  mean_temp_c)])]
+  },
+  mc.cores = 4) %>% 
+  rbindlist()
 
-water_budget[, 
-             full_pred := full_predict(site_status = site_status, 
-                                       hydrology_model = site,
-                                       initial.wl = first(water_level_cm),
-                                       weather = .SD[, .(doy = yday(sample_date),
-                                                         gross_precip_cm = raw_precip,
-                                                         min_temp_c,
-                                                         max_temp_c,
-                                                         mean_temp_c)]),
-             by = .(site, sample_year)]
+water_budget <- 
+  water_budget %>% 
+  split(by = c("site", "sample_year")) %>% 
+  mclapply(function(x){
+    x[!is.na(water_level_cm), 
+      fixed_pred := full_predict(site_status = site_status,
+                                 random.effects = NA,
+                                 hydrology_model = site,
+                                 initial.wl = first(water_level_cm),
+                                 weather = .SD[, .(doy = yday(sample_date),
+                                                   gross_precip_cm = raw_precip,
+                                                   cum_dd,
+                                                   min_temp_c,
+                                                   max_temp_c,
+                                                   mean_temp_c)])]
+  },
+  mc.cores = 4) %>% 
+  rbindlist()
 
-YEAR <- 2012
+ggplot(water_budget[, .(Ds_cm = diff(water_level_cm), Ds_full = diff(full_pred), Ds_fixed = diff(fixed_pred)),
+                    by = .(site, sample_year)],
+       aes(x = Ds_cm,
+           y = Ds_full)) +
+  geom_point() +
+  geom_quantile(quantiles = 0.5) + 
+  geom_abline() +
+  facet_wrap(~site,
+             scales = "free")
+
+
+YEAR <- 2013
 ggplot(water_budget[sample_year == YEAR],
        aes(x = sample_date,
            color = site_status)) +
   geom_line(aes(y = water_level_cm)) +
-  geom_line(data = predictions[sample_year == YEAR], 
-            aes(y = pred_wl),
+  geom_line(aes(y = full_pred),
             linetype = "dotted",
             color = "gray50") +
-  geom_line(aes(y = full_pred),
+  geom_line(aes(y = fixed_pred),
             linetype = "dotted") +
   facet_wrap(~site, 
              scales = "free")
 
-ggplot(water_budget,
-       aes(x = yday(sample_date),
+ggplot(water_budget[sample_year != 2019, 
+                    .(sample_date = sample_date - years(.BY[[2]]),
+                      error_pct = (full_pred - water_level_cm) / diff(range(water_level_cm, na.rm = TRUE))),
+                    by = .(site, sample_year)],
+       aes(x = sample_date,
            color = factor(sample_year))) +
-  geom_line(aes(y = full_pred - water_level_cm)) +
+  geom_line(aes(y = error_pct)) +
   facet_wrap(~site, 
-             scales = "free")
+             scales = "free") + 
+  labs(caption = "Full (random effects) error as a percentage of annual water table range")
 
-ggplot(water_budget,
-       aes(x = yday(sample_date),
-           color = site)) +
-  geom_line(aes(y = full_pred - water_level_cm)) +
-  facet_wrap(~factor(sample_year), 
-             scales = "free")
+ggplot(water_budget[sample_year != 2019 & !(site == "157" & sample_year == "2017"), 
+                    .(sample_date = sample_date - years(.BY[[2]]),
+                      error_pct = (fixed_pred - water_level_cm) / diff(range(water_level_cm, na.rm = TRUE))),
+                    by = .(site, sample_year)],
+       aes(x = sample_date,
+           color = factor(sample_year))) +
+  geom_line(aes(y = error_pct)) +
+  facet_wrap(~site, 
+             scales = "free") + 
+  labs(caption = "Partial (fixed effects) error as a percentage of annual water table range")
+
+# Normalized Water Level (make sure start value matches actual water level start value)
+water_budget[water_budget[!is.na(water_level_cm), 
+                          .(start_date = pmax(min_na(sample_date), 
+                                              ymd(paste0(.BY[[2]], "0615"))),
+                            end_date = pmin(max_na(sample_date),
+                                            ymd(paste0(.BY[[2]], "0930")))), 
+                          by = .(site, sample_year)], 
+             `:=`(norm_fixed_pred = fixed_pred - (first(fixed_pred) + first(water_level_cm)),
+                  norm_full_pred = full_pred - (first(full_pred) + first(water_level_cm))), 
+             by = .(site, sample_year),
+             on = c("site", "sample_date >= start_date", "sample_date <= end_date")
+]
+
+ggplot(
+
+[sample_year == 2019 & !(site == "157" & sample_year == "2017"), 
+  # .(sample_date = sample_date - years(.BY[[2]]),
+  #   error_pct = (full_pred - water_level_cm) / diff(range(water_level_cm, na.rm = TRUE))),
+  # by = .(site, sample_year)
+  ],
+aes(x = yday(sample_date),
+    color = factor(sample_year))) +
+  geom_line(aes(y = full_pred)) +
+  facet_wrap(~site, 
+             scales = "free") + 
+  labs(caption = "Full (random effects) error as a percentage of annual water table range")
 
 
 # Test Treatment Simulation

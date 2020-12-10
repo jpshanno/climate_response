@@ -62,7 +62,7 @@ prepare_water_levels <-
   
   daily_water_levels[site_info, 
                      `:=`(treatment = i.treatment,
-                          site_status = ifelse(sample_date > i.treatment_date,
+                          site_status = ifelse(sample_date > i.treatment_date & i.treatment != "Control",
                                                "Treated",
                                                "Control"),
                           morphology = i.morphology,
