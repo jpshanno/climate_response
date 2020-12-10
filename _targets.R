@@ -69,9 +69,57 @@ targets <- list(
                       ghcnd.units = ghcnd_units) %>%
       fill_missing_data(additional.data = mesowest_met,
                         source = "ncei") %>%
-      calculate_solar_radiation(coefs = solrad_coefs)
+      calculate_mean_temp() %>% 
+      calculate_solar_radiation(coefs = solrad_coefs) %>% 
+      calculate_hargreaves_pet(lambda.MJ.kg = 2.45)
+  )
+
+  , tar_target(
+    study_data_paths,
+    c("data/well_levels.csv",
+      "data/precipitation_daily.csv",
+      "data/daily_snowmelt.csv"),
+    format = "file"
   )
   
+  , tar_target(
+    daily_water_levels,
+    prepare_water_levels(path = study_path("well_levels", study_data_paths)) %>% 
+      append_study_precip(precip.path = study_path("precip", study_data_paths),
+                          snow.path = study_path("snowmelt", study_data_paths))
+  )
+  
+  , tar_target(
+    mod_interception,
+    model_interception_loss(data = daily_water_levels,
+                            precip.column = "best_precip_cm"),
+    format = "rds"
+  )
+  # 
+  # , tar_target(
+  #   mod_esy,
+  #   NULL
+  # )
+  # 
+  # , tar_target(
+  #   mod_flow,
+  #   NULL
+  # )
+  # 
+  # , tar_target(
+  #   mod_rise,
+  #   NULL
+  # )
+  # 
+  # , tar_target(
+  #   mod_drawdown,
+  #   NULL
+  # )
+  # 
+  # , tar_target(
+  #   water_balance,
+  #   NULL
+  # )
 )
 
 # End with a call to tar_pipeline() to wrangle the targets together.
