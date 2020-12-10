@@ -10,28 +10,33 @@
 model_interception_loss <- 
   function(data,
            y,
-           x) {
+           x,
+           g) {
 
-    stopifnot(length(x)==1)
-    
     form <- 
       make_formula(y, x)
     
     interception <- 
-      data[data[[x]] > 0,
-                          .(treatment = first(treatment),
-                            mod = list(lmrob(form,
-                                             data = .SD,
-                                             setting = "KS2014"))),
-                          by = .(site, site_status, season)]
+      data[data[[x[1]]] > 0,
+           .(treatment = first(treatment),
+             mod = list(lmrob(form,
+                              data = .SD,
+                              setting = "KS2014"))),
+           keyby = g]
     
-    interception[, c("intercept", "slope") := map_dfr(mod, coef)]
-    interception[, i_cm := -intercept / slope]
-    
-    interception[, i_cm := ifelse(is.na(i_cm), mean_na(i_cm), i_cm),
-                 by = .(site_status)]
-    
-    interception[i_cm < 0, i_cm := 0]
+    interception[, c("intercept", "slope", "interaction_slope") := map_dfr(mod, coef)]
+
+    # Doing this using split inside := because doing it by group with env = .SD
+    # is only using the last row of values
+
+    prediction_functions <- 
+      split(interception, 
+            by = "site_status") %>% 
+      map(~as.function(list(x = NULL, 
+                            substitute(-intercept / (slope + interaction_slope * cos(2*pi*((x)))), 
+                                       env = .x))))
+        
+    interception[, f_predict := prediction_functions]
     
     interception
     
@@ -42,4 +47,27 @@ model_interception_loss <-
     # 
     # daily_water_balance[, precip_intensity_cm_hr := net_precip_cm / (Dl_time_range_s / 3600)]
 
+}
+
+##' .. content for \description{} (no empty lines) ..
+##'
+##' .. content for \details{} ..
+##'
+##' @title
+##' @return
+##' @author Joe Shannon
+##' @export
+calculate_net_precip <- 
+  function(data, intercept.models, precip.col) {
+
+  stopifnot("doy_decimal" %in% names(data))
+    
+  data[, i_cm := intercept.models[.BY[[1]], f_predict[[1]]](doy_decimal),
+       by = .(site_status)]
+
+  set(data, 
+      j = "net_precip_cm",
+      value = pmax(0, data[[precip.col]] - data$i_cm))
+  
+  data[]
 }
