@@ -92,14 +92,18 @@ targets <- list(
   , tar_target(
     mod_interception,
     model_interception_loss(data = daily_water_levels,
-                            precip.column = "best_precip_cm"),
+                            y = "Ds_cm",
+                            x = c("best_precip_cm", "best_precip_cm:cos(doy_decimal*2*pi)"),
+                            g = "site_status"),
     format = "rds"
   )
-  # 
-  # , tar_target(
-  #   mod_esy,
-  #   NULL
-  # )
+
+  , tar_target(
+    mod_esy,
+    model_ecosystem_sy(data = daily_water_levels,
+                       interception = mod_interception),
+    format = "rds"
+  )
   # 
   # , tar_target(
   #   mod_flow,
