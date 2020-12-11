@@ -10,7 +10,7 @@
 calculate_hargreaves_pet <- 
   function(data, lambda.MJ.kg) {
     
-    data[, pet_cm := 0.1 * 0.0023 * solrad_MJ_m2 / lambda.MJ.kg * (tmean_c + 17.8) * sqrt(tmax_c - tmin_c)][]
+    data[, pet_cm := 0.1 * 0.0135 * solrad_MJ_m2 / lambda.MJ.kg * (tmean_c + 17.8) * sqrt(tmax_c - tmin_c)][]
     
   }
 
