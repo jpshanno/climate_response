@@ -9,13 +9,7 @@ for(i in list.files("code/functions", full.names = TRUE)){
 } 
 
 # Set target-specific options such as packages.
-tar_option_set(packages = c("lutz", 
-                            "data.table", 
-                            "purrr", 
-                            "robustbase", 
-                            "sirad", 
-                            "lubridate",
-                            "geodist"),
+tar_option_set(packages = readLines("code/climate_packages.R"),
                format = "fst_dt",
                resources = list(compress = 100))
 
