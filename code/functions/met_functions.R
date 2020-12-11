@@ -56,3 +56,64 @@ calculate_mean_temp <-
     data[, tmean_c := (tmin_c - tmax_c)/2][]
     
   }
+
+##' .. content for \description{} (no empty lines) ..
+##'
+##' .. content for \details{} ..
+##'
+##' @title
+
+##' @return
+##' @author Joe Shannon
+##' @export
+calculate_water_availability <- 
+  function(data) {
+  
+  data[, water_availability_cm := cumsum(precip_cm - pet_cm),
+       by = .(station_name,
+              water_year)]
+  
+}
+
+##' .. content for \description{} (no empty lines) ..
+##'
+##' .. content for \details{} ..
+##'
+##' @title
+
+##' @return
+##' @author Joe Shannon
+##' @export
+calculate_solrad_coefs <- 
+  function(data) {
+    
+    stopifnot(all(c("sample_date", "lat", "solrad_MJ_m2", "tmax_c", "tmin_c") %in% names(data)))
+    
+    data <- 
+      copy(data)
+    
+    data <- 
+      data[,
+           .(dat = list(.SD)),
+           by = .(station_name)]
+    
+    data[, 
+         clear_sky_t := map_dbl(dat,
+                                ~cst(RefRad = .x$solrad_MJ_m2,
+                                     days = .x$sample_date,
+                                     lat = radians(first(.x$lat)),
+                                     extraT = .x$et_solrad_MJ_m2))]
+    
+    data[,
+         mod := 
+           map2(dat, clear_sky_t,
+                ~nls(solrad_MJ_m2 ~ .y * (1-exp(-B*(tmax_c - tmin_c)**C)) * et_solrad_MJ_m2,
+                     start = list(B = 0.06, C = 2),
+                     data = .x))]
+    
+    data[, c("BC_B", "BC_C") := map_dfr(mod, coef)]
+    
+    data[, .(station_name, 
+             BC_A = clear_sky_t, 
+             BC_B,
+             BC_C)]
