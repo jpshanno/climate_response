@@ -8,10 +8,10 @@
 ##' @author Joe Shannon
 ##' @export
 prepare_mesowest_data <- 
-  function(dir, start_date, end_date) {
+  function(dir, start.date, end.date) {
     
     meso_files <- 
-      list.files("data/mesowest_met/",
+      list.files(dir,
                  full.names = TRUE)
     
     ex_met <- 
@@ -53,9 +53,7 @@ prepare_mesowest_data <-
     # Summarize to daily data
     # We only want to use complete days, so na.rm = FALSE
     ex_met[, daily_dat := map2(dat, tz,
-                               ~.x[, .(lat = first(lat),
-                                       lon = first(lon),
-                                       mean_temp_c = mean(air_temp_c), 
+                               ~.x[, .(mean_temp_c = mean(air_temp_c), 
                                        min_temp_c = min(air_temp_c), 
                                        max_temp_c = max(air_temp_c), 
                                        observed_rad_MJ_m2 = sum(solar_rad_MJ_m2_hr)), 
@@ -69,14 +67,26 @@ prepare_mesowest_data <-
     # Clip off partial days from the beginning & end of the data
     ex_met[, daily_dat := map(daily_dat, 
                               ~.x[between(sample_date, 
-                                          start_date,
-                                          end_date)])]
+                                          start.date,
+                                          end.date)])]
     
     # Unnest daily data
     daily_ex_met <- 
       ex_met[, daily_dat[[1]], 
-             by = .(station)]
+             by = .(station, lat, lon)]
    
+    daily_ex_met[, doy := yday(sample_date)]
+    
+    solrad <- 
+      daily_ex_met[, 
+                   .(doy = 1:366,
+                     et_solrad_MJ_m2 = extrat(1:366, radians(first(lat)))$ExtraTerrestrialSolarRadiationDaily), 
+                   by = .(station)]
+    
+    daily_ex_met[solrad, 
+                 et_solrad_MJ_m2 := i.et_solrad_MJ_m2, 
+                 on = c("doy", "station")]
+    
     # Match to standard column names for project
     daily_ex_met[, .(station_name = station,
                      sample_date,
@@ -84,5 +94,6 @@ prepare_mesowest_data <-
                      lon,
                      tmin_c = min_temp_c,
                      tmax_c = max_temp_c,
-                     solrad_MJ_m2 = observed_rad_MJ_m2)]
+                     solrad_MJ_m2 = observed_rad_MJ_m2,
+                     et_solrad_MJ_m2)]
 }

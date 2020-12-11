@@ -34,9 +34,10 @@ calculate_solar_radiation <-
          solrad_MJ_m2 := bc(days = sample_date, 
                             lat = first(lat),
                             BCb = coefs[, mean(BC_B)],
+                            BCc = coefs[, mean(BC_C)],
                             Tmax = tmax_c,
                             Tmin = tmin_c,
-                            tal = coefs[, mean(clear_sky_t)]),
+                            tal = coefs[, mean(BC_A)]),
          by = .(station_name)][]
     
   }
@@ -117,3 +118,4 @@ calculate_solrad_coefs <-
              BC_A = clear_sky_t, 
              BC_B,
              BC_C)]
+  }
