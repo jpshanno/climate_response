@@ -39,22 +39,24 @@ prepare_water_levels <-
   
   site_info <- 
     fread(text = 
-            "site,study,treatment,treatment_date,morphology
-             006,planting,Girdle,2014-03-31,flowthrough
-             009,eco,Ash Cut,2014-03-31,threshold
-             053,pws,Ash Cut,2015-03-31,flowthrough
-             077,eco,Ash Cut,2014-03-31,threshold
-             111,planting,Control,2014-03-31,threshold
-             113,pws,Control,2015-03-31,flowthrough
-             119,eco,Girdle,2014-03-31,closed
-             135,eco,Control,2014-03-31,flowthrough
-             139,planting,Ash Cut,2014-03-31,threshold
-             140,eco,Girdle,2014-03-31,flowthrough
-             151,eco,Girdle,2014-03-31,threshold
-             152,eco,Control,2014-03-31,flowthrough
-             156,eco,Ash Cut,2014-03-31,closed
-             157,eco,Control,2014-03-31,threshold",
+            "site,lon,lat,study,treatment,treatment_date,morphology
+             006,-89.19036,46.32392,planting,Girdle,2014-03-31,flowthrough
+             009,-89.71207,46.41624,eco,Ash Cut,2014-03-31,threshold
+             053,-89.53043,46.61028,pws,Ash Cut,2015-03-31,flowthrough
+             077,-88.86684,46.71778,eco,Ash Cut,2014-03-31,threshold
+             111,-89.71369,46.57636,planting,Control,2014-03-31,threshold
+             113,-89.80990,46.35090,pws,Control,2015-03-31,flowthrough
+             119,-89.59433,46.28794,eco,Girdle,2014-03-31,closed
+             135,-88.87838,46.75382,eco,Control,2014-03-31,flowthrough
+             139,-88.95577,46.59619,planting,Ash Cut,2014-03-31,threshold
+             140,-89.61962,46.43279,eco,Girdle,2014-03-31,flowthrough
+             151,-88.89502,46.67307,eco,Girdle,2014-03-31,threshold
+             152,-89.71468,46.41277,eco,Control,2014-03-31,flowthrough
+             156,-89.58431,46.28327,eco,Ash Cut,2014-03-31,closed
+             157,-89.58479,46.28173,eco,Control,2014-03-31,threshold",
           select = c(site = "character",
+                     lon = "numeric",
+                     lat = "numeric",
                      study = "character",
                      treatment = "character",
                      treatment_date = "Date",
@@ -63,7 +65,9 @@ prepare_water_levels <-
   
   
   daily_water_levels[site_info, 
-                     `:=`(treatment = i.treatment,
+                     `:=`(lon = i.lon,
+                          lat = i.lat,
+                          treatment = i.treatment,
                           site_status = ifelse(sample_date > i.treatment_date & i.treatment != "Control",
                                                "Treated",
                                                "Control"),
@@ -73,6 +77,9 @@ prepare_water_levels <-
                                              (month(sample_date) == 9 & mday(sample_date) <= 15),
                                            "growing",
                                            "dormant"))]
+  
+  daily_water_levels[, `:=`(water_year = as.water_year(sample_date),
+                            dowy = as.dowy(sample_date))]
   
   daily_water_levels
   
