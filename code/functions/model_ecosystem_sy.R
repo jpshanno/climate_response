@@ -10,12 +10,13 @@
 ##' @export
 model_ecosystem_sy <- 
   function(data, 
-           interception) {
+           interception,
+           precip.col) {
     
     sy_dat <- 
       calculate_net_precip(data, 
                            interception, 
-                           "obs_precip_cm")[
+                           precip.col)[
                              net_precip_cm > 0, 
                              .(site, 
                                sample_date,
