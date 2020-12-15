@@ -9,7 +9,7 @@ for(i in list.files("code/functions", full.names = TRUE)){
 } 
 
 # Set target-specific options such as packages.
-tar_option_set(packages = readLines("code/climate_packages.R"),
+tar_option_set(packages = readLines("code/climate_packages.txt"),
                format = "fst_dt",
                resources = list(compress = 100))
 
@@ -25,8 +25,8 @@ targets <- list(
   , tar_target(
     mesowest_met,
     prepare_mesowest_data(dir = mesowest_dir, 
-                          start_date = as.Date("2011-10-01"),
-                          end_date = as.Date("2020-09-30"))
+                          start.date = as.Date("2011-10-01"),
+                          end.date = as.Date("2020-09-30"))
   )
   
   , tar_target(
@@ -53,8 +53,6 @@ targets <- list(
     format = "file"
   )
   
-  
-  # IDW does not currently include mesowest precip, could add in for daily data
   , tar_target(
     external_met,
     prepare_ncei_data(path = ncei_files,
@@ -65,7 +63,10 @@ targets <- list(
                         source = "ncei") %>%
       calculate_mean_temp() %>% 
       calculate_solar_radiation(coefs = solrad_coefs) %>% 
-      calculate_hargreaves_pet(lambda.MJ.kg = 2.45)
+      calculate_hargreaves_pet(lambda.MJ.kg = 2.45) %>% 
+      calculate_water_availability(precip.col = "precip_cm",
+                                   pet.col = "pet_cm",
+                                   group.cols = c("station_name", "water_year"))
   )
 
   , tar_target(
@@ -95,14 +96,24 @@ targets <- list(
   , tar_target(
     mod_esy,
     model_ecosystem_sy(data = daily_water_levels,
-                       interception = mod_interception),
+                       interception = mod_interception,
+                       precip.col = "best_precip_cm"),
     format = "rds"
   )
-  # 
-  # , tar_target(
-  #   mod_flow,
-  #   NULL
-  # )
+  
+  , tar_target(
+    water_budget,
+    prepare_water_budget(data = daily_water_levels,
+                         external.met = external_met,
+                         interception.mods = mod_interception,
+                         sy.mods = mod_esy)
+  )
+
+  , tar_target(
+    mod_net_flow,
+    model_net_flow(data = water_budget),
+    format = "rds"
+  )
   # 
   # , tar_target(
   #   mod_rise,
