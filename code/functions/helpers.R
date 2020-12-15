@@ -177,3 +177,67 @@ make_formula <-
     as.formula(form, env = parent.env(environment()))
     
   }
+
+##' .. content for \description{} (no empty lines) ..
+##'
+##' .. content for \details{} ..
+##'
+##' @title
+##' @param x a vector of class Date/Datetime or a numeric vector representing month
+##' @return
+##' @author Joe Shannon
+##' @export
+calculate_climate_season <- 
+  function(x){
+    stopifnot(is.numeric(x) | is.Date(x))
+    
+    if(is.numeric(x) & any(data.table::between(x, 1, 12))){
+      stop("If x is numeric then all values must be between 1 and 12")
+    }
+    
+    if(is.Date(x)){
+      mon <- 
+        month(x)
+    }
+    
+    data.table::fcase(mon %in% c(12, 1, 2), "djf", 
+                      mon %in% 3:5, "mam", 
+                      mon %in% 6:8, "jja", 
+                      mon %in% 9:11, "son")
+    
+  }
+
+##' .. content for \description{} (no empty lines) ..
+##'
+##' .. content for \details{} ..
+##'
+##' @title
+##' @param x a vector of class Date/Datetime
+##' @return
+##' @author Joe Shannon
+##' @export
+as.water_year <- 
+  function(x){
+    stopifnot(any(grepl("(Date|POSIXt)", class(x))))
+    
+    ifelse(month(x) > 9,
+           year(x) + 1,
+           year(x))
+  }
+
+##' .. content for \description{} (no empty lines) ..
+##'
+##' .. content for \details{} ..
+##'
+##' @title
+##' @param x a vector of class Date/Datetime
+##' @return
+##' @author Joe Shannon
+##' @export
+as.dowy <- 
+  function(x){
+    stopifnot(any(grepl("(Date|POSIXt)", class(x))))
+    
+    1 + as.numeric(x - as.Date(paste(as.water_year(x)-1, "10-01", sep = "-")))
+    
+  }

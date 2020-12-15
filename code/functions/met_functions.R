@@ -108,9 +108,11 @@ calculate_solrad_coefs <-
     data[,
          mod := 
            map2(dat, clear_sky_t,
-                ~nls(solrad_MJ_m2 ~ .y * (1-exp(-B*(tmax_c - tmin_c)**C)) * et_solrad_MJ_m2,
+                ~nls(solrad_MJ_m2 ~ .y * (1-exp((-B*tdiff**C) / mnth_tdiff_c)) * et_solrad_MJ_m2,
                      start = list(B = 0.06, C = 2),
-                     data = .x))]
+                     data = .x[, .(solrad_MJ_m2, tmax_c, tmin_c, et_solrad_MJ_m2, 
+                                   tdiff = tmax_c - tmin_c, mnth_tdiff_c = mean(tmax_c - tmin_c)),
+                               by = .(month(sample_date))]))]
     
     data[, c("BC_B", "BC_C") := map_dfr(mod, coef)]
     
@@ -118,4 +120,26 @@ calculate_solrad_coefs <-
              BC_A = clear_sky_t, 
              BC_B,
              BC_C)]
+  }
+
+##' .. content for \description{} (no empty lines) ..
+##'
+##' .. content for \details{} ..
+##'
+##' @title
+
+##' @param data
+##' @param precip.col
+##' @param pet.col
+##' @return
+##' @author Joe Shannon
+##' @export
+calculate_water_availability <- 
+  function(data, precip.col, pet.col, group.cols){
+    
+    data[, 
+         water_availability_cm := cumsum(get(precip.col) - get(pet.col)),
+         by = group.cols]
+
+    data    
   }
