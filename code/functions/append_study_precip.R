@@ -36,9 +36,10 @@ append_study_precip <-
               idw_precip_cm = i.idw_precip_cm)]
     
     data[melt,
-        melt := i.melt_cm,
+         melt_cm := i.melt_cm,
         on = "sample_date"]
     
+    data[, melt_cm := nafill(melt_cm, "const", 0)]
     data[, best_precip_cm := fcoalesce(obs_precip_cm, idw_precip_cm)]
     
     data
