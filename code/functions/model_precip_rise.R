@@ -1,0 +1,35 @@
+##' .. content for \description{} (no empty lines) ..
+##'
+##' .. content for \details{} ..
+##'
+##' @title
+
+##' @return
+##' @author Joe Shannon
+##' @export
+model_precip_rise <- 
+  function(data) {
+
+  # Precip models use net precip, so treatment period is not a necessary factor
+    
+  mods <- 
+    data[net_precip_cm > 0 & Dl_signed_cm > 0, 
+         .(mod = list(glmrob(Dl_signed_cm ~ net_precip_cm,
+                             family = Gamma(identity)))),
+         keyby = .(site)]
+  
+  mods[, 
+       c("intercept", "slope") := map_dfr(mod, coef), 
+       by = .(site)]
+  
+  prediction_functions <- 
+    split(mods, 
+          by = "site") %>% 
+    map(~as.function(list(x = NULL, 
+                          substitute(intercept + slope * x, 
+                                     env = .x))))
+  
+  mods[, 
+       f_predict := prediction_functions]
+  
+}

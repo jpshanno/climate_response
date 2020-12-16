@@ -140,10 +140,11 @@ targets <- list(
   
   # Model Water level Rise
 
-  # , tar_target(
-  #   mod_rise,
-  #   model_precip_rise()
-  # )
+  , tar_target(
+    mod_rise,
+    model_precip_rise(training_data),
+    format = "rds"
+  )
     
   # Model PET
 
