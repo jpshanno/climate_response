@@ -19,7 +19,7 @@ targets <- list(
   
   # Set Data Paths ----------------------------------------------------------
   
-  , tar_target(
+  tar_target(
     study_data_paths,
     c("data/well_levels.csv",
       "data/precipitation_daily.csv",
@@ -27,7 +27,7 @@ targets <- list(
     format = "file"
   )
   
-  tar_target(
+  , tar_target(
     mesowest_dir,
     "data/mesowest_met/",
     format = "file"
@@ -125,11 +125,24 @@ targets <- list(
   # Model Response Components -----------------------------------------------
   # Split data
   
+  , tar_target(
+    validation_data,
+    select_validation_years(data = water_budget,
+                            date.col = "sample_date",
+                            n.in.group = 1,
+                            groups = c("site", "site_status"))
+  )
+  
+  , tar_target(
+    training_data,
+    water_budget[!validation_data]
+  )
+  
   # Model Water level Rise
 
   # , tar_target(
   #   mod_rise,
-  #   NULL
+  #   model_precip_rise()
   # )
     
   # Model PET
