@@ -16,11 +16,36 @@ tar_option_set(packages = readLines("code/climate_packages.txt"),
 # Define targets
 targets <- list(
   
-  tar_target(
-    mesowest_dir,
-   "data/mesowest_met/",
+  
+  # Set Data Paths ----------------------------------------------------------
+  
+  , tar_target(
+    study_data_paths,
+    c("data/well_levels.csv",
+      "data/precipitation_daily.csv",
+      "data/daily_snowmelt.csv"),
     format = "file"
   )
+  
+  tar_target(
+    mesowest_dir,
+    "data/mesowest_met/",
+    format = "file"
+  )
+  
+  , tar_target(
+    ncei_files,
+    fetch_ncei_data(out.path = "data/ncei_data",
+                    coords = c(lon = -89.61332,
+                               lat = 46.43133),
+                    radius = 100,
+                    start.date = as.Date("2011-10-01"),
+                    end.date = as.Date("2020-09-30"),
+                    force.download = FALSE),
+    format = "file"
+  )
+  
+  # Prepare Data ------------------------------------------------------------
   
   , tar_target(
     mesowest_met,
@@ -42,18 +67,6 @@ targets <- list(
   )
   
   , tar_target(
-    ncei_files,
-    fetch_ncei_data(out.path = "data/ncei_data",
-                    coords = c(lon = -89.61332,
-                               lat = 46.43133),
-                    radius = 100,
-                    start.date = as.Date("2011-10-01"),
-                    end.date = as.Date("2020-09-30"),
-                    force.download = FALSE),
-    format = "file"
-  )
-  
-  , tar_target(
     external_met,
     prepare_ncei_data(path = ncei_files,
                       start.date = as.Date("2011-10-01"),
@@ -68,14 +81,6 @@ targets <- list(
                                    pet.col = "pet_cm",
                                    group.cols = c("station_name", "water_year"))
   )
-
-  , tar_target(
-    study_data_paths,
-    c("data/well_levels.csv",
-      "data/precipitation_daily.csv",
-      "data/daily_snowmelt.csv"),
-    format = "file"
-  )
   
   , tar_target(
     daily_water_levels,
@@ -85,6 +90,16 @@ targets <- list(
   )
   
   , tar_target(
+    water_budget,
+    prepare_water_budget(data = daily_water_levels,
+                         external.met = external_met,
+                         interception.mods = mod_interception,
+                         sy.mods = mod_esy)
+  )
+  
+  # Model Physical Components -----------------------------------------------
+  
+  , tar_target(
     mod_interception,
     model_interception_loss(data = daily_water_levels,
                             y = "Ds_cm",
@@ -92,7 +107,7 @@ targets <- list(
                             g = "site_status"),
     format = "rds"
   )
-
+  
   , tar_target(
     mod_esy,
     model_ecosystem_sy(data = daily_water_levels,
@@ -102,33 +117,31 @@ targets <- list(
   )
   
   , tar_target(
-    water_budget,
-    prepare_water_budget(data = daily_water_levels,
-                         external.met = external_met,
-                         interception.mods = mod_interception,
-                         sy.mods = mod_esy)
-  )
-
-  , tar_target(
     mod_net_flow,
     model_net_flow(data = water_budget),
     format = "rds"
   )
-  # 
+  
+  # Model Response Components -----------------------------------------------
+  # Split data
+  
+  # Model Water level Rise
+
   # , tar_target(
   #   mod_rise,
   #   NULL
   # )
-  # 
+    
+  # Model PET
+
   # , tar_target(
   #   mod_drawdown,
   #   NULL
   # )
-  # 
-  # , tar_target(
-  #   water_balance,
-  #   NULL
-  # )
+    
+  # Simulate Wetland Runs ---------------------------------------------------
+  
+
 )
 
 # End with a call to tar_pipeline() to wrangle the targets together.
