@@ -54,7 +54,7 @@ calculate_solar_radiation <-
 calculate_mean_temp <-
   function(data) {
     
-    data[, tmean_c := (tmin_c - tmax_c)/2][]
+    data[, tmean_c := (tmin_c + tmax_c)/2][]
     
   }
 
