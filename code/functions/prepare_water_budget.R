@@ -42,7 +42,7 @@ prepare_water_budget <-
              obs_precip_cm = obs_precip_cm / sy,
              net_precip_cm = net_precip_cm / sy,
              best_precip_cm = best_precip_cm / sy,
-             melt_cm,
+             melt_cm = melt_cm / sy,
              Dl_signed_cm,
              Ds_cm)]
     
@@ -65,6 +65,8 @@ prepare_water_budget <-
                                          water_availability_cm = weighted.mean(water_availability_cm, weight))]
                             })
     ]
+
+    water_budget[, `:=`(pet_cm = pet_cm / sy)]
     
     water_budget[, net_flow_cm := Ds_cm + pet_cm - net_precip_cm - melt_cm]
     
