@@ -14,8 +14,8 @@ model_precip_rise <-
     
   mods <- 
     data[net_precip_cm > 0 & Dl_signed_cm > 0, 
-         .(mod = list(glmrob(Dl_signed_cm ~ net_precip_cm,
-                             family = Gamma(identity)))),
+         .(mod = list(lmrob(Dl_signed_cm ~ net_precip_cm,
+                            setting = "KS2014"))),
          keyby = .(site)]
   
   mods[, 

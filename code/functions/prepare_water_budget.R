@@ -39,12 +39,12 @@ prepare_water_budget <-
              sy, 
              wl_initial_cm,
              wl_median_cm,
-             obs_precip_cm = obs_precip_cm / sy,
-             net_precip_cm = net_precip_cm / sy,
-             best_precip_cm = best_precip_cm / sy,
-             melt_cm = melt_cm / sy,
-             Dl_signed_cm,
-             Ds_cm)]
+             obs_precip_cm = obs_precip_cm,
+             net_precip_cm = net_precip_cm,
+             best_precip_cm = best_precip_cm,
+             melt_cm = melt_cm,
+             Dl_signed_cm = Ds_cm * sy,
+             Ds_cm = Ds_cm * sy)]
     
     wghts <- 
       calculate_weights(rbind(unique(data[, .(station_name = site, lat, lon)]), 
@@ -66,7 +66,7 @@ prepare_water_budget <-
                             })
     ]
 
-    water_budget[, `:=`(pet_cm = pet_cm / sy)]
+    water_budget[, `:=`(pet_cm = pet_cm)]
     
     water_budget[, net_flow_cm := Ds_cm + pet_cm - net_precip_cm - melt_cm]
     
