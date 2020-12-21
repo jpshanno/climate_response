@@ -10,140 +10,107 @@
 model_net_flow <- 
   function(data) {
     
-    # ggplot(data,
-    #        aes(x = wl_initial_cm,
-    #            y = Ds_cm + pet_cm - net_precip_cm - nafill(melt_cm, "const", 0))) +
-    #   geom_point(alpha = 0.25) +
-    #   geom_smooth(method = "loess",
-    #               method.args = list(family = "gaussian"),
-    #               span = 0.75,
-    #               color = "red") +
-    #   geom_smooth(method = "loess",
-    #               method.args = list(family = "symmetric"),
-    #               span = 0.75) +
-    #   facet_wrap(~site,
-    #              scales = "free")
+    # Create water level bins of equal width. n is set to be the same number as
+    # rounding to 2 cm bins. Doing it this way provides a better distribution of
+    # points to model net flow. Attempted doing it as rounding to nearest 
+    # centimeter or 2 centimeter, or with doing equal number of observations 
+    # within each bin. 
     
-    flow_mods <- 
-      data[,
-           .(mod = list(autoloess(net_flow_cm ~ wl_initial_cm, 
-                                  data = .SD,
-                                  model = TRUE,
-                                  family = "gaussian",
-                                  span = c(0.3, 1)))),
-           keyby = .(site)]
+    data[, wl_bin := cut_interval(wl_initial_cm,
+                                  n = uniqueN(round(wl_initial_cm, 0))/2), 
+         by = .(site)]
     
-    flow_mods[, span := map(mod, pluck, "pars", "span")]
+    # Reduced data to median flow for each centimeter of water level to remove 
+    # noise
+    reduced_dat <- 
+      data[net_flow_cm < 5, 
+           .(net_flow_cm = median_na(net_flow_cm),
+             wl_initial_cm = median_na(wl_initial_cm)), 
+           by = .(site, wl_bin)]
     
-    # ggplot(data,
-    #        aes(x = wl_initial_cm,
-    #            y = net_flow_cm)) +
-    #   geom_point(alpha = 0.25) +
-    #   geom_smooth(method = "loess",
-    #               method.args = list(family = "gaussian"),
-    #               span = 0.75,
-    #               color = "red") +
-    #   facet_wrap(~site,
-    #              scales = "free")
-    # 
-    # data[, loess_pred := predict(flow_mods[.BY[[1]], mod[[1]]], newdata = .SD), 
-    #      by = .(site)]
-    # 
-    # ggplot(data,
-    #        aes(x = wl_initial_cm,
-    #            y = net_flow_cm)) +
-    #   geom_point(alpha = 0.25) +
-    #   geom_line(aes(y = loess_pred),
-    #             color = "red") +
-    #   facet_wrap(~site,
-    #              scales = "free")
+    # Remove wl_bin from original data
+    data[, wl_bin := NULL]
     
-    smoothed_dat <- 
-      unique(data[!is.na(wl_initial_cm), .(site, wl_initial_cm = round(wl_initial_cm, 1))])
+    # Remove NAs for modeling & flows > 5 cm as these all seem to occur at high
+    # water levels and likely represent melt/rain on snow or missed precip 
+    # events. Removing data from before May removes many of these too, but then 
+    # the most extreme high water levels are missed
     
-    smoothed_dat[,loess_pred := predict(flow_mods[.BY[[1]], mod[[1]]], newdata = .SD), 
-                 by = .(site)]
+    reduced_dat <- 
+      subset(x = reduced_dat,
+             subset = 
+               !is.na(net_flow_cm) & 
+               !is.na(wl_initial_cm))
     
-    # Could use MARS from earth package as well
+    mcp_mods <- 
+      reduced_dat[, .(mod = list(mcp(list(net_flow_cm ~ wl_initial_cm,
+                                          ~0 + wl_initial_cm + I(wl_initial_cm^2)),
+                                     data = .SD))),
+                  keyby = .(site)]
     
-    seg_mods <- 
-      smoothed_dat[!is.na(loess_pred), 
-              .(lm_mod = list(lm(loess_pred ~ wl_initial_cm))),
-              keyby = .(site)]
+    mcp_mods <- 
+      mcp_mods[, cbind(.SD,
+                       map_dfr(mod,
+                               ~dcast(setDT(fixef(.x)[, c("name", "mean")]), 
+                                      . ~ name, 
+                                      value.var = "mean")[, -c(".")]))]
     
-    seg_mods[, seg_mod := map(lm_mod, 
-                              selgmented, 
-                              seg.Z=~wl_initial_cm, 
-                              type = "davies")]
+    # Drop model sigma estimate
+    mcp_mods[, sigma_1 := NULL]
     
-    # data[, seg_pred := predict(seg_mods[.BY[[1]], seg_mod[[1]]], newdata = .SD),
-    #      by = .(site)]
-    # 
-    # ggplot(data,
-    #        aes(x = wl_initial_cm,
-    #            y = net_flow_cm)) +
-    #   geom_point(alpha = 0.25) +
-    #   geom_line(aes(y = test_pred,
-    #                 color = "loess")) +
-    #   geom_line(aes(y = seg_pred,
-    #                 color = "segmented")) +
-    #   facet_wrap(~site,
-    #              scales = "free")
+    setnames(mcp_mods,
+             c("cp_1", "int_1", "wl_initial_cm_1", "wl_initial_cm_2", "wl_initial_cm_2_E2"),
+             c("changepoint", "intercept", "linear_slope_1", "linear_slope_2", 
+               "quadratic_slope_2"))
     
-    seg_coefs <- 
-      seg_mods[, map_dfr(seg_mod, 
-                         ~as.list(c(intercept(.x)$wl_initial_cm[, "Est."], 
-                                    slope(.x)$wl_initial_cm[, "Est."], 
-                                    .x$psi[, "Est."]))), 
-               by = .(site)]
-    
-    setnames(seg_coefs,
-             gsub("[\\(\\)\\.]+", "_", tolower(names(seg_coefs))))
-    
-    setnames(seg_coefs,
-             gsub("(^_+|_+$)", "", names(seg_coefs)))
-
-    # Could make this more flexible to account for models with more or less than
-    # two break points by pasting together an expression from the names
-    # grep("[0-9](?=_)", names(seg_coefs), perl = TRUE, value = TRUE)
     predict_functions <- 
-      split(seg_coefs,
+      split(mcp_mods,
             by = "site") %>%
       map(~as.function(list(x = NULL,
                             outflow.only = NULL,
-                            substitute({q <- fcase(x < psi1_wl_initial_cm, 
-                                                   intercept1 + slope1 * x,
-                                                   x >= psi1_wl_initial_cm & x < psi2_wl_initial_cm,
-                                                   intercept2 + slope2 * x,
-                                                   x >= psi2_wl_initial_cm,
-                                                   intercept3 + slope3 * x)
+                            substitute({
+                              q <- 
+                                ifelse(x <= changepoint,
+                                       intercept + linear_slope_1 * x,
+                                       intercept + linear_slope_1 * (x - changepoint) + linear_slope_2 * (x - changepoint) + quadratic_slope_2 * (x - changepoint)^2)
                             if(!outflow.only){return(q)}
                             pmin(q, 0)},
                                        env = .x))))
 
-    seg_mods[, f_predict := predict_functions]
     
-    # Check of prediction function    
-    # data[, 
-    #      test_pred := seg_mods[.BY[[1]], f_predict[[1]]](wl_initial_cm, outflow.only = FALSE),
+    mcp_mods[, f_predict := predict_functions]
+    
+    # # Check of prediction function
+    # # They are not exactly the same. I think the issue may be that the fixef()
+    # # function gives mean coefficient estimates from the posterior distribution.
+    # # The more skewed the posterior estimates, the more the manual prediction and
+    # # the predict() prediction will differ.
+    # 
+    # reduced_dat[,
+    #      func_pred := mcp_mods[.BY[[1]], f_predict[[1]]](wl_initial_cm, outflow.only = FALSE),
     #      by = .(site)]
     # 
-    # all.equal(data$test_pred, data$seg_pred)
+    # reduced_dat[,
+    #      predict_pred := predict(mcp_mods[.BY[[1]], mod[[1]]],
+    #                           newdata = .SD)$predict,
+    #      by = .(site)]
     # 
-    # ggplot(data,
-    #        aes(x = wl_initial_cm,
-    #            y = net_flow_cm)) +
-    #   geom_point(alpha = 0.25) +
-    #   geom_line(aes(y = test_pred,
-    #                 color = "manual")) +
-    #   geom_line(aes(y = seg_pred,
-    #                 color = "segmented"),
-    #             linetype = "dashed") +
-    #   facet_wrap(~site,
-    #              scales = "free")
+    # map2(mcp_mods$site,
+    #      mcp_mods$mod,
+    #      ~plot(.y, q_predict = TRUE) +
+    #        ggtitle(.x) +
+    #        geom_line(data = reduced_dat[site == .x],
+    #                  aes(x = wl_initial_cm,
+    #                      y = predict_pred),
+    #                  linetype = "dashed",
+    #                  color = "red") +
+    #        geom_line(data = reduced_dat[site == .x],
+    #                  aes(x = wl_initial_cm,
+    #                      y = func_pred))) %>%
+    #   reduce(`+`)
+    # 
+    # all.equal(reduced_dat$func_pred, reduced_dat$predict_pred)
     
-    seg_mods[, lm_mod := NULL]
-    
-    seg_mods
+    mcp_mods
     
 }
