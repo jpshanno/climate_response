@@ -19,27 +19,27 @@ model_residual_flow <-
     
     data[, residual_flow_cm := expected_flow_cm - net_flow_cm]
     
-    ggplot(data[best_precip_cm == 0],
-           aes(x = pet_cm,
-               y = residual_flow_cm,
-               color = water_availability_cm)) +
-      geom_point() +
-      geom_smooth(method = lmrob,
-                  formula = y ~ x,
-                  method.args = list(setting = "KS2014")) +
-      facet_wrap(~site,
-                 scales = "free")
-    
-    ggplot(data[best_precip_cm == 0 & residual_flow_cm > -10],
-           aes(x = water_availability_cm,
-               y = residual_flow_cm,
-               color = pet_cm)) +
-      geom_point() +
-      geom_smooth(method = lmrob, 
-                  formula = y ~ cos(2 * pi * x / diff(range(x))) + sin(2 * pi * x / diff(range(x))),
-                  method.args = list(setting = "KS2014")) +
-      facet_wrap(~site,
-                 scales = "free")
+    # ggplot(data[best_precip_cm == 0],
+    #        aes(x = pet_cm,
+    #            y = residual_flow_cm,
+    #            color = water_availability_cm)) +
+    #   geom_point() +
+    #   geom_smooth(method = lmrob,
+    #               formula = y ~ x,
+    #               method.args = list(setting = "KS2014")) +
+    #   facet_wrap(~site,
+    #              scales = "free")
+    # 
+    # ggplot(data[best_precip_cm == 0 & residual_flow_cm > -10],
+    #        aes(x = water_availability_cm,
+    #            y = residual_flow_cm,
+    #            color = pet_cm)) +
+    #   geom_point() +
+    #   geom_smooth(method = lmrob, 
+    #               formula = y ~ cos(2 * pi * x / diff(range(x))) + sin(2 * pi * x / diff(range(x))),
+    #               method.args = list(setting = "KS2014")) +
+    #   facet_wrap(~site,
+    #              scales = "free")
     
     data[, water_availability_decimal := water_availability_cm / diff(range(water_availability_cm)),
          by = .(site)]
@@ -83,100 +83,100 @@ model_residual_flow <-
                                    newdata = .SD)),
          by = .(site)]
     
-    ggplot(data[best_precip_cm == 0],
-           aes(x = residual_flow_cm,
-               y = pred_pet)) +
-      geom_point() +
-      geom_abline() +
-      facet_wrap(~site,
-                 scales = "free")
-    
-    ggplot(data[best_precip_cm == 0],
-           aes(x = residual_flow_cm,
-               y = pred_add)) +
-      geom_point() +
-      geom_abline() +
-      facet_wrap(~site,
-                 scales = "free")
-    
-    ggplot(data[best_precip_cm == 0],
-           aes(x = residual_flow_cm,
-               y = pred_wa)) +
-      geom_point() +
-      geom_abline() +
-      facet_wrap(~site,
-                 scales = "free")
-    
-    ggplot(data[best_precip_cm == 0],
-           aes(x = residual_flow_cm,
-               y = pred_int)) +
-      geom_point() +
-      geom_abline() +
-      facet_wrap(~site,
-                 scales = "free")
-    
-    ggplot(data[best_precip_cm == 0],
-           aes(x = residual_flow_cm,
-               y = pred_no_int)) +
-      geom_point() +
-      geom_abline() +
-      facet_wrap(~site,
-                 scales = "free")
-    
-    ggplot(data[best_precip_cm == 0],
-           aes(x = residual_flow_cm,
-               y = pred_full)) +
-      geom_point() +
-      geom_abline() +
-      facet_wrap(~site,
-                 scales = "free")
+    # ggplot(data[best_precip_cm == 0],
+    #        aes(x = residual_flow_cm,
+    #            y = pred_pet)) +
+    #   geom_point() +
+    #   geom_abline() +
+    #   facet_wrap(~site,
+    #              scales = "free")
+    # 
+    # ggplot(data[best_precip_cm == 0],
+    #        aes(x = residual_flow_cm,
+    #            y = pred_add)) +
+    #   geom_point() +
+    #   geom_abline() +
+    #   facet_wrap(~site,
+    #              scales = "free")
+    # 
+    # ggplot(data[best_precip_cm == 0],
+    #        aes(x = residual_flow_cm,
+    #            y = pred_wa)) +
+    #   geom_point() +
+    #   geom_abline() +
+    #   facet_wrap(~site,
+    #              scales = "free")
+    # 
+    # ggplot(data[best_precip_cm == 0],
+    #        aes(x = residual_flow_cm,
+    #            y = pred_int)) +
+    #   geom_point() +
+    #   geom_abline() +
+    #   facet_wrap(~site,
+    #              scales = "free")
+    # 
+    # ggplot(data[best_precip_cm == 0],
+    #        aes(x = residual_flow_cm,
+    #            y = pred_no_int)) +
+    #   geom_point() +
+    #   geom_abline() +
+    #   facet_wrap(~site,
+    #              scales = "free")
+    # 
+    # ggplot(data[best_precip_cm == 0],
+    #        aes(x = residual_flow_cm,
+    #            y = pred_full)) +
+    #   geom_point() +
+    #   geom_abline() +
+    #   facet_wrap(~site,
+    #              scales = "free")
 
     
-    evals <- 
-      data[best_precip_cm == 0,
-           lapply(.SD,
-                  hydroGOF::mae,
-                  obs = residual_flow_cm,
-                  na.rm = TRUE),
-           by = .(site),
-           .SDcols = patterns("pred_")]
-    
-    
-    ggplot(melt(evals, id.vars = "site"),
-           aes(x = variable, y = value)) + 
-      geom_boxplot() +
-      geom_jitter(width = 0.15)
-    
-    data[,
-         `:=`(resid_pet = as.numeric(scale(pred_pet - residual_flow_cm)),
-              resid_full = as.numeric(scale(pred_full - residual_flow_cm)),
-              resid_int = as.numeric(scale(pred_int - residual_flow_cm))),
-         by = .(site)]
-    
-    
-    ggplot(data[best_precip_cm == 0],
-           aes(x = pet_cm,
-               y = resid_full)) +
-      geom_point() +
-      geom_smooth(method = lmrob,
-                  formula = y ~ x,
-                  se = FALSE) +
-      geom_hline(aes(yintercept = 0),
-                 color = "red") +
-      facet_wrap(~site,
-                 scales = "free")
-    
-    ggplot(data[best_precip_cm == 0],
-           aes(x = water_availability_rad,
-               y = resid_full)) +
-      geom_point() +
-      geom_smooth(method = lmrob,
-                  formula = y ~ x,
-                  se = FALSE) +
-      geom_hline(aes(yintercept = 0),
-                 color = "red") +
-      facet_wrap(~site,
-                 scales = "free")
+    # evals <- 
+    #   data[best_precip_cm == 0,
+    #        lapply(.SD,
+    #               hydroGOF::mae,
+    #               obs = residual_flow_cm,
+    #               na.rm = TRUE),
+    #        by = .(site),
+    #        .SDcols = patterns("pred_")]
+    # 
+    # 
+    # ggplot(melt(evals, id.vars = "site"),
+    #        aes(x = variable, y = value)) + 
+    #   geom_boxplot() +
+    #   geom_jitter(width = 0.15)
+    # 
+    # data[,
+    #      `:=`(resid_pet = as.numeric(scale(pred_pet - residual_flow_cm)),
+    #           resid_full = as.numeric(scale(pred_full - residual_flow_cm)),
+    #           resid_int = as.numeric(scale(pred_int - residual_flow_cm))),
+    #      by = .(site)]
+    # 
+    # 
+    # ggplot(data[best_precip_cm == 0],
+    #        aes(x = pet_cm,
+    #            y = resid_full)) +
+    #   geom_point() +
+    #   geom_smooth(method = lmrob,
+    #               formula = y ~ x,
+    #               se = FALSE) +
+    #   geom_hline(aes(yintercept = 0),
+    #              color = "red") +
+    #   facet_wrap(~site,
+    #              scales = "free")
+    # 
+    # ggplot(data[best_precip_cm == 0],
+    #        aes(x = water_availability_rad,
+    #            y = resid_full)) +
+    #   geom_point() +
+    #   geom_smooth(method = lmrob,
+    #               formula = y ~ x,
+    #               se = FALSE) +
+    #   geom_hline(aes(yintercept = 0),
+    #              color = "red") +
+    #   facet_wrap(~site,
+    #              scales = "free")
     
     
     # Using pred_int is the simpler model and performance is really similar
