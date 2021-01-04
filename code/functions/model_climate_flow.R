@@ -7,7 +7,7 @@
 ##' @return
 ##' @author Joe Shannon
 ##' @export
-model_residual_flow <- 
+model_climate_flow <- 
   function(data,
            flow.models) {
     
@@ -46,76 +46,49 @@ model_residual_flow <-
     data[, water_availability_decimal := water_availability_cm / diff(range(water_availability_cm)),
          by = .(site_status)]
     
-    data[, water_availability_rad := 2 * pi * water_availability_cm]
+    data[, water_availability_rad := 2 * pi * water_availability_decimal]
     
     mods <- 
       data[best_precip_cm == 0,
            .(mod_pet = list(lmrob(residual_flow_cm ~ pet_cm,
                                   setting = "KS2014",
                                   data = .SD)),
-             mod_crossed = list(lmrob(residual_flow_cm ~ pet_cm*water_availability_m,
+             mod_crossed = list(lmrob(residual_flow_cm ~ pet_cm*(water_availability_rad + cos(water_availability_rad) + sin(water_availability_rad)),
                                       setting = "KS2014",
                                       data = .SD)),
-             mod_wa = list(lmrob(residual_flow_cm ~ cos(water_availability_rad) + sin(water_availability_rad),
-                                 setting = "KS2014",
-                                 data = .SD)),
-             mod_add = list(lmrob(residual_flow_cm ~ pet_cm + cos(water_availability_rad) + sin(water_availability_rad),
-                                  setting = "KS2014",
-                                  data = .SD)),
-             mod_int = list(lmrob(residual_flow_cm ~ pet_cm + pet_cm:water_availability_m,
-                                  setting = "KS2014",
-                                  data = .SD)),
-             mod_no_int = list(lmrob(residual_flow_cm ~ pet_cm + cos(water_availability_rad) + sin(water_availability_rad),
+             mod_no_int = list(lmrob(residual_flow_cm ~ pet_cm + water_availability_rad + cos(water_availability_rad) + sin(water_availability_rad),
                                      setting = "KS2014",
-                                     data = .SD)),
-             mod_full = list(lmrob(residual_flow_cm ~ pet_cm + pet_cm:water_availability_m + cos(water_availability_rad) + sin(water_availability_rad),
-                                   setting = "KS2014",
-                                   data = .SD))),
+                                     data = .SD))),
            keyby = .(site)]
     
-    # pet*water_avilability_cm is a worse fit
-    # Need to test this harmonic method
     mmods <- 
       data[best_precip_cm == 0,
-           .(
-             mmod = list(rlmerRcpp(residual_flow_cm ~ pet_cm + pet_cm:water_availability_m + (pet_cm + pet_cm:water_availability_m || site),
-                              data = .SD)),
-             mmod_harmonic = list(rlmerRcpp(residual_flow_cm ~ pet_cm + pet_cm:water_availability_m + cos(water_availability_rad) + sin(water_availability_rad) + (1 | site) + (0 + pet_cm | site) + (0 + cos(water_availability_rad) + sin(water_availability_rad) | site),
-                                            data = .SD))),
+           .(mmod_crossed = list(rlmerRcpp(residual_flow_cm ~ pet_cm*(water_availability_rad + cos(water_availability_rad) + sin(water_availability_rad)) + (pet_cm*(water_availability_rad + cos(water_availability_rad) + sin(water_availability_rad)) || site),
+                                           data = .SD))),
            keyby = .(site_status)]
     
     data[, `:=`(pred_pet = predict(mods[CJ(.BY[[1]]), mod_pet[[1]]],
                                    newdata = .SD),
                 pred_crossed = predict(mods[CJ(.BY[[1]]), mod_crossed[[1]]],
                                    newdata = .SD),
-                pred_wa = predict(mods[CJ(.BY[[1]]), mod_wa[[1]]],
-                                   newdata = .SD),
-                pred_add = predict(mods[CJ(.BY[[1]]), mod_add[[1]]],
-                                   newdata = .SD),
-                pred_int = predict(mods[CJ(.BY[[1]]), mod_int[[1]]],
-                                   newdata = .SD),
                 pred_no_int = predict(mods[CJ(.BY[[1]]), mod_no_int[[1]]],
-                                   newdata = .SD),
-                pred_full = predict(mods[CJ(.BY[[1]]), mod_full[[1]]],
                                    newdata = .SD)),
          by = .(site)]
     
-    data[, `:=`(pred_mmod_full = predict(mmods[CJ(.BY[[1]]), mmod[[1]]],
+    data[, `:=`(pred_mmod_full = predict(mmods[CJ(.BY[[1]]), mmod_crossed[[1]]],
                                          newdata = .SD),
-                pred_mmod_harmonic = predict(mmods[CJ(.BY[[1]]), mmod_harmonic[[1]]],
-                                         newdata = .SD),
-                pred_mmod_fixed = predict(mmods[CJ(.BY[[1]]), mmod[[1]]],
+                pred_mmod_fixed = predict(mmods[CJ(.BY[[1]]), mmod_crossed[[1]]],
                                           re.form = NA,
                                           newdata = .SD)),
          by = .(site_status)]
     
-    # ggplot(data[best_precip_cm == 0],
-    #        aes(x = residual_flow_cm,
-    #            y = pred_pet)) +
-    #   geom_point() +
-    #   geom_abline() +
-    #   facet_wrap(~site,
-    #              scales = "free")
+    ggplot(data[best_precip_cm == 0],
+           aes(x = residual_flow_cm,
+               y = pred_no_int)) +
+      geom_point() +
+      geom_abline() +
+      facet_wrap(~site,
+                 scales = "free")
     # 
     # ggplot(data[best_precip_cm == 0],
     #        aes(x = residual_flow_cm,
@@ -158,20 +131,22 @@ model_residual_flow <-
     #              scales = "free")
 
 # 
-#     evals <-
-#       data[best_precip_cm == 0,
-#            lapply(.SD,
-#                   hydroGOF::mae,
-#                   obs = residual_flow_cm,
-#                   na.rm = TRUE),
-#            by = .(site),
-#            .SDcols = patterns("pred_")]
+    evals <-
+      data[best_precip_cm == 0,
+           lapply(.SD,
+                  hydroGOF::rmse,
+                  obs = residual_flow_cm,
+                  na.rm = TRUE),
+           by = .(site),
+           .SDcols = patterns("pred_")]
 # 
 # 
-#     ggplot(melt(evals, id.vars = "site"),
-#            aes(x = variable, y = value)) +
-#       geom_boxplot() +
-#       geom_jitter(width = 0.15)
+    
+    melt(evals, id.vars = "site")[, .(value = median(value)), by = .(variable)][order(value)]
+    ggplot(melt(evals, id.vars = "site"),
+           aes(x = variable, y = value)) +
+      geom_boxplot() +
+      geom_jitter(width = 0.15)
     # 
     # data[,
     #      `:=`(resid_pet = as.numeric(scale(pred_pet - residual_flow_cm)),
