@@ -116,9 +116,10 @@ targets <- list(
     format = "rds"
   )
   
+  # Need formal model validations (save residual checks, etc)
   , tar_target(
-    mod_net_flow,
-    model_net_flow(data = water_budget),
+    mod_morphology_flow,
+    model_morphology_flow(data = water_budget),
     format = "rds"
   )
   
@@ -146,15 +147,28 @@ targets <- list(
     format = "rds"
   )
     
-  # Model PET
-
-  # , tar_target(
-  #   mod_drawdown,
-  #   NULL
-  # )
+  # Model Residual Flow
+  # Flow not explained by water level fluctuations
+  # Does not allow random slope, only random intercept. Should probably involve
+  # both, but run times took forever
+  , tar_target(
+    mod_residual,
+    model_residual_flow(training_data,
+                        mod_morphology_flow),
+    format = "rds"
+  )
     
   # Simulate Wetland Runs ---------------------------------------------------
   
+  # simulate_water_levels()
+  # , tar_target(
+  #   simulations,
+  #   run_simulations(n, ...) %>% 
+  #   simulate_water_levels(site_status, 
+  #                       hydrology_model = NULL, 
+  #                       initial.wl = NA,
+  #                       weather, 
+  #                       return.components = FALSE)
 
 )
 

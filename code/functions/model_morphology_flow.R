@@ -7,7 +7,7 @@
 ##' @return
 ##' @author Joe Shannon
 ##' @export
-model_net_flow <- 
+model_morphology_flow <- 
   function(data) {
     
     # Create water level bins of equal width. n is set to be the same number as
