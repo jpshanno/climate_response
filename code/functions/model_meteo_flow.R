@@ -7,7 +7,7 @@
 ##' @return A two component list for fixed and random effects coefficients and prediction functions
 ##' @author Joe Shannon
 ##' @export
-model_climate_flow <- 
+model_meteo_flow <- 
   function(data,
            flow.models) {
     
@@ -20,12 +20,12 @@ model_climate_flow <-
          by = .(site)]
     
     # Determine residual flow explained by weather variation
-    data[, climate_flow_cm := morphology_flow_cm - net_flow_cm]
+    data[, meteo_flow_cm := morphology_flow_cm - net_flow_cm]
     
     # Plots showing mixed-model structure
-    # ggplot(data[best_precip_cm == 0 & between(climate_flow_cm, -7.5, 2.5)],
+    # ggplot(data[best_precip_cm == 0 & between(meteo_flow_cm, -7.5, 2.5)],
     #        aes(x = pet_cm,
-    #            y = climate_flow_cm,
+    #            y = meteo_flow_cm,
     #            color = site)) +
     #   geom_point(alpha = 0.25) +
     #   geom_smooth(method = lmrob,
@@ -34,9 +34,9 @@ model_climate_flow <-
     #   facet_wrap(~site_status,
     #              scales = "free")
     # 
-    # ggplot(data[best_precip_cm == 0 & between(climate_flow_cm, -7.5, 2.5)],
+    # ggplot(data[best_precip_cm == 0 & between(meteo_flow_cm, -7.5, 2.5)],
     #        aes(x = water_availability_cm,
-    #            y = climate_flow_cm,
+    #            y = meteo_flow_cm,
     #            color = site)) +
     #   geom_point(alpha = 0.25) +
     #   geom_smooth(method = lmrob,
@@ -57,7 +57,7 @@ model_climate_flow <-
     # Method 'DAStau' does not support blocks of size larger than 2. Falling back to method 'DASvar'."
     mods <- 
       data[best_precip_cm == 0,
-           .(mod = list(rlmerRcpp(climate_flow_cm ~ pet_cm*(cos(water_availability_rad) + sin(water_availability_rad)) + (1 + cos(water_availability_rad) + sin(water_availability_rad) | site),
+           .(mod = list(rlmerRcpp(meteo_flow_cm ~ pet_cm*(cos(water_availability_rad) + sin(water_availability_rad)) + (1 + cos(water_availability_rad) + sin(water_availability_rad) | site),
                                   data = .SD,
                                   method = "DASvar"))),
            keyby = .(site_status)]
@@ -72,7 +72,7 @@ model_climate_flow <-
     #      by = .(site_status)]
     #
     # ggplot(data[best_precip_cm == 0],
-    #        aes(x = climate_flow_cm,
+    #        aes(x = meteo_flow_cm,
     #            y = pred_random)) +
     #   geom_point(shape = 20) +
     #   geom_abline() +
@@ -81,14 +81,14 @@ model_climate_flow <-
     # 
     # ggplot(data[best_precip_cm == 0],
     #        aes(x = pet_cm,
-    #            y = pred_random - climate_flow_cm)) +
+    #            y = pred_random - meteo_flow_cm)) +
     #   geom_point(shape = 20) +
     #   facet_wrap(~site,
     #              scales = "free")
     # 
     # ggplot(data[best_precip_cm == 0],
     #        aes(x = water_availability_cm,
-    #            y = pred_random - climate_flow_cm)) +
+    #            y = pred_random - meteo_flow_cm)) +
     #   geom_point(shape = 20) +
     #   facet_wrap(~site,
     #              scales = "free")
@@ -97,7 +97,7 @@ model_climate_flow <-
     # # Site-level model with no treatment status information
     # site_mods <-
     #   data[best_precip_cm == 0,
-    #        .(mod_crossed = list(lmrob(climate_flow_cm ~ pet_cm*(water_availability_rad + cos(water_availability_rad) + sin(water_availability_rad)),
+    #        .(mod_crossed = list(lmrob(meteo_flow_cm ~ pet_cm*(water_availability_rad + cos(water_availability_rad) + sin(water_availability_rad)),
     #                                   setting = "KS2014",
     #                                   data = .SD))),
     #        keyby = .(site)]
@@ -108,7 +108,7 @@ model_climate_flow <-
     # 
     # # Compare models graphically
     # ggplot(data[best_precip_cm == 0],
-    #        aes(x = climate_flow_cm,
+    #        aes(x = meteo_flow_cm,
     #            y = pred_random)) +
     #   geom_point(aes(y = pred_site),
     #              color = "red",
@@ -123,7 +123,7 @@ model_climate_flow <-
     #   data[best_precip_cm == 0,
     #        lapply(.SD,
     #               hydroGOF::rmse,
-    #               obs = climate_flow_cm,
+    #               obs = meteo_flow_cm,
     #               na.rm = TRUE),
     #        by = .(site, site_status),
     #        .SDcols = patterns("pred_")]

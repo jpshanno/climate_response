@@ -89,14 +89,6 @@ targets <- list(
                           snow.path = study_path("snowmelt", study_data_paths))
   )
   
-  , tar_target(
-    water_budget,
-    prepare_water_budget(data = daily_water_levels,
-                         external.met = external_met,
-                         interception.mods = mod_interception,
-                         sy.mods = mod_esy)
-  )
-  
   # Model Physical Components -----------------------------------------------
   
   , tar_target(
@@ -123,9 +115,20 @@ targets <- list(
     format = "rds"
   )
   
-  # Model Response Components -----------------------------------------------
-  # Split data
+  # Prepare Water Budget Data ---------------------------------------------
+
+    # All values are in ground surface units
+  , tar_target(
+    water_budget,
+    prepare_water_budget(data = daily_water_levels,
+                         external.met = external_met,
+                         interception.mods = mod_interception,
+                         sy.mods = mod_esy)
+  )
   
+
+  # Split Data --------------------------------------------------------------
+
   , tar_target(
     validation_data,
     select_validation_years(data = water_budget,
@@ -137,7 +140,9 @@ targets <- list(
   , tar_target(
     training_data,
     water_budget[!validation_data]
-  )
+  )  
+  
+  # Model Response Components ---------------------------------------------
   
   # Model Water level Rise
 
@@ -147,14 +152,15 @@ targets <- list(
     format = "rds"
   )
     
-  # Model Residual Flow
-  # Flow not explained by water level fluctuations
+  # Model Climate Flow
+  # This can be thought of as the residual flow not explained by water level
+  # fluctuations
   # Does not allow random slope, only random intercept. Should probably involve
   # both, but run times took forever
   , tar_target(
-    mod_residual,
-    model_residual_flow(training_data,
-                        mod_morphology_flow),
+    mod_meteo_flow,
+    model_meteo_flow(training_data,
+                       mod_morphology_flow),
     format = "rds"
   )
     
