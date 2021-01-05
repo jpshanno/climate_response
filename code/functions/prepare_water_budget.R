@@ -52,7 +52,10 @@ prepare_water_budget <-
     
     setkey(external.met, "sample_date")
     
-    water_budget[, c("pet_cm", "water_availability_cm") := 
+    water_budget[, c("pet_cm", 
+                     "tmin_c",
+                     "tmax_c",
+                     "water_availability_cm") := 
                    map2_dfr(site, sample_date, 
                             function(site, ex_date){
                               
@@ -62,6 +65,8 @@ prepare_water_budget <-
                               ex_dat[, weight := wghts[site, station_name]]
                               
                               ex_dat[, .(pet_cm = weighted.mean(pet_cm, weight),
+                                         tmin_c = weighted.mean(tmin_c, weight),
+                                         tmax_c = weighted.mean(tmax_c, weight),
                                          water_availability_cm = weighted.mean(water_availability_cm, weight))]
                             })
     ]
