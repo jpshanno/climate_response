@@ -38,6 +38,12 @@ model_interception_loss <-
         
     interception[, f_predict := prediction_functions]
     
+    # Add Observed Precip Range
+    interception[data[, .(precip_range = list(range(best_precip_cm, na.rm = TRUE))),
+                      by = .(site_status)],
+                 precip_range_cm := i.precip_range,
+                 on = c("site_status")]
+    
     interception
     
     # daily_water_balance[interception, 

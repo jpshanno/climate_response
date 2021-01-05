@@ -111,6 +111,13 @@ model_morphology_flow <-
     # 
     # all.equal(reduced_dat$func_pred, reduced_dat$predict_pred)
     
+    # Add Observed Water Level Range
+    
+    mcp_mods[data[, .(wl_range = list(range(wl_initial_cm, na.rm = TRUE))), 
+                  by = .(site)],
+             wl_range_cm := i.wl_range,
+             on = "site"]
+             
     mcp_mods
     
 }

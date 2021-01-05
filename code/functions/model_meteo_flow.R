@@ -154,7 +154,8 @@ model_meteo_flow <-
     # For fixed effects predictions water_availability_rad will be calculated
     # using the global min & max of observed water availability values
     # Calculate water_availability_range for converting to radians
-    fixed_pred[, water_availability_range_cm := diff(range(data$water_availability_cm))]
+    fixed_pred[, water_availability_range_cm := replicate(2, range(data$water_availability_cm), simplify = FALSE)]
+    fixed_pred[, pet_range_cm := replicate(2, range(data$pet_cm), simplify = FALSE)]
     
     # Created prediction functions
     fixed_predict_functions <- 
@@ -167,7 +168,7 @@ model_meteo_flow <-
                               
                               if(convert.to.radians){
                                 water_rad <- 
-                                  2 * pi * water.availability / water_availability_range_cm
+                                  2 * pi * water.availability / diff(water_availability_range_cm[[1]])
                               } else {
                                 water_rad <- 
                                   water.availability
@@ -228,11 +229,12 @@ model_meteo_flow <-
     
     # Get min and max water level by site to calculate radians and check for out
     # of range predictions in climate simulations
-    random_pred[data[, .(min_obs_water_availability_cm = min(water_availability_cm),
-                         max_obs_water_availability_cm = max(water_availability_cm)),
+    random_pred[data[, 
+                     .(water_availability_range_cm = list(range(water_availability_cm)),
+                       pet_range_cm = list(range(pet_cm))),
                      by = .(site)],
-                `:=`(min_obs_water_availability_cm = i.min_obs_water_availability_cm,
-                     max_obs_water_availability_cm = i.max_obs_water_availability_cm),
+                `:=`(water_availability_range_cm = i.water_availability_range_cm,
+                     pet_range_cm = i.pet_range_cm),
                 on = c("site")]
     
     # Set key to ensure ordering and look-up for prediction
@@ -249,7 +251,7 @@ model_meteo_flow <-
                               
                               if(convert.to.radians){
                                 water_rad <- 
-                                  2 * pi * water.availability / (max_obs_water_availability_cm - min_obs_water_availability_cm)
+                                  2 * pi * water.availability / diff(water_availability_range_cm[[1]])
                               } else {
                                 water_rad <- 
                                   water.availability
