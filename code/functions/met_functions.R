@@ -9,8 +9,11 @@
 ##' @export
 calculate_hargreaves_pet <- 
   function(data, lambda.MJ.kg) {
-    
-    data[, pet_cm := 0.1 * 0.0135 * solrad_MJ_m2 / lambda.MJ.kg * (tmean_c + 17.8) * sqrt(tmax_c - tmin_c)][]
+    # 0.014375 = 0.0023/0.16, taken from Hargreaves & Allen 2003 (eq. 8 & Ks =
+    # 0.16 from precedeing paragraph)
+    # Eq 3 from Hargreaves & Allen (2003), using Rs as calculated from 
+    # Bristow-Campbell.
+    data[, pet_cm := 0.1 * 0.0135 * solrad_MJ_m2 / lambda.MJ.kg * (tmean_c + 17.8)][]
     
   }
 
@@ -35,7 +38,13 @@ calculate_solar_radiation <-
              et_solrad_MJ_m2 = extrat(1:366, radians(first(lat)))$ExtraTerrestrialSolarRadiationDaily), 
            by = .(station_name)]
     
-    data[, doy := yday(sample_date)]
+    has_doy <- 
+      "doy" %in% names(data)
+    
+    if(!has_doy){
+      data[, doy := yday(sample_date)]  
+    }
+    
     
     data[solrad,
          et_solrad_MJ_m2 := i.et_solrad_MJ_m2,
@@ -84,9 +93,14 @@ calculate_solar_radiation <-
                                   coefs[, mean(BC_A)] * (1-exp((-coefs[, mean(BC_B)]*(0)**coefs[, mean(BC_C)]) / mean((tmax_c - tmin_c)))) * et_solrad_MJ_m2),
            by = .(station_name, month(sample_date))]
 
+      data[, bc_tmin := NULL]
     }
 
-    data[, c("doy", "et_solrad_MJ_m2", "bc_tmin") := NULL]
+    if(!has_doy){
+      data[, doy := NULL]
+    }
+    
+    data[, et_solrad_MJ_m2 := NULL]
     
   }
 
