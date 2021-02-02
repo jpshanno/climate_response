@@ -1,3 +1,4 @@
+source("code/load_project.R")
 tar_load(external_met)
 tar_load(daily_water_levels)
 
@@ -45,7 +46,7 @@ peak_dates <-
   external_met[, .(sos = .SD[which.max(resid(lm(water_availability_cm ~ sample_date, 
                                                         data = .SD,
                                                         weights = c(10000, rep(1, .N-2), 10000)))), sample_date],
-                   eos = as.Date(paste0(.BY[[2]], "-11-01")),
+                   eos = as.Date(paste0(.BY[[2]], "-12-31")),
                    max_wa_cm = .SD[which.max(resid(lm(water_availability_cm ~ sample_date, 
                                                       data = .SD,
                                                       weights = c(10000, rep(1, .N-2), 10000)))), water_availability_cm]),
@@ -71,12 +72,25 @@ external_met[wa_trends,
 
 external_met[, detrend_wa_cm := (water_availability_cm + trend_adj) - trend_y]
 
+
+# Rather than use the maximum annual water water availability, calculate the max
+# springtime water avaialbility as above and use that for normalizing. Need to
+# simulate how that would look for long-term drying
+
+external_met[peak_dates,
+             seasonal_max_wa_cm := i.max_wa_cm,
+             on = c("station_name", "sample_year")]
+
+# Using the seasonal max approach from above (ie spring max water level) show 
+# divergent curves in Ds/normalized wa because it allows for some positive 
+# values in normalized_wa_cm
+
 external_met[,
              normalized_wa_cm := (water_availability_cm - first(water_availability_cm)) - max(water_availability_cm - first(water_availability_cm)),
-             by = .(station_name, water_year)]
+             by = .(station_name, sample_year)]
 
 
-ggplot(external_met[sample_year %in% 2012:2020], 
+ggplot(external_met[water_year %in% 2012:2020], 
        aes(x = sample_date, y = normalized_wa_cm)) + 
   geom_line() + 
   geom_hline(aes(yintercept = 0)) +
@@ -95,11 +109,13 @@ ggplot(external_met,
 
 
 daily_water_levels[, Ds_continuous := diff_na(wl_initial_cm),
-                   by = .(site, water_year)]
+                   by = .(site, sample_year)]
 
 daily_water_levels[, Ds_cumulative := ytd_sum(Ds_continuous),
-                   by = .(site, water_year)]
+                   by = .(site, sample_year)]
 
+daily_water_levels[, Ds_centered := Ds_cumulative + first(na.omit(wl_initial_cm)),
+                   by = .(site, sample_year)]
 
 ggplot(daily_water_levels,
        aes(x = sample_date,
@@ -109,9 +125,9 @@ ggplot(daily_water_levels,
              scales = "free")
 
 daily_water_levels[external_met[station_name == "kenton"],
-                   `:=`(detrend_wa_cm = i.detrend_wa_cm,
-                        normalized_wa_cm = i.normalized_wa_cm),
-                   on = c("dowy", "water_year")]
+                   `:=`(normalized_wa_cm = i.normalized_wa_cm,
+                        detrend_wa_cm = i.detrend_wa_cm),
+                   on = c("doy", "sample_year")]
 
 
 ggplot(daily_water_levels,
@@ -141,17 +157,17 @@ ggplot(daily_water_levels,
   facet_wrap(~ site, 
              scales = "free")
 
-daily_water_levels[, normalized_Ds := Ds_cumulative - max_na(Ds_cumulative),
+daily_water_levels[, normalized_Ds := Ds_centered - max_na(Ds_centered),
                    by = .(site, water_year)]
 daily_water_levels[, esy_wa_emp := Ds_cumulative/normalized_wa_cm]
-daily_water_levels[, wl_l1_cm := shift(wl_initial_cm, -1),
-                   by = .(site, water_year)]
+daily_water_levels[, wl_l1_cm := shift(wl_initial_cm, 1),
+                   by = .(site, sample_year)]
 
 # MCP DID HORRIBLY (with esy_wa_emp made using detrend_wa_cm & wl_initial_cm as X)
 # Ds_cumulative as X does great, but that's because then it's in X & Y
 
 esy_wa_mods <-
-  daily_water_levels[is.finite(esy_wa_emp), 
+  daily_water_levels[is.finite(esy_wa_emp) & wl_l1_cm < 0, 
                      .(mod_lm = list(lmrob(esy_wa_emp ~ wl_l1_cm,
                                            data = .SD,
                                            setting = "KS2014"))
@@ -159,10 +175,13 @@ esy_wa_mods <-
                                                data = .SD,
                                                setting = "KS2014"))
                        # , mod_mcp = list(mcp(list(esy_wa_emp ~ wl_initial_cm,
-                       #                         ~ 0 + wl_initial_cm),
-                       #                    data = .SD))
-                       ),
-                     by = .(site)]
+                       #                           ~ 0 + wl_initial_cm),
+                       #                      prior = list(cp_1 = "dnorm(0, 1)",
+                       #                                   int_1 = "dnorm(1, 1)"),
+                       #                      cores = 1,
+                       #                      data = .SD))
+                     ),
+                     keyby = .(site)]
 
 
 esy_wa_mods[,
@@ -208,8 +227,7 @@ esy_wa_mods[,
 
 daily_water_levels[, esy_wa_lm := esy_wa_mods[.BY[[1]], f_lm[[1]]](wl_l1_cm),
                    by = .(site)]
-daily_water_levels[, Ds_hat_lm := normalized_wa_cm * esy_wa_lm,
-                   by = .(site)]
+daily_water_levels[, Ds_hat_lm := normalized_wa_cm * esy_wa_lm]
 
 daily_water_levels[, esy_wa_quad := esy_wa_mods[.BY[[1]], f_quad[[1]]](wl_l1_cm),
                    by = .(site)]
@@ -218,7 +236,7 @@ daily_water_levels[, Ds_hat_quad := normalized_wa_cm * esy_wa_quad,
 
 # daily_water_levels[, esy_wa_mcp := esy_wa_mods[.BY[[1]], f_mcp[[1]]](wl_l1_cm),
 #                    by = .(site)]
-# daily_water_levels[, Ds_hat_mcp := detrend_wa_cm * esy_wa_mcp,
+# daily_water_levels[, Ds_hat_mcp := normalized_wa_cm * esy_wa_mcp,
 #                    by = .(site)]
 
 ggplot(daily_water_levels,
@@ -252,19 +270,22 @@ ggplot(daily_water_levels,
              scales = "free")
 
 test <- 
-  daily_water_levels[site == "135" & water_year == 2017 & !is.na(wl_initial_cm)]
+  daily_water_levels[site == "135" & sample_year == 2012 & !is.na(wl_initial_cm)]
 
 f_esy <- 
   esy_wa_mods["135", f_lm[[1]]]
 
-m <- 
-  esy_wa_mods["135", coef(mod_lm[[1]])[[2]]]
-  
 WL <- 
   test$wl_initial_cm
 
 WA <- 
   test$normalized_wa_cm
+
+P <- 
+  test$best_precip_cm
+
+PET <- 
+  test[external_met[station_name == "kenton"], pet_cm, nomatch = NULL, on = "sample_date"]
 
 SY <- 
   test$esy_wa_emp
@@ -282,20 +303,29 @@ wl_hat <-
   numeric(nrow(test))
 
 wl_hat[1] <- 
-  0
+  WL[1]
+
+sy_hat <- 
+  numeric(nrow(test))
+
+sy_hat[1] <- 
+  f_esy(WL[1])
 
 for(i in 2:length(d_hat)){
+  sy_hat[i] <- 
+    f_esy(wl_hat[i-1])
+  
   d_hat[i] <- 
-    (f_esy(wl_hat[i-1]) * WA[i-1])
+     sy_hat[i] * WA[i]
   
   wl_hat[i] <- 
-    wl_hat[1] + d_hat[i]
+    wl_hat[1] + d_hat[i] + P[i] * sy_hat[i] - PET[i] * sy_hat[i]
 }
 
-plot(WL, type = 'l', col = "gray40")
-lines(WL[1] + wl_hat)
+plot(WL, type = 'l', col = "gray40"); lines(wl_hat)
+plot(SY, type = 'l', col = "gray40"); lines(sy_hat)
 plot(wl_hat, type = 'l')
-plot(d_hat, type = 'l')
+plot(WL[1] + cumsum(d_hat), type = 'l'); lines(WL, col = 'gray40')
 lines(Dobs, lty = 3)
 lines(WL[1] + as.numeric(filter(WA, 0.0198785393130021, "rec", sides = 1)), type = 'l')
 plot(Dobs)
