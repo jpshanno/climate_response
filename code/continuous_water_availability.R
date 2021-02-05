@@ -460,7 +460,7 @@ library(brms)
 options(mc.cores = 4)
 
 brm_test <- 
-  daily_water_levels[site == "152" & sample_year %in% c(2012, 2018) & !is.na(wl_initial_cm), 
+  daily_water_levels[site == "152" & sample_year %in% c(2012, 2013) & !is.na(wl_initial_cm), 
                      .(wlObs = wl_initial_cm,
                        wlL1 = wl_l1_cm,
                        pet = pet_cm,
@@ -476,21 +476,41 @@ val_dat <-
                        wa = normalized_wa_cm,
                        precip = best_precip_cm)][min(which(!is.na(wlObs))):.N]
 
+# To Do:
+# - Get water levels to go above cp (probably need to add piecewise component to p)
+# - Add quickflow in/out from preceding day's precip
+# - Try to vary esy for P and PET again. Maybe having P when wl > cp not depend
+# on esy will help set a more accurate esy(s)
+
 wb_form <- 
-  bf(wlObs ~ wlL1 + p + et + q + g,
-     # Think about adding different precip response above and below cp
-     nlf(p ~ precip / esy),
-     nlf(et ~ step(cpWA - wa) * (Mpet * pet / esy)),
-     # This could have a below threshold component that response to previous day's precip
-     nlf(q ~ step(wlL1 - cp) * (Bq + Mq * wlL1^2)),
-     nlf(g ~ step(cp - cpWA) * Bg),
-     nlf(esy ~ Besy + Mesy ^ (step(cp - wlL1) * (wlL1 - cp))),
-     cpWA + cp + Mpet + Bg + Bq + Mq + Besy + Mesy ~ 1,
-     nl = TRUE)
+  bf(
+    # Generic Water Budget
+    wlObs ~ wlL1 + p + et + q + g,
+    
+    # Precip response scaled by ecosystem specific yield
+    nlf(p ~ precip / esy),
+    
+    # PET response scaled by ecosystem specific yield and 0 when annual water
+    # availability (YTD P - YTD PET) is above a threshold value
+    nlf(et ~ step(cpWA - wa) * (Mpet * pet / esy)),
+    
+    # Streamflow and subsurface flow losses above a water level threshold
+    nlf(q ~ step(wlL1 - cp) * (Bq + Mq * wlL1^2)),
+    
+    # Local subsurface inputs when annual water availability is above threshold
+    nlf(g ~ step(cp - cpWA) * Bg),
+    
+    # Ecosystem Specific Yield
+    nlf(esy ~ Besy + Mesy ^ (step(cp - wlL1) * (wlL1 - cp))),
+    
+    # All effects are population effects
+    cpWA + cp + Mpet + Bg + Bq + Mq + Besy + Mesy ~ 1,
+    nl = TRUE)
 
 wb_priors <- 
   # Not sure how to set priors on the intermediate values, got an error that
-  # they are not parameters in the model
+  # they are not parameters in the model. It would be nice to be able to control
+  # them directly rather than through multiple parameters
   # prior(gamma(0.16, 1.54), nlpar = "p", lb = 0) + # determined via lmomco for brm_test$precip_cm
   # prior(normal(5, 10), nlpar = "et", ub = 0) +
   # prior(gamma(0.5, 1), nlpar = "q", ub = 0) +
@@ -576,6 +596,22 @@ for(i in 1:nrow(val_dat)){
 }
 
 plot(wlObs ~ sample_date, data = val_dat, col = 'gray40', type = 'l'); lines(wl_hat2 ~ val_dat$sample_date)
+
+
+safe_brm <- 
+  quietly(brm)
+
+wl_mods2012 <- 
+  daily_water_levels[sample_year == 2012,
+                     .(mod = list(safe_brm(wb_form,
+                                      data = .SD,
+                                      prior = wb_priors,
+                                      family = student,
+                                      iter = 2500,
+                                      warmup = 1000,
+                                      seed = 1234,
+                                      chains = 1))),
+                     keyby = .(site)]
 
 
 predict_water_levels <- 
