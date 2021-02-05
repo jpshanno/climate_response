@@ -480,9 +480,13 @@ val_dat <-
 # - Get water levels to go above cp (probably need to add piecewise component to p)
 # - Add quickflow in/out from preceding day's precip
 # - Try to vary esy for P and PET again. Maybe having P when wl > cp not depend
-# on esy will help set a more accurate esy(s)
+# on esy will help set a more accurate esy(s). Or try to work, previously they
+# ended up negatively afffecting the esy fit
 # - Consider changing distributions for priors (i.e. lognormal, or skew_normal for
 # some things)
+# - Try making G dependent on normalized_wa_cm (need to experiment for decent priors)
+# - Adjust cp from constant prior based on observed percentiles to a strict 
+# distributional prior
 
 wb_form <- 
   bf(
@@ -519,7 +523,7 @@ wb_priors <-
   # prior(normal(5, 10), nlpar = "g", lb = 0) +
   # prior(normal(1, 1), nlpar = "Mp", lb = 0) +
   # prior(normal(0.5, 1), nlpar = "esy", lb = 0) +
-  prior(normal(11.634684, 1), nlpar = "cp") +
+  set_prior(paste0("constant(", quantile(brm_test$wlObs, 0.8), ")"), nlpar = "cp") +
   prior(normal(-15, 1), nlpar = "cpWA", ub = 0) +
   prior(normal(1.5, 1), nlpar = "Mp", lb = 1) +
   prior(constant(-1), nlpar = "Mpet", ub = 0) +
@@ -607,6 +611,14 @@ safe_brm <-
 
 # 2012 and 2013 and 2012 & 2018 both worked well for 152 test models
 
+update_cp <- 
+  function(priors, new.cp){
+    priors[priors$nlpar == "cp", ] <- 
+      set_prior(paste0("constant(", new.cp, ")"), nlpar = "cp")
+    
+    priors
+  }
+
 wl_mods2012 <- 
   daily_water_levels[sample_year == 2012,
                      .(wlObs = wl_initial_cm,
@@ -617,15 +629,15 @@ wl_mods2012 <-
                        site)][,
                               .(mod = list(safe_brm(wb_form,
                                                     data = .SD,
-                                                    prior = wb_priors,
+                                                    prior = update_cp(wb_priors, quantile(.SD$wlObs, 0.8, na.rm = TRUE)),
                                                     family = student,
-                                                    iter = 2500,
-                                                    warmup = 1000,
+                                                    iter = 500,
+                                                    warmup = 100,
                                                     seed = 1234,
-                                                    chains = 4))),
+                                                    chains = 1))),
                               keyby = .(site)]
 
-saveRDS(wl_mods2012, "tmp/full_wetland_models.rds")
+# saveRDS(wl_mods2012, "tmp/full_wetland_models.rds")
 
 
 wl_mods2012[, fit := map(mod, "result")]
@@ -694,7 +706,7 @@ predict_water_levels <-
       }
       
       p[i] <- 
-        precip[i-1] / esy[i-1]
+        (cp > wl_hat[i-1]) * (precip[i-1] / esy[i-1]) + (cp <= wl_hat[i-1]) * (Mp * precip[i-1])
       
       et[i] <- 
         (cpWA > wa[i-1]) * (Mpet * pet[i-1] / esy[i-1])  
@@ -728,13 +740,23 @@ wl_mods2012[,
                         predict_water_levels)]
 
 plot(wl_hat ~ sample_date, 
-     data = wl_mods2012["157", out[[1]]],
+     data = wl_mods2012["152", out[[1]]],
      type = 'l')
 lines(wl_initial_cm ~ sample_date,
-       data = daily_water_levels[site == "157"],
+       data = daily_water_levels[site == "152"],
        col = 'gray40')
 
+daily_water_levels[wl_mods2012[, out[[1]], by = .(site)], 
+                   wl_hat := i.wl_hat,
+                   on = c("site", "sample_date")]
 
+split(daily_water_levels[!is.na(wl_initial_cm) & site != "006"],
+      by = "site") %>% 
+  map(~as.data.table(t(gof(sim = .x$wl_hat, obs = .x$wl_initial_cm)))) %>% 
+  rbindlist()
+
+daily_water_levels[site == "152", 
+                   as.data.table(t(gof(sim = .SD$wl_hat, obs = .SD$wl_initial_cm)))]
 
 
 
