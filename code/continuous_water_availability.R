@@ -454,127 +454,18 @@ lines(Dobs, lty = 3)
 lines(WL[1] + as.numeric(filter(WA, 0.0198785393130021, "rec", sides = 1)), type = 'l')
 plot(Dobs)
 
+# Big Bayesian Model ------------------------------------------------------
+
 library(brms)
 options(mc.cores = 4)
 
 brm_test <- 
   daily_water_levels[site == "152" & sample_year %in% c(2012, 2018) & !is.na(wl_initial_cm), 
-       .(wlObs = wl_initial_cm,
-           wlL1 = wl_l1_cm,
-           pet = pet_cm,
-           precip = best_precip_cm)]
-
-# Original Formula
-brm_form <- 
-  brmsformula(wlObs ~ wlL1 + 
-                (precip / (step(cp - wlL1) * (bW + mW * wlL1) + step(wlL1 - cp) * (bW2))) -
-                (pet / (step(cp - wlL1) * (bD + mD * wlL1) + step(wlL1 - cp) * (bD2)) + 
-                   step(wlL1 - cp) * (bQ + mQ * wlL1)),
-              cp + bW + mW + bW2 + bD + mD + bD2 + bQ + mQ ~ 1,
-              nl = TRUE)
-
-brm_prior <- 
-  prior(normal(0, 10), nlpar = "cp", lb = 0) +
-  prior(normal(0.1, 1), nlpar = "bW", lb = 0) +
-  prior(normal(0.002, 0.1), nlpar = "mW", lb = 0) +
-  prior(normal(0.1, 1), nlpar = "bW2") +
-  prior(normal(0.1, 1), nlpar = "bD") +
-  prior(normal(0.002, 0.1), nlpar = "mD", lb = 0) +
-  prior(normal(0.1, 1), nlpar = "bD2") +
-  prior(normal(-10, 10), nlpar = "bQ", ub = 0) +
-  prior(normal(-0.1, 1), nlpar = "mQ", ub = 0) +
-  prior(gamma(2, .1), class = nu)
-
-# The scale does not match. The trends are good, but the scales don't match,
-# weird. It may be good to switch to water_availabilty rather than P & PET
-# because it would work well between years to capture when drawdown begins. Or
-# if not between years, it may provide a signal for when drawdown starts
-
-wl_mod <- 
-  brm(brm_form,
-      data = brm_test,
-      prior = brm_prior,
-      family = student,
-      iter = 500,
-      warmup = 100,
-      seed = 1234,
-      chains = 1)
-
-
-# wl ~ wlL1 + d_in - d_out
-# d_in ~ precip / sy_in
-# sy_in ~ ((wlL1 < cp) * (bW + mW * wlL1) + (wlL1 >= cp) * (mW2 * wlL1))
-# 
-# d_out ~ (pet / sy_out) + Q
-# sy_out ~ (wlL1 < cp) * (bD + mD * wlL1) + (wlL1 >= cp) * (mD2 * wlL1) 
-# Q ~ (wlL1 >= cp) * (bQ + bM * wlL1)
-
-val_dat <- 
-  daily_water_levels[site == "152" & sample_year %in% c(2012:2013), 
-                     .(sample_date, 
-                       wlObs = wl_initial_cm,
+                     .(wlObs = wl_initial_cm,
                        wlL1 = wl_l1_cm,
                        pet = pet_cm,
-                       precip = best_precip_cm)][min(which(!is.na(wlObs))):.N]
-
-wl_hat2 <- 
-  numeric(nrow(val_dat))
-
-wl_hat2[1] <- 
-  val_dat$wlObs[1]
-
-precip <- 
-  val_dat$precip
-
-pet <- 
-  val_dat$pet
-
-q <- sy_in <- sy_out <- d_in <- d_out <- numeric(length(wl_hat2))
-
-wl_coefs <- 
-  fixef(wl_mod)
-
-cp <- wl_coefs[1, 1]
-bW <- wl_coefs[2, 1]
-mW <- wl_coefs[3, 1]
-bW2 <- wl_coefs[4, 1]
-bD <- wl_coefs[5, 1]
-mD <- wl_coefs[6, 1]
-bD2 <- wl_coefs[7, 1]
-bQ <- wl_coefs[8, 1]
-mQ <- wl_coefs[9, 1]
-
-
-for(i in 2:length(wl_hat2)){
-  
-  sy_in[i] <- 
-    ((wl_hat2[i-1] < cp) * (bW + mW * wl_hat2[i-1]) + (wl_hat2[i-1] >= cp) * (bW2))
-  
-  d_in[i] <- 
-    (precip[i-1] / sy_in[i])
-  
-  sy_out[i] <- 
-    ((wl_hat2[i-1] < cp) * (bD + mD * wl_hat2[i-1]) + (wl_hat2[i-1] >= cp) * (bD2)) 
-  
-  q[i] <-  
-    (wl_hat2[i-1] >= cp) * (bQ + mQ * wl_hat2[i-1])
-  
-  d_out[i] <- 
-    (pet[i-1] / sy_out[i]) - q[i]
-  
-  wl_hat2[i] <- wl_hat2[i-1] + d_in[i] + d_out[i]
-
-  if(is.na(wl_hat2[i])){
-    stop("wl_hat2 is NA at i = ", i)
-  }
-  
-}
-
-plot(val_dat$wlObs, col = 'gray40', type = 'l'); lines(wl_hat2)
-plot(scale(val_dat$wlObs[1:244]), col = 'gray40', type = 'l'); lines(scale(wl_hat2[1:244]))
-
-# Big Bayesian Model ------------------------------------------------------
-
+                       wa = normalized_wa_cm,
+                       precip = best_precip_cm)]
 
 val_dat <- 
   daily_water_levels[site == "152" & sample_year %in% c(2012:2014), 
@@ -582,17 +473,19 @@ val_dat <-
                        wlObs = wl_initial_cm,
                        wlL1 = wl_l1_cm,
                        pet = pet_cm,
+                       wa = normalized_wa_cm,
                        precip = best_precip_cm)][min(which(!is.na(wlObs))):.N]
 
 wb_form <- 
   bf(wlObs ~ wlL1 + p + et + q + g,
-     nlf(p ~ precip / esyP),
-     nlf(et ~ step(cp - wlL1) * (Mpet * pet / esyET)),
+     # Think about adding different precip response above and below cp
+     nlf(p ~ precip / esy),
+     nlf(et ~ step(cpWA - wa) * (Mpet * pet / esy)),
      # This could have a below threshold component that response to previous day's precip
      nlf(q ~ step(wlL1 - cp) * (Bq + Mq * wlL1^2)),
-     nlf(g ~ step(cp - wlL1) * Bg),
+     nlf(g ~ step(cp - cpWA) * Bg),
      nlf(esy ~ Besy + Mesy ^ (step(cp - wlL1) * (wlL1 - cp))),
-     cp + Mpet + Bg + Bq + Mq + Besy + Mesy ~ 1,
+     cpWA + cp + Mpet + Bg + Bq + Mq + Besy + Mesy ~ 1,
      nl = TRUE)
 
 wb_priors <- 
@@ -605,11 +498,11 @@ wb_priors <-
   # prior(normal(1, 1), nlpar = "Mp", lb = 0) +
   # prior(normal(0.5, 1), nlpar = "esy", lb = 0) +
   prior(normal(5, 1), nlpar = "cp", lb = 0) +
+  prior(normal(-15, 1), nlpar = "cpWA", ub = 0) +
   prior(constant(-1), nlpar = "Mpet", ub = 0) +
   prior(normal(1, 10), nlpar = "Bq", ub = 0) +
   prior(normal(0.02, 1), nlpar = "Mq", ub = 0) +
   prior(normal(1, 5), nlpar = "Bg", lb = 0) +
-  # prior(normal(0.02, 1), nlpar = "Mg", lb = 0) +
   prior(normal(0.2, 1), nlpar = "Besy", lb = 0, ub = 0.5) +
   prior(normal(1.1, 1), nlpar = "Mesy", lb = 1, ub = 2) +
   prior(gamma(2, .1), class = nu)
@@ -642,15 +535,17 @@ for(i in 1:nrow(val_dat)){
     pet <- 
       val_dat$pet
     
+    wa <- 
+      val_dat$wa
+    
     p <- et <- q <- g <- esy <- numeric(nrow(val_dat))
     
-    # Mp <- wb_coefs["Mp_Intercept", 1]
+    cpWA <- wb_coefs["cpWA_Intercept", 1]
     cp <- wb_coefs["cp_Intercept", 1]
     Mpet <- wb_coefs["Mpet_Intercept", 1]
     Bq <- wb_coefs["Bq_Intercept", 1]
     Mq <- wb_coefs["Mq_Intercept", 1]
     Bg <- wb_coefs["Bg_Intercept", 1]
-    # Mg <- wb_coefs["Mg_Intercept", 1]
     Besy <- wb_coefs["Besy_Intercept", 1]
     Mesy <- wb_coefs["Mesy_Intercept", 1]
     
@@ -664,13 +559,13 @@ for(i in 1:nrow(val_dat)){
     precip[i-1] / esy[i-1]
   
   et[i] <- 
-    (cp > wl_hat2[i-1]) * (Mpet * pet[i-1] / esy[i-1])  
+    (cpWA > wa[i-1]) * (Mpet * pet[i-1] / esy[i-1])  
   
   q[i] <- 
     (cp <= wl_hat2[i-1]) * (Bq + Mq * wl_hat2[i-1]^2)
   
   g[i] <-
-    (cp <= wl_hat2[i-1]) * (Bg) # + Mg * wl_hat2[i-1])
+    (cpWA <= wa[i-1]) * (Bg)
   
   wl_hat2[i] <- 
     wl_hat2[i-1] + p[i] + et[i] + q[i] + g[i]
