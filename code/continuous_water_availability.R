@@ -481,6 +481,8 @@ val_dat <-
 # - Add quickflow in/out from preceding day's precip
 # - Try to vary esy for P and PET again. Maybe having P when wl > cp not depend
 # on esy will help set a more accurate esy(s)
+# - Consider changing distributions for priors (i.e. lognormal, or skew_normal for
+# some things)
 
 wb_form <- 
   bf(
@@ -488,7 +490,7 @@ wb_form <-
     wlObs ~ wlL1 + p + et + q + g,
     
     # Precip response scaled by ecosystem specific yield
-    nlf(p ~ precip / esy),
+    nlf(p ~ step(wlL1 - cp) * (precip / esy) + step(cp - wlL1) * (Mp * precip)),
     
     # PET response scaled by ecosystem specific yield and 0 when annual water
     # availability (YTD P - YTD PET) is above a threshold value
@@ -504,7 +506,7 @@ wb_form <-
     nlf(esy ~ Besy + Mesy ^ (step(cp - wlL1) * (wlL1 - cp))),
     
     # All effects are population effects
-    cpWA + cp + Mpet + Bg + Bq + Mq + Besy + Mesy ~ 1,
+    cpWA + cp + Mp + Mpet + Bg + Bq + Mq + Besy + Mesy ~ 1,
     nl = TRUE)
 
 wb_priors <- 
@@ -517,8 +519,9 @@ wb_priors <-
   # prior(normal(5, 10), nlpar = "g", lb = 0) +
   # prior(normal(1, 1), nlpar = "Mp", lb = 0) +
   # prior(normal(0.5, 1), nlpar = "esy", lb = 0) +
-  prior(normal(5, 1), nlpar = "cp", lb = 0) +
+  prior(normal(11.634684, 1), nlpar = "cp") +
   prior(normal(-15, 1), nlpar = "cpWA", ub = 0) +
+  prior(normal(1.5, 1), nlpar = "Mp", lb = 1) +
   prior(constant(-1), nlpar = "Mpet", ub = 0) +
   prior(normal(1, 10), nlpar = "Bq", ub = 0) +
   prior(normal(0.02, 1), nlpar = "Mq", ub = 0) +
@@ -563,6 +566,7 @@ for(i in 1:nrow(val_dat)){
     cpWA <- wb_coefs["cpWA_Intercept", 1]
     cp <- wb_coefs["cp_Intercept", 1]
     Mpet <- wb_coefs["Mpet_Intercept", 1]
+    Mp <- wb_coefs["Mp_Intercept", 1]
     Bq <- wb_coefs["Bq_Intercept", 1]
     Mq <- wb_coefs["Mq_Intercept", 1]
     Bg <- wb_coefs["Bg_Intercept", 1]
@@ -576,7 +580,7 @@ for(i in 1:nrow(val_dat)){
   }
   
   p[i] <- 
-    precip[i-1] / esy[i-1]
+    (cp > wl_hat2[i-1]) * (precip[i-1] / esy[i-1]) + (cp <= wl_hat2[i-1]) * (Mp * precip[i-1])
   
   et[i] <- 
     (cpWA > wa[i-1]) * (Mpet * pet[i-1] / esy[i-1])  
@@ -729,6 +733,7 @@ plot(wl_hat ~ sample_date,
 lines(wl_initial_cm ~ sample_date,
        data = daily_water_levels[site == "157"],
        col = 'gray40')
+
 
 
 
