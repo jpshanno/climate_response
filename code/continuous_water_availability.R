@@ -601,45 +601,135 @@ plot(wlObs ~ sample_date, data = val_dat, col = 'gray40', type = 'l'); lines(wl_
 safe_brm <- 
   quietly(brm)
 
+# 2012 and 2013 and 2012 & 2018 both worked well for 152 test models
+
 wl_mods2012 <- 
   daily_water_levels[sample_year == 2012,
-                     .(mod = list(safe_brm(wb_form,
-                                      data = .SD,
-                                      prior = wb_priors,
-                                      family = student,
-                                      iter = 2500,
-                                      warmup = 1000,
-                                      seed = 1234,
-                                      chains = 1))),
-                     keyby = .(site)]
+                     .(wlObs = wl_initial_cm,
+                       wlL1 = wl_l1_cm,
+                       precip = best_precip_cm,
+                       pet = pet_cm,
+                       wa = normalized_wa_cm,
+                       site)][,
+                              .(mod = list(safe_brm(wb_form,
+                                                    data = .SD,
+                                                    prior = wb_priors,
+                                                    family = student,
+                                                    iter = 2500,
+                                                    warmup = 1000,
+                                                    seed = 1234,
+                                                    chains = 4))),
+                              keyby = .(site)]
 
+saveRDS(wl_mods2012, "tmp/full_wetland_models.rds")
+
+
+wl_mods2012[, fit := map(mod, "result")]
+
+wl_mods2012_extras <- 
+  wl_mods2012[,
+              .(site,
+                output = map(mod, "output"),
+                warnings = map(mod, "warnings"),
+                messages = map(mod, "messages"))]
+
+
+wl_mods2012[, pop_eff := map(fit, ~fixef(.x, robust = TRUE)[, 1])]
+
+daily_water_levels[sample_date == as.Date("2012-04-01"), 
+                   .(site, sample_date, wl_initial_cm)]
+
+wl_mods2012[daily_water_levels[sample_date == as.Date("2012-04-01")],
+            initial.wl := i.wl_initial_cm,
+            on = c("site")]
+
+wl_mods2012[, met := list(kenton[sample_date >= as.Date("2012-04-01"),
+                                 .(sample_date, 
+                                   pet = pet_cm,
+                                   wa = normalized_wa_cm,
+                                   precip = precip_cm)])]
 
 predict_water_levels <- 
-  function(wl.obs,
-           water.availability,
-           esy.model){
+  function(initial.wl,
+           met,
+           pop_eff){
     
-    n <- 
-      length(water.availability) + 1
-    
-    d_hat <- 
-      numeric(n)
-    
-    init <- 
-      1
-    
-    if(length(wl.obs) > 1){
-      init <- 
-        min(which(!is.na(wl.obs)))
+    for(i in 1:nrow(met)){
+      
+      if(i == 1){
+        wl_hat <- 
+          numeric(nrow(met))
+        
+        wl_hat[1] <- 
+          initial.wl
+        
+        precip <- 
+          met$precip
+        
+        pet <- 
+          met$pet
+        
+        wa <- 
+          met$wa
+        
+        p <- et <- q <- g <- esy <- numeric(nrow(met))
+        
+        cpWA <- pop_eff[["cpWA_Intercept"]]
+        cp <- pop_eff[["cp_Intercept"]]
+        Mpet <- pop_eff[["Mpet_Intercept"]]
+        Bq <- pop_eff[["Bq_Intercept"]]
+        Mq <- pop_eff[["Mq_Intercept"]]
+        Bg <- pop_eff[["Bg_Intercept"]]
+        Besy <- pop_eff[["Besy_Intercept"]]
+        Mesy <- pop_eff[["Mesy_Intercept"]]
+        
+        esy[1] <- 
+          Besy + Mesy ^ ((cp > wl_hat[1]) * (wl_hat[1] - cp))
+        
+        next
+      }
+      
+      p[i] <- 
+        precip[i-1] / esy[i-1]
+      
+      et[i] <- 
+        (cpWA > wa[i-1]) * (Mpet * pet[i-1] / esy[i-1])  
+      
+      q[i] <- 
+        (cp <= wl_hat[i-1]) * (Bq + Mq * wl_hat[i-1]^2)
+      
+      g[i] <-
+        (cpWA <= wa[i-1]) * (Bg)
+      
+      wl_hat[i] <- 
+        wl_hat[i-1] + p[i] + et[i] + q[i] + g[i]
+      
+      esy[i] <- 
+        Besy + Mesy ^ ((cp > wl_hat[i]) * (wl_hat[i] - cp))
+      
     }
-
-    d_hat[init] <- 
-      0
     
-    for(i in 2:n){
-      d_hat[i] <- 
-        (f_esy(d_hat[i-1]) * WA[i-1])
-    }
-    
-    wl.obs[init] + d_hat[-c(1)]
+    data.table(sample_date = met$sample_date,
+               wl_hat,
+               p_hat = p,
+               et_hat = et,
+               q_hat = q,
+               g_hat = g,
+               esy_hat = esy)
   }
+
+
+wl_mods2012[,
+            out := pmap(.SD[, .(initial.wl, met, pop_eff)],
+                        predict_water_levels)]
+
+plot(wl_hat ~ sample_date, 
+     data = wl_mods2012["157", out[[1]]],
+     type = 'l')
+lines(wl_initial_cm ~ sample_date,
+       data = daily_water_levels[site == "157"],
+       col = 'gray40')
+
+
+
+
