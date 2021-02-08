@@ -30,6 +30,8 @@ prepare_ncei_data <-
                    tmax_c = i.tmax_c),
               on = c("station_name", "sample_date")]
     
+    hpdn_data[, sample_year := year(sample_date)]
+    
     # Remove days where tmax <= tmin as they are likely errors, but keep missing
     # values
     hpdn_data[tmax_c > tmin_c | is.na(tmin_c) | is.na(tmax_c)]  
@@ -61,13 +63,10 @@ prepare_hpdn_data <-
                  precip_cm := NA_real_]
     
     # Set water year based on USGS approach (begins October 1)
-    daily_precip[, water_year := ifelse(month(sample_date) > 9,
-                                        year(sample_date) + 1,
-                                        year(sample_date))]
+    daily_precip[, water_year := as.water_year(sample_date, wy.month = 11)]
     
     # Set day of water year (dowy)
-    daily_precip[, dowy := as.numeric(1 + sample_date - min(sample_date)),
-                 by = .(water_year)]
+    daily_precip[, dowy := as.dowy(sample_date, wy.month = 11)]
     
     # Final output of daily data
     daily_precip <- 

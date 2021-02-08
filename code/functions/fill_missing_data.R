@@ -110,6 +110,7 @@ fill_ncei_idw <-
              lat,
              lon,
              sample_date,
+             sample_year,
              water_year,
              dowy,
              precip_cm = fcoalesce(obs_precip_cm, idw_precip_cm),
