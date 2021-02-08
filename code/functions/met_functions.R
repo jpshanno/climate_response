@@ -194,11 +194,14 @@ calculate_solrad_coefs <-
 ##' @author Joe Shannon
 ##' @export
 calculate_water_availability <- 
-  function(data, precip.col, pet.col, group.cols){
+  function(data){
     
     data[, 
-         water_availability_cm := cumsum(get(precip.col) - get(pet.col)),
-         by = group.cols]
+         water_availability_cm := cumsum(precip_cm - pet_cm),
+         by = .(station_name)]
+    
+    data[, ytd_water_availability_cm := (water_availability_cm - first(water_availability_cm)) - max(water_availability_cm - first(water_availability_cm)),
+         by = .(station_name, sample_year)]
 
     data    
   }

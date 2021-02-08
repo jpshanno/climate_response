@@ -47,7 +47,7 @@ targets <- list(
     format = "file"
   )
   
-  # Prepare Data ------------------------------------------------------------
+  # Prepare Met Data ------------------------------------------------------
   
   , tar_target(
     mesowest_met,
@@ -79,103 +79,38 @@ targets <- list(
       calculate_mean_temp() %>% 
       calculate_solar_radiation(coefs = solrad_coefs[station_name == "PIEM4"]) %>% 
       calculate_hargreaves_pet(lambda.MJ.kg = 2.45) %>% 
-      calculate_water_availability(precip.col = "precip_cm",
-                                   pet.col = "pet_cm",
-                                   group.cols = c("station_name")) %>% 
+      calculate_water_availability() %>% 
       subset(!(station_name %in% c("ironwood", "alberta_ford_for_center")))
   )
   
-  , tar_target(
-    daily_water_levels,
-    prepare_water_levels(path = study_path("well_levels", study_data_paths)) %>% 
-      append_study_precip(precip.path = study_path("precip", study_data_paths),
-                          snow.path = study_path("snowmelt", study_data_paths))
-  )
-  
-  # Model Physical Components -----------------------------------------------
-  
-  , tar_target(
-    mod_interception,
-    model_interception_loss(data = daily_water_levels,
-                            y = "Ds_cm",
-                            x = c("best_precip_cm", "best_precip_cm:cos(doy_decimal*2*pi)"),
-                            g = "site_status"),
-    format = "rds"
-  )
-  
-  , tar_target(
-    mod_esy,
-    model_ecosystem_sy(data = daily_water_levels,
-                       interception = mod_interception,
-                       precip.col = "best_precip_cm"),
-    format = "rds"
-  )
-  
-  # Need formal model validations (save residual checks, etc)
-  , tar_target(
-    mod_morphology_flow,
-    model_morphology_flow(data = water_budget),
-    format = "rds"
-  )
-  
   # Prepare Water Budget Data ---------------------------------------------
-
-    # All values are in ground surface units
   , tar_target(
     water_budget,
-    prepare_water_budget(data = daily_water_levels,
-                         external.met = external_met,
-                         interception.mods = mod_interception,
-                         sy.mods = mod_esy)
+    prepare_water_levels(path = study_path("well_levels", study_data_paths)) %>% 
+      append_study_precip(precip.path = study_path("precip", study_data_paths),
+                          snow.path = study_path("snowmelt", study_data_paths)) %>% 
+      merge_external_met(external.met = external_met)
   )
   
-
   # Split Data --------------------------------------------------------------
 
-  , tar_target(
-    validation_data,
-    select_validation_years(data = water_budget,
-                            date.col = "sample_date",
-                            n.in.group = 1,
-                            groups = c("site", "site_status"))
-  )
-  
-  , tar_target(
-    training_data,
-    water_budget[!validation_data]
-  )  
-  
-  # Model Response Components ---------------------------------------------
-  
-  # Model Water level Rise
+  # , tar_target(
+  #   validation_data,
+  #   select_validation_data(data = water_budget,
+  #                           n.in.group = 1,
+  #                           groups = c("site", "site_status"))
+  # )
+  # 
+  # , tar_target(
+  #   training_data,
+  #   water_budget[!validation_data]
+  # )  
 
-  , tar_target(
-    mod_rise,
-    model_precip_rise(training_data),
-    format = "rds"
-  )
-    
-  # Model Meteorologic Net Flow
-  # This can be thought of as the residual flow not explained by water level
-  # fluctuations
-  # Does not allow random slope, only random intercept. Should probably involve
-  # both, but run times took forever
-  , tar_target(
-    mod_meteo_flow,
-    model_meteo_flow(training_data,
-                     mod_morphology_flow),
-    format = "rds"
-  )
-    
-  # Model PET Dradown
-  , tar_target(
-    mod_pet_drawdown,
-    model_pet_drawdown(data = training_data,
-                       morpho.models = mod_morphology_flow,
-                       meteo.models = mod_meteo_flow[["random"]],
-                       rise.models = mod_rise),
-    format = "rds"
-  )
+  # Build Water Level Models ------------------------------------------------
+
+  # Make priors
+  # Run Models
+  # Evaluate Models
   
   # Simulate Wetland Runs ---------------------------------------------------
   

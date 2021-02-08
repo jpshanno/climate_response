@@ -78,8 +78,8 @@ prepare_water_levels <-
                                            "growing",
                                            "dormant"))]
   
-  daily_water_levels[, `:=`(water_year = as.water_year(sample_date),
-                            dowy = as.dowy(sample_date))]
+  daily_water_levels[, `:=`(water_year = as.water_year(sample_date, 11),
+                            dowy = as.dowy(sample_date, 11))]
   
   daily_water_levels
   
