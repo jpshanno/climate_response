@@ -53,7 +53,7 @@ calculate_solar_radiation <-
     # lat in bc() can only be a single value, so this has to be done by each 
     # station name
     data[, 
-         solrad_MJ_m2 := bc(days = sample_date, 
+         solrad_MJ_m2 := sirad::bc(days = sample_date, 
                             lat = first(lat),
                             BCb = coefs[, mean(BC_B)],
                             BCc = coefs[, mean(BC_C)],
