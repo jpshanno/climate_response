@@ -8,9 +8,10 @@ source("code/load_project.R")
 tr_dat <- 
   tar_read(training_data)
 
-tr_dat[, Ds_cm := Ds_cm / sy]
+tr_dat[, Ds_raw := Ds_cm / sy]
 
-tr_dat[, `:=`(lag1_precip_cm = shift(best_precip_cm, 1),
+tr_dat[, `:=`(lag1_wl_cm = shift(wl_initial_cm, 1),
+              lag1_precip_cm = shift(best_precip_cm, 1),
               lag2_precip_cm = shift(best_precip_cm, 2),
               lag3_precip_cm = shift(best_precip_cm, 3),
               lag1_pet_cm = shift(pet_cm, 1),
@@ -18,68 +19,133 @@ tr_dat[, `:=`(lag1_precip_cm = shift(best_precip_cm, 1),
               lag3_pet_cm = shift(pet_cm, 3)),
        by = .(site, sample_year)]
 
-tr_dat[, 
-       .(pet_mod = list(forecast::auto.arima(pet_cm, max.q = 0, allowdrift = FALSE, allowmean = FALSE)),
-         precip_mod = list(forecast::auto.arima(best_precip_cm, max.q = 0, allowdrift = FALSE, allowmean = FALSE)),
-         wl_ts = list(wl_initial_cm),
-         pet_ts = list(pet_cm),
-         precip_ts = list(best_precip_cm)),
-       keyby = .(site, sample_year)
-][, `:=`(pet_coefs = map(pet_mod, coef), 
-         precip_coefs = map(precip_mod, coef))
-][, prewhite_wl := pmap(list(wl_ts, pet_coefs, precip_coefs),
-                        function(WL, PET, P){
-                          filter(
-                            x = filter(x = WL,
-                                       filter = PET,
-                                       method = "recursive",
-                                       sides = 1),
-                            filter = P,
-                            method = "recursive",
-                            sides = 1)
-                        }
-)]
+# tr_dat[, 
+#        .(pet_mod = list(forecast::auto.arima(pet_cm, max.q = 0, allowdrift = FALSE, allowmean = FALSE)),
+#          precip_mod = list(forecast::auto.arima(best_precip_cm, max.q = 0, allowdrift = FALSE, allowmean = FALSE)),
+#          wl_ts = list(wl_initial_cm),
+#          pet_ts = list(pet_cm),
+#          precip_ts = list(best_precip_cm)),
+#        keyby = .(site, sample_year)
+# ][, `:=`(pet_coefs = map(pet_mod, coef), 
+#          precip_coefs = map(precip_mod, coef))
+# ][, prewhite_wl := pmap(list(wl_ts, pet_coefs, precip_coefs),
+#                         function(WL, PET, P){
+#                           filter(
+#                             x = filter(x = WL,
+#                                        filter = PET,
+#                                        method = "recursive",
+#                                        sides = 1),
+#                             filter = P,
+#                             method = "recursive",
+#                             sides = 1)
+#                         }
+# )]
 
 ds_mmods <-
-  tr_dat[, .(mod = list(lmer(Ds_cm ~ 0 + 
-                               wl_initial_cm*(best_precip_cm + 
+  tr_dat[, .(mod = list(lmrob(Ds_raw ~ 
+                               best_precip_cm + 
                                lag1_precip_cm + 
                                lag2_precip_cm + 
-                               pet_cm) +
-                               (0 + wl_initial_cm*(best_precip_cm + 
-                                                     lag1_precip_cm + 
-                                                     lag2_precip_cm + 
-                                                     pet_cm) || site)))),
-               keyby = .(site_status)]
+                               lag3_precip_cm + 
+                               pet_cm +
+                               lag1_pet_cm + 
+                               lag2_pet_cm + 
+                               lag3_pet_cm,
+                             data = .SD,
+                             setting = "KS2014"))),
+               keyby = .(site, site_status)]
 
-wl_coefs <- 
-  CJ(site = unique(tr_dat$site),
-     site_status = unique(tr_dat$site_status))
+# wl_mmods <-
+#   tr_dat[, .(mod = list(lmer(wl_initial_cm ~ 0 + 
+#                                lag1_wl + 
+#                                best_precip_cm + 
+#                                lag1_precip_cm + 
+#                                lag2_precip_cm + 
+#                                pet_cm +
+#                                (0 + 
+#                                   lag1_wl + 
+#                                   best_precip_cm + 
+#                                   lag1_precip_cm + 
+#                                   lag2_precip_cm + 
+#                                   pet_cm || site),
+#                         data = .SD))),
+#          keyby = .(site_status)]
 
-wl_coefs[, pop_coefs := list(list(lme4::fixef(ds_mmods[.BY[[1]], mod[[1]]]))),
-         by = .(site_status)]
+# wl_coefs <- 
+#   CJ(site = unique(tr_dat$site),
+#      site_status = unique(tr_dat$site_status))
+# 
+# wl_coefs[, pop_coefs := list(list(lme4::fixef(ds_mmods[.BY[[1]], mod[[1]]]))),
+#          by = .(site_status)]
+# 
+# wl_coefs[, group_coefs := list(list(as.numeric((lme4::ranef(ds_mmods[.BY[[1]], mod[[1]]])$site[.BY[[2]],])))),
+#          by = .(site_status, site)]
+# 
+# wl_coefs[, group_coefs := map(group_coefs,
+#                               ~ifelse(is.na(first(.x)),
+#                                       rep(0, length(wl_coefs[1, group_coefs[[1]]])),
+#                                       .x))]
+# 
+# na_plus <- function(x, y){nafill(x, "const", 0) + nafill(y, "const", 0)}
+# 
+# wl_coefs[, full_coefs := map2(pop_coefs,
+#                               group_coefs,
+#                               na_plus)]
+# 
+# wl_coefs[, full_coefs := map2(pop_coefs, full_coefs,
+#                               ~set_names(.y, names(.x)))]
+# wl_coefs[, f_predict := map(full_coefs,
+#                             ~as.function(
+#                               list(water.level = NULL,
+#                                    pet = NULL,
+#                                    precip = NULL,
+#                                    bquote(
+#                                      {precip1 <- 
+#                                        shift(precip, 1, 0)
+#                                      
+#                                      precip2 <- 
+#                                        shift(precip, 2, 0)
+#                                      
+#                                      precip3 <- 
+#                                        shift(precip, 3, 0)
+#                                      
+#                                      pet1 <- 
+#                                        shift(pet, 1, 0)
+#                                      
+#                                      pet2 <- 
+#                                        shift(pet, 2, 0)
+#                                      
+#                                      pet3 <- 
+#                                        shift(pet, 3, 0)
+#                                      
+#                                      .(wl_m) * water.level +
+#                                        .(p_m) * precip +
+#                                        .(p1_m) * precip1 +
+#                                        .(p2_m) * precip2 +
+#                                        .(p3_m) * precip3 +
+#                                        .(pet_m) * pet +
+#                                        .(pet1_m) * pet1 +
+#                                        .(pet2_m) * pet2 +
+#                                        .(pet3_m) * pet3
+#                                      },
+#                                      where = list(wl_m = .x[["wl_initial_cm"]],
+#                                                   p_m = .x[["best_precip_cm"]],
+#                                                   p1_m = .x[["lag1_precip_cm"]],
+#                                                   p2_m = .x[["lag2_precip_cm"]],
+#                                                   p3_m = .x[["lag3_precip_cm"]],
+#                                                   pet_m = .x[["pet_cm"]],
+#                                                   pet1_m = .x[["lag1_pet_cm"]],
+#                                                   pet2_m = .x[["lag2_pet_cm"]],
+#                                                   pet3_m = .x[["lag3_pet_cm"]])
+#                                    )
+#                               )))]
 
-wl_coefs[, group_coefs := list(list(as.numeric((lme4::ranef(ds_mmods[.BY[[1]], mod[[1]]])$site[.BY[[2]],])))),
-         by = .(site_status, site)]
 
-wl_coefs[, group_coefs := map(group_coefs,
-                              ~ifelse(is.na(first(.x)),
-                                      rep(0, length(wl_coefs[1, group_coefs[[1]]])),
-                                      .x))]
+ds_mmods[, coefs := map(mod, coef)]
 
-na_plus <- function(x, y){nafill(x, "const", 0) + nafill(y, "const", 0)}
-
-wl_coefs[, full_coefs := map2(pop_coefs,
-                              group_coefs,
-                              na_plus)]
-
-wl_coefs[, full_coefs := map2(pop_coefs, full_coefs,
-                              ~set_names(.y, names(.x)))]
-
-wl_coefs[, f_predict := map(full_coefs,
+ds_mmods[, f_predict := map(coefs,
                             ~as.function(
-                              list(water.level = NULL,
-                                   pet = NULL,
+                              list(pet = NULL,
                                    precip = NULL,
                                    bquote(
                                      {precip1 <- 
@@ -88,30 +154,42 @@ wl_coefs[, f_predict := map(full_coefs,
                                      precip2 <- 
                                        shift(precip, 2, 0)
                                      
-                                     .(wl_m) * water.level +
+                                     precip3 <- 
+                                       shift(precip, 3, 0)
+                                     
+                                     pet1 <- 
+                                       shift(pet, 1, 0)
+                                     
+                                     pet2 <- 
+                                       shift(pet, 2, 0)
+                                     
+                                     pet3 <- 
+                                       shift(pet, 3, 0)
+                                     
+                                     .(b) +
                                        .(p_m) * precip +
                                        .(p1_m) * precip1 +
                                        .(p2_m) * precip2 +
+                                       .(p3_m) * precip3 +
                                        .(pet_m) * pet +
-                                       .(wlp_m) * water.level * precip +
-                                       .(wlp1_m) * water.level * precip1 +
-                                       .(wlp2_m) * water.level * precip2 +
-                                       .(wlpet_m) * water.level * pet
+                                       .(pet1_m) * pet1 +
+                                       .(pet2_m) * pet2 +
+                                       .(pet3_m) * pet3
                                      },
-                                     where = list(wl_m = .x[["wl_initial_cm"]],
+                                     where = list(b = .x[["(Intercept)"]],
                                                   p_m = .x[["best_precip_cm"]],
                                                   p1_m = .x[["lag1_precip_cm"]],
                                                   p2_m = .x[["lag2_precip_cm"]],
+                                                  p3_m = .x[["lag3_precip_cm"]],
                                                   pet_m = .x[["pet_cm"]],
-                                                  wlp_m = .x[["wl_initial_cm:best_precip_cm"]],
-                                                  wlp1_m = .x[["wl_initial_cm:lag1_precip_cm"]],
-                                                  wlp2_m = .x[["wl_initial_cm:lag2_precip_cm"]],
-                                                  wlpet_m = .x[["wl_initial_cm:pet_cm"]])
+                                                  pet1_m = .x[["lag1_pet_cm"]],
+                                                  pet2_m = .x[["lag2_pet_cm"]],
+                                                  pet3_m = .x[["lag3_pet_cm"]])
                                    )
                               )))]
 
 
-tr_dat[, Ds_hat := wl_coefs[CJ(.BY[[1]], .BY[[2]]), f_predict[[1]]](wl_initial_cm, pet_cm, best_precip_cm),
+tr_dat[, Ds_hat := ds_mmods[CJ(.BY[[1]], .BY[[2]]), f_predict[[1]]](pet_cm, best_precip_cm),
        by = .(site, site_status)]
 
 ggplot(tr_dat,
@@ -131,15 +209,17 @@ ggplot(tr_dat,
   coord_cartesian(xlim = c(-1.5, 1.5),
                   ylim = c(-1.5, 1.5))
 
-
+tr_dat[, c("ytd_Ds_cm", "ytd_Ds_hat") := map(.SD, ~cumsum(nafill(.x, "const", 0))),
+       by = .(site, sample_year),
+       .SDcols = c("Ds_cm", "Ds_hat")]
 tr_dat[, wl_hat := shift(wl_initial_cm + Ds_hat, 1),
        by = .(site, sample_year)]
 
 ggplot(tr_dat[site == "077"],
        aes(x = doy)) +
-  geom_line(aes(y = wl_initial_cm),
+  geom_line(aes(y = ytd_Ds_cm),
             color = "gray45") + 
-  geom_line(aes(y = wl_hat),
+  geom_line(aes(y = ytd_Ds_hat),
             color = "blue",
             linetype = "dashed") +
   facet_wrap(~sample_year,
@@ -176,7 +256,7 @@ ggplot(val_dat[site == "077"],
              scales = "free_y") +
   theme_bw()
 
-val_dat[wl_coefs, 
+val_dat[ds_mmods, 
         f_predict := i.f_predict,
         on = c("site", "site_status")]
 
@@ -231,13 +311,10 @@ val_dat2[,
                      wl_function = first(f_predict)),
         by = .(site, sample_year)]
 
-ggplot(val_dat2[site == "077"],
+ggplot(val_dat2[site == "135"],
        aes(x = doy)) +
   geom_line(aes(y = wl_initial_cm),
             color = "gray45") + 
-  geom_line(aes(y = wl_hat),
-            color = "blue",
-            linetype = "dashed") +
   geom_line(aes(y = wl_hat_func),
             color = "red",
             linetype = "dotted") +

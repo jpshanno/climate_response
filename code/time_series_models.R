@@ -10,7 +10,7 @@ library(TSA)
 tar_load(water_budget)
 
 dat <- 
-  water_budget[site == "152" & sample_year == 2017]
+  water_budget[site == "156" & sample_year == 2017]
 
 # # Prewhitening example to look at ccf of pet and wl_initial:
 # # https://online.stat.psu.edu/stat510/lesson/9/9.1
@@ -98,38 +98,42 @@ dat <-
 # dat[, prev_ds := shift(Ds_cm, 1)]
 # dat[, prev2_ds := shift(Ds_cm, 2)]
 
-dat <- 
-  tar_read(water_budget)[site == "152" & sample_year == 2017]
-
 start_doy <- 
   dat[!is.na(wl_initial_cm), doy][1]
 
+
+DOY <- 
+  dat[!is.na(wl_initial_cm), doy]
+HAR <- 
+  harmonic(ts(1:366, deltat = 1/366), 3)[DOY,]
 WL <- 
   dat[!is.na(wl_initial_cm), wl_initial_cm]
 L1WL <- 
   dat[, .(wl_initial_cm = shift(wl_initial_cm, 1))][!is.na(wl_initial_cm), c(wl_initial_cm, last(wl_initial_cm))]
 DS <- 
   dat[!is.na(wl_initial_cm), Ds_cm]
+DSr <- 
+  dat[!is.na(wl_initial_cm), Ds_cm/sy]
 P <- 
   dat[!is.na(wl_initial_cm), best_precip_cm]
 PET <- 
   dat[!is.na(wl_initial_cm), pet_cm]
 L1P <- 
-  dat[, .(wl_initial_cm, p = shift(best_precip_cm, 1))][!is.na(wl_initial_cm), p]
+  dat[, .(wl_initial_cm, p = shift(best_precip_cm, 1, 0))][!is.na(wl_initial_cm), p]
 L2P <- 
-  dat[, .(wl_initial_cm, p = shift(best_precip_cm, 2))][!is.na(wl_initial_cm), p]
+  dat[, .(wl_initial_cm, p = shift(best_precip_cm, 2, 0))][!is.na(wl_initial_cm), p]
 L3P <- 
-  dat[, .(wl_initial_cm, p = shift(best_precip_cm, 3))][!is.na(wl_initial_cm), p]
+  dat[, .(wl_initial_cm, p = shift(best_precip_cm, 3, 0))][!is.na(wl_initial_cm), p]
 L4P <- 
-  dat[, .(wl_initial_cm, p = shift(best_precip_cm, 4))][!is.na(wl_initial_cm), p]
+  dat[, .(wl_initial_cm, p = shift(best_precip_cm, 4, 0))][!is.na(wl_initial_cm), p]
 L1PET <- 
-  dat[, .(wl_initial_cm, p = shift(pet_cm, 1))][!is.na(wl_initial_cm), p]
+  dat[, .(wl_initial_cm, p = shift(pet_cm, 1, 0))][!is.na(wl_initial_cm), p]
 L2PET <- 
-  dat[, .(wl_initial_cm, p = shift(pet_cm, 2))][!is.na(wl_initial_cm), p]
+  dat[, .(wl_initial_cm, p = shift(pet_cm, 2, 0))][!is.na(wl_initial_cm), p]
 L3PET <- 
-  dat[, .(wl_initial_cm, p = shift(pet_cm, 3))][!is.na(wl_initial_cm), p]
+  dat[, .(wl_initial_cm, p = shift(pet_cm, 3, 0))][!is.na(wl_initial_cm), p]
 L4PET <- 
-  dat[, .(wl_initial_cm, p = shift(pet_cm, 4))][!is.na(wl_initial_cm), p]
+  dat[, .(wl_initial_cm, p = shift(pet_cm, 4, 0))][!is.na(wl_initial_cm), p]
 
 # Probably should do just precip, filter out the effects and then look at PET
 # Having trouble implementing that right now (this model does not filter out 
@@ -141,8 +145,8 @@ L4PET <-
 # a fixed draw down rate as described above
 mod <- 
   arimax(WL, order = c(1, 1, 0), 
-         xtransf = matrix(c(L1P, L1PET), ncol = 2), 
-         transfer = list(c(2,0), c(0,0)))
+         xtransf = matrix(c(L1P), ncol = 1), 
+         transfer = list(c(2,0)))
 
 coefs <- 
   coef(mod)
@@ -159,14 +163,38 @@ p_theta0 <-
 pet_theta0 <- 
   coefs[["T2-MA0"]]
 
-lmrob(fitted(forecast::Arima(WL,
-                             model = forecast::Arima(p_theta0 * L1P, order = c(2, 0, 0), 
-                                                     fixed = c(p_phi1, p_phi2, 0)))) ~ PET)
+auto.arima(WL, xreg = HAR, allowmean = FALSE)
+mod2 <-
+  arimax(WL,
+       order = c(1, 0, 1),
+       xreg = HAR,
+       fixed = c(coef(auto.arima(WL, xreg = HAR)), NA, NA, NA, NA),
+       xtransf = matrix(c(L1P, L1PET), ncol = 2),
+       transfer = list(c(2,0), c(0, 0)),
+       transform.pars = FALSE)
+# 
+# 
+# pet_theta0 <- 
+#   coef(mod2)[["T2-MA0"]]
+#   # coefs[["T2-MA0"]]
+# 
+# plot(diff(fitted(forecast::Arima(WL,
+#                              model = forecast::Arima(p_theta0 * L1P, order = c(2, 0, 0), 
+#                                                      fixed = c(p_phi1, p_phi2, 0))))) ~ PET[-c(1)])
+# 
+# lmrob(diff(fitted(forecast::Arima(WL,
+#                                  model = forecast::Arima(p_theta0 * L1P, order = c(2, 0, 0), 
+#                                                          fixed = c(p_phi1, p_phi2, 0))))) ~ PET[-c(1)],
+#       setting = "KS2014")
+
+# For 135, pet_theta0 = -0.45 was a good fit, need to see if I can find that relationship
 
 HAT <- 
   WL[1] +
   cumsum((p_theta0 * filter(L1P, c(p_phi1, p_phi2), "con", sides = 1) +
-        pet_theta0 * L1PET)[-c(1:2)])
+            pet_theta0 * L1PET)[-c(1:2)])
+
+
 # WL[1] +
 #   cumsum((
 #     4.3834 * (L1P - mean(L1P)) +
@@ -180,24 +208,67 @@ plot(HAT,
               max(c(HAT, WL), na.rm = TRUE)))
 lines(WL, col = "blue")
 
-# morpho_mods <- 
-#   tar_read(mod_morphology_flow)
-# 
-# flow_mod <- 
-#   morpho_mods[site == "152", f_predict[[1]]]
-# 
-# cp <- 
-#   morpho_mods[site == "152", changepoint]
+morpho_mods <-
+  tar_read(mod_morphology_flow)
+
+flow_mod <-
+  morpho_mods[site == "135", f_predict[[1]]]
+
+cp <-
+  morpho_mods[site == "135", changepoint]
+
+
+# NF <- HAT - WL[-c(1:2)]
+# NF_fil <- filter(NF, rep(1/3, 3), sides = 2)
+# plot(NF_fil ~ WL[-c(1:2)])
+# df <- data.table(NF_fil, WL[-c(1:2)])
+# mcp(list(NF_fil ~ WL, ~0 + WL + I(WL^2)), data = df)
+# ifelse(vHAT[i-1] <= 10.8,
+#        0, #-(-0.199 + 0.037 * vHAT[i-1]), # Doing the opposite below the change point. Need to set change point = 0 for model?
+#        -0.199 + 0.037 * (10.8) +
+#          -0.0005 * (vHAT[i-1] - 10.8) +
+#          -0.018 * (vHAT[i-1] - 10.8)^2)
+
+
+tar_load(external_met)
+
+external_met[, gdd_10 := (tmax_c + tmin_c) / 2 - 10]
+
+regional_met <- 
+  external_met[by = .(sample_date),
+               j = lapply(.SD, median, na.rm = TRUE),
+               .SDcols = c("pet_cm", "precip_cm", "gdd_10")]
+
+regional_met[, ytd_gdd_10 := cumsum(gdd_10),
+             by = .(year(sample_date))]
+
+regional_met[by = .(year(sample_date)),
+             j = `:=`(L1P = shift(precip_cm, 1),
+                      L1PET = shift(pet_cm, 1))]
   
 val <- 
-  tar_read(water_budget)[site == "152" & sample_year == 2012]
+  tar_read(water_budget)[site == "157" & sample_year == 2013]
 
 vWL <- 
   val[!is.na(wl_initial_cm), wl_initial_cm]
+vP <- 
+  # regional_met[val[!is.na(wl_initial_cm)], L1P, on = c("sample_date")]
+  val[!is.na(wl_initial_cm), best_precip_cm]
+vPET <- 
+  # regional_met[val[!is.na(wl_initial_cm)], L1P, on = c("sample_date")]
+  val[!is.na(wl_initial_cm), pet_cm]
 vL1P <- 
-  val[, .(wl_initial_cm, p = shift(best_precip_cm, 1))][!is.na(wl_initial_cm) & !is.na(p), p]
+  # regional_met[val[!is.na(wl_initial_cm)], L1P, on = c("sample_date")]
+  val[, .(wl_initial_cm, p = shift(best_precip_cm, 1))][!is.na(wl_initial_cm), nafill(p, "const", 0)]
+vL2P <- 
+  # regional_met[val[!is.na(wl_initial_cm)], L1P, on = c("sample_date")]
+  val[, .(wl_initial_cm, p = shift(best_precip_cm, 2))][!is.na(wl_initial_cm), nafill(p, "const", 0)]
+vL3P <- 
+  # regional_met[val[!is.na(wl_initial_cm)], L1P, on = c("sample_date")]
+  val[, .(wl_initial_cm, p = shift(best_precip_cm, 3))][!is.na(wl_initial_cm), nafill(p, "const", 0)]
 vL1PET <- 
-  val[, .(wl_initial_cm, p = shift(pet_cm, 1))][!is.na(wl_initial_cm) & !is.na(p), p]
+  # regional_met[val[!is.na(wl_initial_cm)], L1PET, on = c("sample_date")]
+  val[, .(wl_initial_cm, p = shift(pet_cm, 1))][!is.na(wl_initial_cm), nafill(p, "const", 0)]
 
 vHAT <- 
   rep(NA, length(vWL))
@@ -208,22 +279,19 @@ vHAT[1] <-
 for(i in 2:length(vWL)){
   vHAT[i] <- 
     vHAT[i-1] + 
-    p_theta0 * (p_phi1 * vL1P[i] + p_phi2 * vL1P[i-1]) + 
-    pet_theta0 * vL1PET[i] +
+    p_theta0 * (p_phi1 * vL1P[i] + p_phi2 * vL1P[i-1]) +
+    pet_theta0 * vPET[i] #+
     # pmin(0, flow_mod(vHAT[i-1]))
     # NF <- resid(mod)
     # NF_fil <- filter(NF, rep(1/3, 3), sides = 2)
     # df <- data.table(NF_fil, WL)
     # mcp(list(NF_fil ~ WL, ~0 + WL + I(WL^2)), data = df)
-    ifelse(vHAT[i-1] <= 10.8,
-           0, #-(-0.199 + 0.037 * vHAT[i-1]), # Doing the opposite below the change point. Need to set change point = 0 for model?
-           -0.199 + 0.037 * (10.8) +
-             -0.0005 * (vHAT[i-1] - 10.8) +
-             -0.018 * (vHAT[i-1] - 10.8)^2)
+    # ifelse(vHAT[i-1] <= 10.8,
+    #        0, #-(-0.199 + 0.037 * vHAT[i-1]), # Doing the opposite below the change point. Need to set change point = 0 for model?
+    #        -0.199 + 0.037 * (10.8) +
+    #          -0.0005 * (vHAT[i-1] - 10.8) +
+    #          -0.018 * (vHAT[i-1] - 10.8)^2)
 }
-
-vHAT_base <-
-   vWL[1] + cumsum((4.3764 * filter(vL1P, c(0.7288, 0.1691), "con", sides = 1) + -0.7821 * vL1PET)[-c(1:2)])
 
 plot(vHAT,
      type = 'l',
