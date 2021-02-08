@@ -24,7 +24,7 @@ fetch_ncei_data <-
                                       datasets),
                  readme_url = c("https://www.ncei.noaa.gov/data/coop-hourly-precipitation/v2/doc/readme.csv.txt",
                                 "https://www1.ncdc.noaa.gov/pub/data/ghcn/daily/readme.txt"),
-                 inventory_url = c("https://www.ncei.noaa.gov/data/coop-hourly-precipitation/v2/station-inventory/HPD_v02r02_stationinv_c20201129.csv",
+                 inventory_url = c("https://www.ncei.noaa.gov/data/coop-hourly-precipitation/v2/station-inventory/HPD_v02r02_stationinv_c20210126.csv",
                                    "https://www1.ncdc.noaa.gov/pub/data/ghcn/daily/ghcnd-stations.txt"),
                  citation_text = c(paste0("Hourly Precipitation Data (HPD) Network, Version 2.r2, NOAA National Centers for Environmental Information. ",
                                           Sys.Date(), "."),
@@ -38,7 +38,7 @@ fetch_ncei_data <-
                  key = "dataset")
     
     # Create download directory if it doesn't exist
-    walk(dat$out_path, ~if(!dir.exists(.x) | force.download){dir.create(.x)})
+    walk(dat$out_path, ~if(!dir.exists(.x)){dir.create(.x)})
     
     # Download readme
     walk2(dat$out_path, 
