@@ -6,9 +6,7 @@ planning to restore them is a hopeless endeavor. -->
 
 ## Hierarchical Model
 
-$$
-WL_t = WL_{t-1} + wlL1 + p + et + q + g
-$$
+*WL<sub>t<\sub> = WL<sub>t-1<\sub> + P<sub>t-1<\sub> + ET<sub>t-1<\sub> + Q<sub>t-1<\sub>  + G<sub>t-1<\sub> *
 
 _Precip response scaled by ecosystem specific yield__
 nlf(p ~ step(wlL1 - cp) * (precip / esy) + step(cp - wlL1) * (Mp * precip)),
