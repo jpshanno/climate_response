@@ -155,7 +155,7 @@ targets <- list(
     format = "rds"
   )
     
-  # Model Climate Flow
+  # Model Meteorologic Net Flow
   # This can be thought of as the residual flow not explained by water level
   # fluctuations
   # Does not allow random slope, only random intercept. Should probably involve
@@ -163,10 +163,20 @@ targets <- list(
   , tar_target(
     mod_meteo_flow,
     model_meteo_flow(training_data,
-                       mod_morphology_flow),
+                     mod_morphology_flow),
     format = "rds"
   )
     
+  # Model PET Dradown
+  , tar_target(
+    mod_pet_drawdown,
+    model_pet_drawdown(data = training_data,
+                       morpho.models = mod_morphology_flow,
+                       meteo.models = mod_meteo_flow[["random"]],
+                       rise.models = mod_rise),
+    format = "rds"
+  )
+  
   # Simulate Wetland Runs ---------------------------------------------------
   
   # simulate_water_levels()
