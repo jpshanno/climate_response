@@ -60,10 +60,6 @@ wa_trends <-
       trend_y = max_wa_cm,
       trend_adj = diff(water_availability_cm) / as.numeric(diff(sample_date, units = "days"))),
     by = .(station_name, sample_year)]
-  # external_met[format(sample_date, "%m%d") %in% c("0401", "1231"),
-  #            .(water_year, wa_trend = ((shift(water_availability_cm, -1) - shift(water_availability_cm, 1)) / (365*3))),
-  #            by = .(station_name,
-  #                   sample_year)][, .(station_name, water_year, wa_trend)]
 
 external_met[wa_trends,
              `:=`(trend_y = i.trend_y,
@@ -71,7 +67,6 @@ external_met[wa_trends,
              on = c("station_name", "sample_year")]
 
 external_met[, detrend_wa_cm := (water_availability_cm + trend_adj) - trend_y]
-
 
 # Rather than use the maximum annual water water availability, calculate the max
 # springtime water avaialbility as above and use that for normalizing. Need to
@@ -89,47 +84,11 @@ external_met[,
              normalized_wa_cm := (water_availability_cm - first(water_availability_cm)) - max(water_availability_cm - first(water_availability_cm)),
              by = .(station_name, sample_year)]
 
-
-ggplot(external_met[water_year %in% 2012:2020], 
-       aes(x = sample_date, y = normalized_wa_cm)) + 
-  geom_line() + 
-  geom_hline(aes(yintercept = 0)) +
-  facet_grid(station_name ~ sample_year, scales = "free") + 
-  scale_x_date(date_breaks = "1 month", date_labels = "%m", expand = expansion()) + 
-  theme_bw()
-
-
-ggplot(external_met, 
-       aes(x = sample_date, y = detrend_wa_cm)) + 
-  geom_line() + 
-  geom_point(data = external_met[format(sample_date, "%m%d") == "1101"], 
-             color = "red") + 
-  facet_wrap(~station_name, ncol = 1) + 
-  scale_x_date(breaks = as.Date(paste0(2000:2020, "-11-01")))
-
-
 daily_water_levels[, Ds_continuous := diff_na(wl_initial_cm),
                    by = .(site)]
 
 daily_water_levels[, Ds_cumulative := ytd_sum(Ds_continuous),
                    by = .(site)]
-
-ggplot(daily_water_levels,
-       aes(x = wl_initial_cm,
-           y = normalized_wa_cm/Ds_cumulative)) +
-  geom_point(shape = 20,
-             alpha = 0.2) +
-  coord_cartesian(ylim = c(-1, 3)) +
-  facet_wrap(~site, 
-             scales = "free")
-
-
-ggplot(daily_water_levels,
-       aes(x = sample_date,
-           y = Ds_cumulative)) +
-  geom_line() +
-  facet_grid(site ~ water_year, 
-             scales = "free")
 
 external_met[,
              ytd_pet_cm := cumsum(pet_cm),
@@ -153,34 +112,6 @@ daily_water_levels[sample_date >= sos,
                    wa_cumulative := water_availability_cm - first(water_availability_cm),
                    by = .(site, sample_year)]
 
-
-ggplot(daily_water_levels,
-       aes(x = wl_initial_cm,
-           y = Ds_cumulative/normalized_wa_cm)) +
-  geom_point() +
-  coord_cartesian(ylim = c(-20, 20)) +
-  facet_grid(site ~ sample_year, 
-             scales = "free")
-
-ggplot(daily_water_levels,
-       aes(x = wl_initial_cm,
-           y = Ds_cumulative/normalized_wa_cm,
-           color = factor(sample_year))) +
-  geom_point() +
-  facet_wrap(~ site, 
-             scales = "free")
-
-ggplot(daily_water_levels,
-       aes(x = wl_initial_cm,
-           y = Ds_cumulative/normalized_wa_cm)) +
-  geom_point(aes(color = factor(sample_year))) +
-  geom_smooth(method = lmrob,
-              formula = y ~ x,
-              method.args = list(setting = "KS2014")) +
-  coord_cartesian(ylim = c(-20, 20)) +
-  facet_wrap(~ site, 
-             scales = "free")
-
 daily_water_levels[, esy_wa_emp := Ds_cumulative / normalized_wa_cm]
 
 daily_water_levels[, wl_l1_cm := shift(wl_initial_cm, 1),
@@ -190,269 +121,6 @@ daily_water_levels[, threshold := coef(lm(wl_l1_cm ~ Ds_cumulative,
                                           data = .SD))[[1]],
                    by = .(site)]
 
-
-ggplot(daily_water_levels[wl_l1_cm < threshold],
-       aes(x = wl_l1_cm,
-           y = esy_wa_emp,
-           color = factor(sample_year))) +
-  geom_point() +
-  facet_wrap(~ site, 
-             scales = "free")
-
-esy_wa_mods <-
-  daily_water_levels[is.finite(esy_wa_emp) & wl_l1_cm < threshold,
-                     .(mod_lm = list(lmrob(esy_wa_emp ~ wl_l1_cm,
-                                           data = .SD,
-                                           setting = "KS2014"))
-                       , mod_quad = list(lmrob(esy_wa_emp ~ wl_l1_cm + I(wl_l1_cm^2),
-                                               data = .SD,
-                                               setting = "KS2014"))
-                       , b = min_na(esy_wa_emp)
-                       , mod_nls = list(nls(esy_wa_emp ~ m**(wl_l1_cm - o),
-                                            start = list(m = 1.1, o = unique(.SD$threshold)),
-                                            control = nls.control(warnOnly = TRUE),
-                                            data = .SD))
-                       # , mod_mcp = list(mcp(list(esy_wa_emp ~ wl_initial_cm,
-                       #                           ~ 0 + wl_initial_cm),
-                       #                      prior = list(cp_1 = "dnorm(0, 1)",
-                       #                                   int_1 = "dnorm(1, 1)"),
-                       #                      cores = 1,
-                       #                      data = .SD))
-                     ),
-                     keyby = .(site)]
-
-esy_wa_mods[,
-            f_nls := map2(mod_nls, b,
-                          ~{
-                            coefs <-
-                              coef(.x)
-                            as.function(list(water.level = NULL,
-                                             bquote(.(b) + .(m)**(water.level - .(o)),
-                                                    where = list(b = .y,
-                                                                 m = coefs[[1]],
-                                                                 o = coefs[[2]]))))
-                          })]
-
-
-
-esy_wa_mods[,
-            f_lm := map(mod_lm,
-                        ~{
-                          coefs <-
-                            coef(.x)
-
-                          as.function(list(water.level = NULL,
-                                           bquote(.(b) + .(m) * water.level,
-                                                  where = list(b = coefs[[1]],
-                                                               m = coefs[[2]]))))
-                        })]
-
-esy_wa_mods[,
-            f_quad := map(mod_quad,
-                        ~{
-                          coefs <-
-                            coef(.x)
-
-                          as.function(list(water.level = NULL,
-                                           bquote(.(b) + .(m) * water.level + .(m2) * water.level^2,
-                                                  where = list(b = coefs[[1]],
-                                                               m = coefs[[2]],
-                                                               m2 = coefs[[3]]))))
-                        })]
-
-# esy_wa_mods[,
-#             f_mcp := map(mod_mcp,
-#                          ~{
-#                            coefs <-
-#                              mcp::fixef(.x)
-# 
-#                            as.function(list(water.level = NULL,
-#                                             bquote(.(b) +
-#                                                      (water.level <= .(cp)) * (water.level * .(m1)) +
-#                                                      (water.level > .(cp)) * (.(cp) * .(m1) + .(m2) * (water.level - .(cp))),
-#                                                    where = list(cp = coefs[1, "mean"],
-#                                                                 b = coefs[2, "mean"],
-#                                                                 m1 = coefs[4, "mean"],
-#                                                                 m2 = coefs[5, "mean"]))))
-#                          })]
-
-daily_water_levels[, esy_wa_lm := esy_wa_mods[.BY[[1]], f_lm[[1]]](wl_l1_cm),
-                   by = .(site)]
-daily_water_levels[, Ds_hat_lm := normalized_wa_cm * esy_wa_lm]
-
-daily_water_levels[, esy_wa_quad := esy_wa_mods[.BY[[1]], f_quad[[1]]](wl_l1_cm),
-                   by = .(site)]
-daily_water_levels[, Ds_hat_quad := normalized_wa_cm * esy_wa_quad,
-                   by = .(site)]
-
-daily_water_levels[, esy_wa_nls := esy_wa_mods[.BY[[1]], f_predict[[1]]](wl_initial_cm),
-                   by = .(site)]
-daily_water_levels[, Ds_hat_nls := normalized_wa_cm / esy_wa_nls]
-
-# daily_water_levels[, esy_wa_mcp := esy_wa_mods[.BY[[1]], f_mcp[[1]]](wl_l1_cm),
-#                    by = .(site)]
-# daily_water_levels[, Ds_hat_mcp := normalized_wa_cm * esy_wa_mcp,
-#                    by = .(site)]
-
-ggplot(daily_water_levels[wl_initial_cm < (threshold - 1)],
-       aes(x = wl_initial_cm,
-           y = esy_wa_emp)) +
-  geom_point() +
-  geom_line(aes(y = esy_wa_nls), 
-            color = "red") +
-  # geom_line(aes(y = esy_wa_quad),
-  #           color = "blue") +
-  # geom_line(aes(y = esy_wa_mcp), 
-  #           color = "blue") +
-  facet_wrap(~ site, 
-             scales = "free")
-
-ggplot(daily_water_levels,
-       aes(x = sample_date,
-           y = Ds_cumulative)) +
-  geom_line(color = "gray40") +
-  geom_line(aes(y = Ds_hat_lm),
-            color = "blue") +
-  facet_grid(site ~ sample_year, 
-             scales = "free")
-
-ggplot(daily_water_levels[wl_initial_cm < (threshold - 1)],
-       aes(x = Ds_cumulative,
-           y = Ds_hat_nls)) +
-  geom_point() +
-  geom_abline(color = "red") +
-  facet_grid(site ~ sample_year, 
-             scales = "free")
-
-test <- 
-  daily_water_levels[site == "152" & sample_year == 2013][min(which(!is.na(wl_initial_cm))):.N]
-
-f_esy <- 
-  esy_wa_mods["152", f_lm[[1]]]
-
-WL <- 
-  test$wl_initial_cm
-
-threshold <- 
-  unique(test$threshold)
-
-WA <- 
-  test$normalized_wa_cm
-
-P <- 
-  test$best_precip_cm
-
-PET <- 
-  test[external_met[station_name == "kenton"], pet_cm, nomatch = NULL, on = "sample_date"]
-
-SY <- 
-  test$esy_wa_emp
-
-Dobs <- 
-  test$Ds_cumulative
-
-Dcm <- 
-  test$Ds_cm
-
-d_hat <- 
-  numeric(nrow(test))
-
-d_hat[1] <- 
-  0
-
-wl_hat <- 
-  numeric(nrow(test))
-
-wl_hat[1] <- 
-  WL[1]
-
-sy_hat <- 
-  numeric(nrow(test))
-
-sy_hat[1] <- 
-  f_esy(WL[1])
-
-for(i in 2:length(d_hat)){
-
-  # if(wl_hat[i-1] < threshold-0.6){
-  #   sy_hat[i] <- 
-  #     0.1932 + 1.1532**(wl_hat[i-1] - 17.2069)
-  #   # daily_water_levels[, sy_emp := (best_precip_cm + melt_cm - pet_cm) / Ds_cm]
-  #   # nls(sy_emp ~ b + m**(wl_l1_cm-c),
-  #   #     data = daily_water_levels[site == "152" & wl_l1_cm < threshold & between(sy_emp, 0, 1)],
-  #   #     start = list(b = 0.1, m = 1.1, c = 20),
-  #   #     na.action = na.exclude)
-  #   
-  # } else {
-  #   sy_hat[i] <- 
-  #     10
-  # }
-  # 
-  # d_hat[i] <- 
-  #   (P[i]-PET[i])/sy_hat[i]
-  
-  # sy_hat[i] <- 
-  #   0.1328917 + 1.1109099**(wl_hat[i-1] - 31.4566861)
-  
-  # if(P[i] < PET[i]){
-    sy_hat[i] <-
-      0.306868 + 0.002693 * wl_hat[i-1]
-      # ifelse(wl_hat[i-1] < threshold,
-      #        0.2047 + 1.1045**(wl_hat[i-1] - 21.3802),
-      #        # Test as below
-      #        # nlrob({(-pet_cm)/Ds_cm} ~ b + m **(wl_l1_cm - c), data = test[best_precip_cm < 0.2 & wl_l1_cm < threshold],
-      #        #       na.action = na.exclude,
-      #        #       start = c(b = 0.2, m = 1.1, c = 20))
-      #        2)
-      # pmin(1,
-      #      0.5 + 1.2437181**(wl_hat[i-1] - 12.8420301))
-
-      d_hat[i] <-
-        (-PET[i]) / sy_hat[i]
-
-      # if(wl_hat[i-1] > threshold) {
-      #
-      #   d_hat[i] <-
-      #     d_hat[i] + ((threshold - wl_hat[i-1]) / 2)
-      #
-      # }
-
-  # } else {
-
-    sy_hat[i] <-
-      0.216396 + 0.002312 * wl_hat[i - 1]
-      # ifelse(wl_hat[i-1] < threshold,
-      #        0.1432 + 1.1785**(wl_hat[i-1] - 15.0037),
-      #        # test <- daily_water_levels[site == "152"]
-      #        # nlrob({(best_precip_cm - 0.2)/Ds_cm} ~ b + m**(wl_l1_cm - c), data = test[wl_l1_cm < threshold & !is.na(best_precip_cm) & !is.na(Ds_cm)],
-      #        # start = c(b = 0.05, m = 1.1, c = 50))
-      #        1)
-      # pmin(1,
-      #      0.4 + 1.2437181**(wl_hat[i-1] - 12.8420301))
-
-    d_hat[i] <-
-     (P[i]) / sy_hat[i] + d_hat[i]
-  # }
-  
-  wl_hat[i] <- 
-    wl_hat[i-1] + d_hat[i]
-  
-  if(wl_hat[i] > (threshold)){
-    wl_hat[i] <-
-      wl_hat[i] + (threshold - wl_hat[i]) / 2
-  }
-
-}
-
-plot(WL, type = 'l', col = "gray40"); lines(wl_hat)
-plot(SY, type = 'l', col = "gray40"); lines(sy_hat)
-plot(d_hat, type = 'h')
-plot(wl_hat, type = 'l')
-plot(sy_hat, type = 'l')
-plot(WL[1] + cumsum(d_hat), type = 'l'); lines(WL, col = 'gray40')
-lines(Dobs, lty = 3)
-lines(WL[1] + as.numeric(filter(WA, 0.0198785393130021, "rec", sides = 1)), type = 'l')
-plot(Dobs)
 
 # Big Bayesian Model ------------------------------------------------------
 
