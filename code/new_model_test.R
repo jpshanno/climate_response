@@ -35,13 +35,13 @@ mod_g <-
                             water_availability_cm + I(water_availability_cm^2),
                           data = .SD,
                           setting = "KS2014"))),
-       keyby = .(site, site_status)]
+       keyby = .(site)]
 
 mod_g[, c("intercept", "slope", "quad_slope") := map_dfr(mod, coef)]
 
 func_g <-
   split(mod_g,
-        by = c("site", "site_status")) %>%
+        by = c("site")) %>%
   map(~as.function(list(water.availability = NULL,
                         substitute({
                          intercept + slope * water.availability + quad_slope * water.availability^2},
