@@ -21,7 +21,7 @@ prepare_water_budget <-
     data[, sy := sy.mods[.BY[[1]], f_predict[[1]]](wl_min_cm),
          by = .(site)]
     
-    data[, net_precip_cm := best_precip_cm - interception.mods[.BY[[1]], f_predict[[1]]](best_precip_cm),
+    data[, net_precip_cm := pmax(0, best_precip_cm - interception.mods[.BY[[1]], f_predict[[1]]](best_precip_cm)),
          by = .(site_status)]
     
     water_budget <- 
