@@ -75,8 +75,8 @@ model_ecosystem_sy <-
     prediction_functions <- 
       split(sy_mods, 
             by = "site") %>% 
-      map(~as.function(list(x = NULL, 
-                            substitute(b + m ** (x - c), 
+      map(~as.function(list(water.level = NULL, 
+                            substitute(b + m ** (water.level - c), 
                                        env = .x))))
     
     sy_mods[, f_predict := prediction_functions]

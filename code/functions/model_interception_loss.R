@@ -32,8 +32,8 @@ model_interception_loss <-
     prediction_functions <- 
       split(interception, 
             by = "site_status") %>% 
-      map(~as.function(list(x = NULL, 
-                            substitute(-intercept / (slope + interaction_slope * cos(2*pi*((x)))), 
+      map(~as.function(list(doy = NULL, 
+                            substitute(-intercept / (slope + interaction_slope * cos(2*pi*((doy / 366)))), 
                                        env = .x))))
         
     interception[, f_predict := prediction_functions]

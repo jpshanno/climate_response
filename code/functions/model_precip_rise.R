@@ -14,7 +14,7 @@ model_precip_rise <-
     
   mods <- 
     data[net_precip_cm > 0 & Dl_signed_cm > 0, 
-         .(mod = list(lmrob(Dl_signed_cm ~ net_precip_cm,
+         .(mod = list(lmrob(Dl_signed_cm ~ 0 + net_precip_cm,
                             setting = "KS2014"))),
          keyby = .(site)]
   
@@ -25,8 +25,10 @@ model_precip_rise <-
   prediction_functions <- 
     split(mods, 
           by = "site") %>% 
-    map(~as.function(list(x = NULL, 
-                          substitute(intercept + slope * x, 
+    map(~as.function(list(net.precip = NULL, 
+                          substitute({ifelse(net.precip == 0,
+                                             0,
+                                             slope * net.precip)}, 
                                      env = .x))))
   
   mods[, 

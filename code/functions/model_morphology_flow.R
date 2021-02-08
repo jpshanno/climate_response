@@ -66,13 +66,13 @@ model_morphology_flow <-
     predict_functions <- 
       split(mcp_mods,
             by = "site") %>%
-      map(~as.function(list(x = NULL,
-                            outflow.only = NULL,
+      map(~as.function(list(water.level = NULL,
+                            outflow.only = FALSE,
                             substitute({
                               q <- 
-                                ifelse(x <= changepoint,
-                                       intercept + linear_slope_1 * x,
-                                       intercept + linear_slope_1 * (x - changepoint) + linear_slope_2 * (x - changepoint) + quadratic_slope_2 * (x - changepoint)^2)
+                                ifelse(water.level <= changepoint,
+                                       intercept + linear_slope_1 * water.level,
+                                       intercept + linear_slope_1 * (water.level - changepoint) + linear_slope_2 * (water.level - changepoint) + quadratic_slope_2 * (water.level - changepoint)^2)
                             if(!outflow.only){return(q)}
                             pmin(q, 0)},
                                        env = .x))))
