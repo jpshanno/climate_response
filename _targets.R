@@ -33,14 +33,16 @@ targets <- list(
     format = "file"
   )
   
+  # The station inventory for the HPD data is not a stable address, the date
+  # changes. Need to update the function to account for that.
   , tar_target(
     ncei_files,
     fetch_ncei_data(out.path = "data/ncei_data",
                     coords = c(lon = -89.61332,
                                lat = 46.43133),
                     radius = 100,
-                    start.date = as.Date("2011-10-01"),
-                    end.date = as.Date("2020-09-30"),
+                    start.date = as.Date("2005-11-01"),
+                    end.date = as.Date("2020-10-30"),
                     force.download = FALSE),
     format = "file"
   )
@@ -50,8 +52,8 @@ targets <- list(
   , tar_target(
     mesowest_met,
     prepare_mesowest_data(dir = mesowest_dir, 
-                          start.date = as.Date("2011-10-01"),
-                          end.date = as.Date("2020-09-30"))
+                          start.date = as.Date("2011-11-01"),
+                          end.date = as.Date("2020-10-30"))
   )
   
   , tar_target(
@@ -69,17 +71,18 @@ targets <- list(
   , tar_target(
     external_met,
     prepare_ncei_data(path = ncei_files,
-                      start.date = as.Date("2011-10-01"),
-                      end.date = as.Date("2020-09-30"),
+                      start.date = as.Date("2005-11-01"),
+                      end.date = as.Date("2020-10-30"),
                       ghcnd.units = ghcnd_units) %>%
       fill_missing_data(additional.data = mesowest_met,
                         source = "ncei") %>%
       calculate_mean_temp() %>% 
-      calculate_solar_radiation(coefs = solrad_coefs) %>% 
+      calculate_solar_radiation(coefs = solrad_coefs[station_name == "PIEM4"]) %>% 
       calculate_hargreaves_pet(lambda.MJ.kg = 2.45) %>% 
       calculate_water_availability(precip.col = "precip_cm",
                                    pet.col = "pet_cm",
-                                   group.cols = c("station_name", "water_year"))
+                                   group.cols = c("station_name")) %>% 
+      subset(!(station_name %in% c("ironwood", "alberta_ford_for_center")))
   )
   
   , tar_target(
