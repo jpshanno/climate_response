@@ -228,7 +228,7 @@ for(i in 1:nrow(val_dat)){
   
   if(i == 1){
     wb_coefs <- 
-      fixef(wb_mod)
+      fixef(wb_mod, robust = TRUE)
     
     wl_hat2 <- 
       numeric(nrow(val_dat))
