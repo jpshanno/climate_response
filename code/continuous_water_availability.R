@@ -114,9 +114,6 @@ daily_water_levels[sample_date >= sos,
 
 daily_water_levels[, esy_wa_emp := Ds_cumulative / normalized_wa_cm]
 
-daily_water_levels[, wl_l1_cm := shift(wl_initial_cm, 1),
-                   by = .(site)]
-
 daily_water_levels[, threshold := coef(lm(wl_l1_cm ~ Ds_cumulative,
                                           data = .SD))[[1]],
                    by = .(site)]
@@ -127,13 +124,27 @@ daily_water_levels[, threshold := coef(lm(wl_l1_cm ~ Ds_cumulative,
 library(brms)
 options(mc.cores = 4)
 
+# Look for relationship comparing PET:Drawdown on days with precip vs days without
+
+daily_water_levels[, `:=`(wl_l1_cm = shift(wl_initial_cm, 1),
+                          pet_l1_cm = shift(pet_cm, 1),
+                          precip_l1_cm = shift(best_precip_cm, 1),
+                          precip_l2_cm = shift(best_precip_cm, 2),
+                          wa_l1_cm = shift(normalized_wa_cm)),
+                   by = .(site, sample_year)]
+
 brm_test <- 
   daily_water_levels[site == "152" & sample_year %in% c(2012, 2013) & !is.na(wl_initial_cm), 
                      .(wlObs = wl_initial_cm,
                        wlL1 = wl_l1_cm,
-                       pet = pet_cm,
-                       wa = normalized_wa_cm,
-                       precip = best_precip_cm)]
+                       pet = pet_l1_cm,
+                       wa = wa_l1_cm,
+                       precip = precip_l1_cm)]
+
+# Prediction loops are made to do i-1 for drivers, so I'm not using the 
+# pre-lagged predictors in val_dat. This needs to be switched but lagged met 
+# predictors need to be calculated in external_met and then joined to water_balance
+# so that there is not an NA at the beginning of each year of data.
 
 val_dat <- 
   daily_water_levels[site == "152" & sample_year %in% c(2012:2014), 
