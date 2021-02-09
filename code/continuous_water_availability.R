@@ -193,7 +193,8 @@ wb_priors <-
   # prior(normal(0.5, 1), nlpar = "esy", lb = 0) +
   set_prior(paste0("constant(", quantile(brm_test$wlObs, 0.8), ")"), nlpar = "cp") +
   prior(normal(-15, 1), nlpar = "cpWA", ub = 0) +
-  prior(normal(1.5, 1), nlpar = "Mp", lb = 1) +
+  # prior(normal(1.5, 1), nlpar = "Mp", lb = 1) +
+  prior(constant(1), nlpar = "Mp", lb = 1) +
   prior(constant(-1), nlpar = "Mpet", ub = 0) +
   prior(normal(1, 10), nlpar = "Bq", ub = 0) +
   prior(normal(0.02, 1), nlpar = "Mq", ub = 0) +
