@@ -1,13 +1,11 @@
 lutz
 data.table
 purrr
-robustbase
+furrr
 sirad
 lubridate
 geodist
 ggplot2
 patchwork
-lme4
-segmented
-robustlmm
-mcp
+brms
+airGR
