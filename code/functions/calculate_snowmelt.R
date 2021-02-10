@@ -1,0 +1,54 @@
+##' .. content for \description{} (no empty lines) ..
+##'
+##' .. content for \details{} ..
+##'
+##' @title
+##' @param data
+##' @return
+##' @author Joe Shannon
+##' @export
+calculate_snowmelt <- 
+  function(data) {
+    
+    cn_mods <- 
+      data[, 
+           .(n_records = .N,
+             input_mod = list(CreateInputsModel(FUN_MOD = RunModel_CemaNeigeGR4J, 
+                                                DatesR = as.POSIXct(sample_date, tz = "UTC"), 
+                                                Precip = precip_cm * 10, 
+                                                PotEvap = pmax(0, pet_cm * 10),
+                                                TempMean = tmean_c,
+                                                TempMin = tmin_c,
+                                                TempMax = tmax_c,
+                                                ZInputs = 380,
+                                                HypsoData = rep(380, 101),
+                                                NLayers = 1))),
+           by = .(station_name)]
+    
+    cn_mods[,
+            run_opts := map2(input_mod, n_records,
+                             ~CreateRunOptions(FUN_MOD = RunModel_CemaNeigeGR4J, 
+                                               InputsModel = .x,
+                                               IndPeriod_WarmUp = 1:365,
+                                               IndPeriod_Run = (365 + 1):.y,
+                                               IsHyst = FALSE)
+            )]
+    
+    cn_mods[, mod := map2(input_mod,
+                          run_opts,
+                          ~RunModel_CemaNeige(InputsModel = .x,
+                                              RunOptions = .y,
+                                              Param = c(0.25, 3.74)))]
+    
+    daily_melt <- 
+      cn_mods[, map_dfr(mod, 
+                        ~data.table(sample_date = as.Date(.x[["DatesR"]]),
+                                    melt_cm = 0.1 * .x$CemaNeigeLayers$Layer01$Melt)),
+              by = .(station_name)]
+    
+    data[daily_melt,
+         melt_cm := i.melt_cm,
+         on = c("station_name", "sample_date")]
+    
+    data
+  }

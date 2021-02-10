@@ -22,8 +22,7 @@ targets <- list(
   tar_target(
     study_data_paths,
     c("data/well_levels.csv",
-      "data/precipitation_daily.csv",
-      "data/daily_snowmelt.csv"),
+      "data/precipitation_daily.csv"),
     format = "file"
   )
   
@@ -80,15 +79,15 @@ targets <- list(
       calculate_solar_radiation(coefs = solrad_coefs[station_name == "PIEM4"]) %>% 
       calculate_hargreaves_pet(lambda.MJ.kg = 2.45) %>% 
       calculate_water_availability() %>% 
-      subset(!(station_name %in% c("ironwood", "alberta_ford_for_center")))
+      subset(!(station_name %in% c("ironwood", "alberta_ford_for_center"))) %>% 
+      calculate_snowmelt()
   )
   
   # Prepare Water Budget Data ---------------------------------------------
   , tar_target(
     water_budget,
     prepare_water_levels(path = study_path("well_levels", study_data_paths)) %>% 
-      append_study_precip(precip.path = study_path("precip", study_data_paths),
-                          snow.path = study_path("snowmelt", study_data_paths)) %>% 
+      append_study_precip(precip.path = study_path("precip", study_data_paths)) %>% 
       merge_external_met(external.met = external_met)
   )
   
@@ -109,6 +108,9 @@ targets <- list(
   # Build Water Level Models ------------------------------------------------
 
   # Make priors
+    # Besy priors from min of empirical Sy
+    # Mesy prior from papers?
+    # 
   # Run Models
   # Evaluate Models
   
