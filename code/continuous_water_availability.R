@@ -440,3 +440,208 @@ daily_water_levels[site == "152",
 
 
 
+
+# Physical Model ----------------------------------------------------------
+
+bank_water <- 
+  function(x){
+    
+    b <- 0
+    
+    for(i in 1:length(x)){
+      
+      x[i] <- 
+        x[i] + b/10
+      
+      if(x[i] > 0){
+        b <- x[i]
+        x[i] <- 0
+      } else {
+        b <- 0
+      }
+    }
+    
+    x
+  }
+
+kenton[sample_year != 2020, 
+       banked_wa := bank_water(ytd_offset_wa_cm),
+       by = .(sample_year)]
+
+plot(ytd_offset_wa_cm ~ sample_date, data = kenton[year(sample_date) %in% 2012:2014], 
+     type = 'l')
+
+
+# Hysteresis --------------------------------------------------------------
+
+# This looks like the best approach. There seems to be little chance of runaway
+# water level declines because the function is built on WA not an ESY derived
+# from water levels. 
+
+# Get just the declining portion of water availability (should probably consider
+# doing this as high sprint water level to lowest water level, possible with the
+# detrended annual levels). For now the max and min available water serves as
+# a good proxy. This could probably be slightly improved by getting just the 
+# first local minimum, or try to remove any rewetting periods (but that may 
+# reduce too much data). 
+# The only serious improvement that seems to be necessary is to have slightly
+# better interannual alignment of the water availability. It looks like using
+# the previous year's water deficit/surplus may be enough to align the curves. 
+# I have only eyeballed that, but it seems close
+drying_curves <- 
+  water_budget[site == "135", 
+               .SD[
+                 # Index of maximum water availability (melt period)
+                 which.max(ytd_water_availability_cm):
+                   # Index of max WA + Index of min WA that occurs after max WA
+                   (which.max(ytd_water_availability_cm) + which.min(.SD[which.max(ytd_water_availability_cm):.N, ytd_water_availability_cm]))], 
+               by = .(sample_year)]
+
+drying_mod <-
+  robustbase::nlrob(wl_initial_cm ~ b - m2**ytd_water_availability_cm,
+                    start = list(b = 20, m2 = 0.86), na.action = na.exclude,
+                    data = drying_curves)
+
+hyst_function <-
+  deriv(bquote(.(b) - .(m2)**water.availability,
+               where = list(b = coef(drying_mod)[["b"]],
+                            m2 = coef(drying_mod)[["m2"]])),
+        namevec = "water.availability",
+        func = TRUE)
+
+ggplot(drying_curves, 
+       aes(x = ytd_water_availability_cm, 
+           y = wl_initial_cm)) + 
+  geom_point(aes(color = factor(sample_year))) + 
+  geom_function(fun = hyst_function)
+
+
+
+ggplot(drying_curves[, 
+                     .(ytd_water_availability_cm = cumsum(pmin(total_input_cm - pet_cm, 0)),
+                       wl_initial_cm = cumsum(pmin(Ds_cm, 0))),
+                     by = .(sample_year)], 
+       aes(x = ytd_water_availability_cm, 
+           y = wl_initial_cm)) + 
+  geom_point(aes(color = factor(sample_year)))
+
+# The new drying curves seem to work pretty well too. Maybe they would be easier
+# to get all the years aligned?
+# new_drying <-
+#   drying_curves[,
+#                 .(ytd_water_availability_cm = cumsum(pmin(total_input_cm - pet_cm, 0)),
+#                   wl_initial_cm = cumsum(pmin(Ds_cm, 0))),
+#                 by = .(sample_year)]
+# 
+# drying_mod <-
+#   robustbase::nlrob(wl_initial_cm ~ b + m1 * ytd_water_availability_cm - m2**ytd_water_availability_cm,
+#                     start = list(b = 20, m1 = 1, m2 = 0.86), na.action = na.exclude,
+#                     data = new_drying,
+#                     maxit = 50)
+# 
+# hyst_function <-
+#   deriv(bquote(.(b) + .(m1)*water.availability - .(m2)**water.availability,
+#                where = list(b = coef(drying_mod)[[1]],
+#                             m1 = coef(drying_mod)[[2]],
+#                             m2 = coef(drying_mod)[[3]])),
+#         namevec = "water.availability",
+#         func = TRUE)
+
+
+WA <- 
+  water_budget[site == "135" & year(sample_date) == 2014
+  ][min(which(!is.na(wl_initial_cm))):.N, 
+    ytd_water_availability_cm]
+
+WL <- 
+  water_budget[site == "135" & year(sample_date) == 2014
+  ][min(which(!is.na(wl_initial_cm))):.N, 
+    wl_initial_cm]
+
+PET <- 
+  water_budget[site == "135" & year(sample_date) == 2014
+  ][min(which(!is.na(wl_initial_cm))):.N, 
+    pet_cm]
+
+P <- 
+  water_budget[site == "135" & year(sample_date) == 2014
+  ][min(which(!is.na(wl_initial_cm))):.N, 
+    total_input_cm]
+
+# Previous year's water deficit
+kenton[,
+       .(wd = .SD[!is.na(ytd_water_availability_cm), 
+                  last(ytd_water_availability_cm) - first(ytd_water_availability_cm)]), 
+       by = .(sample_year)]
+
+
+for(t in 1:length(WA)){
+  
+  if(t == 1){
+    X <- 
+      WA
+    
+    Y <- out <- gradient <- dWA <- 
+      numeric(length(WL))
+    
+    Y[1] <- WL[1]
+    
+    next
+  }
+  
+  out[t] <-
+    hyst_function(X[t]) + (Y[1] - hyst_function(X[1]))
+  
+  gradient[t] <- 
+    attr(hyst_function(X[t]), "gradient")[1, ]
+  
+  dWA[t] <- 
+    X[t] - X[t-1]
+  
+  if(dWA[t] < 0){
+    Y[t] <- Y[t-1] + (hyst_function(X[t]) - hyst_function(X[t-1]))
+  } else {
+    # Y[t] <- Y[t-1] + (X[t] - X[t-1]) * gradient[t]
+    Y[t] <- pmax(Y[t-1], hyst_function(X[t-1] + dWA[t] * gradient[t]) + (Y[1] - hyst_function(X[1])))
+  }
+  
+}
+
+plot(WL, type = 'l', col = 'gray40'); lines(Y); lines(WA, col = 'blue')
+plot(WA, type = 'l')
+plot(Y, type = 'l')
+
+
+CP <- 
+  density(na.omit(simple_val$wlObs))$x[which.max(density(na.omit(simple_val$wlObs))$y)]
+
+Y <- Th <- WAm <- 
+  numeric(length(WL))
+
+Y[1] <- WL[1]
+
+for(t in 2:length(WA)){
+  
+  WAm <- WA[t]*(0.5 * cos(pi*(CP-Y[t-1])) + 1)^(-1/3)
+  
+  Y[t] <- CP - (1/pi * acos(2*(WA[t]/WAm)-1))^3
+    
+}
+
+cpWA <- 4
+for(t in 2:length(WA)){
+  if(WA[t] < WA[t-1]){
+    
+    if(Y[t-1] >= 10){
+      WAm[t] <- WA[t-1]
+    }
+    
+    Th[t] <- pmin(WAm[t], cpWA)
+    
+    Y[t] <- pmin(10 * WA[t]/Th[t], 10)
+  } else {
+    Y[t] <- Y[t-1]
+  }
+}
+plot(WL, type = 'l')
+lines(Y, lty = 2)
