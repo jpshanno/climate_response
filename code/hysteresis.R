@@ -323,61 +323,87 @@ lines(na.omit(dat$wl_initial_cm)[1] +
                  dat[order(ytd_pet_cm), pet_cm]) ~ dat[, ytd_pet_cm], 
       lty = 2)
 
-# Power Curve
+
+# Power Curve -------------------------------------------------------------
+
+pow <- 
+  function(wa, b0, b1, b2){
+    b0 + b1*(wa) - b2**(wa)
+  }
+
+pow_prime <- 
+  function(wa, b1, b2){
+    b1 - b2^(wa) * log(b2)
+  }
+
+# wd is water deficit from previous year
+
+# Initial Parameters:
+robustbase::nlrob(wl_initial_cm ~ pow(water_balance, 
+                                      b0 = b0, b1 = b1, b2 = b2),
+                  dat[1:which.min(wl_initial_cm), .(wl_initial_cm, water_balance = wd + ytd_p_cm + ytd_pet_cm + ytd_m_cm)],
+                  na.action = na.exclude,
+                  maxit = 50,
+                  start = list(b0 = 20, b1 = 1, b2 = 0.9))
+
+b0 <- 24.9487008
+b1 <- 0.7650523
+b2 <- 0.8731924
+
 power_curve_wl <- 
-  function(PET, P, M, I, c, b, wd){
+  function(PET, P, M, I, b0, b1, b2, wd){
     
     n <- 
       length(PET)
     
-    YTD <- wl_hat <- gradient <- 
+    wa_hat <- wl_hat <- gradient <- 
       numeric(n)
     
-    wl_hat[1] <- c
+    wl_hat[1] <- b0
     
-    YTD[1] <- wd
+    wa_hat[1] <- wd
     
-    ind_min <-
-      which.min(cumsum(P + PET))
+    # ind_min <-
+    #   which.min(cumsum(P + PET))
     
     for(t in 2:n){
-      YTD[t] <- 
-          YTD[t-1] + PET[t] + M[t]
+      wa_hat[t] <- 
+        wa_hat[t-1] + PET[t] + M[t] + P[t]
       
       gradient[t] <- 
-        f_prime(YTD[t], b)
+        pow_prime(wa_hat[t], b1 = b1, b2 = b2)
       
-      if(P[t] <= I){
+      if(P[t] <= abs(PET[t])){
         wl_hat[t] <-
           wl_hat[t-1] + (PET[t]) * gradient[t]
       } else {
         wl_hat[t] <-
-          wl_hat[t-1] + (P[t] - PET[t]) * gradient[t]
+          wl_hat[t-1] + (P[t] - I*PET[t]) * gradient[t]
 
-        if(t >= ind_min){
-          YTD[t] <-
-            pmin(0, YTD[t] + P[t])
-        }
+        # if(t >= ind_min){
+        #   wa_hat[t] <-
+        #     pmin(0, YTD[t] + P[t])
+        # }
       }
       
       wl_hat[t] <-
         wl_hat[t] + M[t]
       
-      if(wl_hat[t-1] > int){
+      if(wl_hat[t-1] > b0){
         wl_hat[t] <- 
-          wl_hat[t] - (wl_hat[t-1] - int)/2
+          wl_hat[t] - (wl_hat[t-1] - b0)/2
       }
       
       # Reset YTD
-      if(n %% 365 == 0){
-        YTD[t] <- 
-          c + (cumsum(gradient[(t-365):t] * (P[(t-365):t] + PET[(t-365):t])))
-      }
+      # if(n %% 365 == 0){
+      #   YTD[t] <- 
+      #     c + (cumsum(gradient[(t-365):t] * (P[(t-365):t] + PET[(t-365):t])))
+      # }
     }
     
     # This looks good
     # lplot(wl_hat ~ D); lines(WL ~ D, col = 'gray40')
-    # hydroGOF::KGE(wl_hat[!is.na(WL)], WL[!is.na(WL)])
+    # hydroGOF::gof(wl_hat[!is.na(WL)], WL[!is.na(WL)])
     # lplot(c + cumsum(gradient * P + gradient * PET))
     # c + last(cumsum(gradient * P + gradient * PET))
     
@@ -563,7 +589,7 @@ hydroGOF::NSE(sig_wl[!is.na(dat$wl_initial_cm)], dat[!is.na(wl_initial_cm), wl_i
 # Optimize ----------------------------------------------------------------
 
 
-max_nse <- 
+sig_max_nse <- 
   function(x, wobs, met){
     
     wl_hat <- 
@@ -581,10 +607,173 @@ max_nse <-
   }
 
 optim(par = c(uasym, lasym, rate, inflection),
-      fn = max_nse,
+      fn = sig_max_nse,
       gr = NULL,
       wobs = dat$wl_initial_cm, 
       met = dat[, .(pet_cm, rain_cm, melt_cm)],
       control = list(fnscale = -1))
 
+lplot(sigmoid_wl(PET = PET,
+                   P = P, 
+                   M = M, 
+                   uasym = 16.4034215, 
+                   lasym = -121.8338205, 
+                   rate = -0.1449116,
+                   inflection = -31.7902495,
+                   wd = -10) ~ D); lines(WL ~ D, col = 'gray40')
 
+pow_max_nse <- 
+  function(params, wobs, met){
+    
+    wl_hat <- 
+      power_curve_wl(PET = met$pet_cm,
+                     P = met$rain_cm, 
+                     M = met$melt_cm, 
+                     b0 = params[["b0"]],
+                     b1 = params[["b1"]],
+                     b2 = params[["b2"]],
+                     I = params[["I"]],
+                     wd = -10)
+    
+    hydroGOF::NSE(wl_hat[!is.na(wobs)], wobs[!is.na(wobs)])
+    
+  }
+
+optim(par = list(b0 = b0, b1 = b1, b2 = b2, I = 0.5),
+      fn = pow_max_nse,
+      gr = NULL,
+      wobs = dat$wl_initial_cm, 
+      met = dat[, .(pet_cm, rain_cm, melt_cm)],
+      control = list(fnscale = -1),
+      method = "L-BFGS-B",
+      lower = c(-Inf, -Inf, 0.7, 0))
+
+lplot(power_curve_wl(PET = PET,
+                     P = P, 
+                     M = M, 
+                     I = 0.93788,
+                     b0 = 24.7347820,
+                     b1 = 2.4423119,
+                     b2 = 0.8784166,
+                     wd = -10) ~ D); lines(WL ~ D, col = 'gray40')
+
+
+cbind(
+  hydroGOF::gof(sigmoid_wl(PET = PET,
+                           P = P, 
+                           M = M, 
+                           uasym = 16.4034215, 
+                           lasym = -121.8338205, 
+                           rate = -0.1449116,
+                           inflection = -31.7902495,
+                           wd = -10)[!is.na(WL)],
+                WL[!is.na(WL)]),
+  hydroGOF::gof(power_curve_wl(PET = PET,
+                               P = P, 
+                               M = M, 
+                               I = 0.93788,
+                               b0 = 24.7347820,
+                               b1 = 2.4423119,
+                               b2 = 0.8784166,
+                               wd = -10)[!is.na(WL)],
+                WL[!is.na(WL)])
+)
+
+pow_opt <- 
+  function(start, wobs, met, ...){
+    
+    
+    nse <- 
+      function(params, wobs, met){
+        
+        wl_hat <- 
+          power_curve_wl(PET = met$pet_cm,
+                         P = met$rain_cm, 
+                         M = met$melt_cm, 
+                         b0 = params[["b0"]],
+                         b1 = params[["b1"]],
+                         b2 = params[["b2"]],
+                         I = params[["I"]],
+                         wd = -10)
+        
+        hydroGOF::NSE(wl_hat[!is.na(wobs)], wobs[!is.na(wobs)])
+        
+      }
+    
+    optim(par = start,
+          fn = nse,
+          gr = NULL,
+          wobs = wobs, 
+          met = met,
+          ...)
+  }
+
+pow_opt(start = list(b0 = b0, b1 = b1, b2 = b2, I = 0.5),
+        wobs = dat$wl_initial_cm, 
+        met = dat[, .(pet_cm, rain_cm, melt_cm)],
+        control = list(fnscale = -1),
+        method = "L-BFGS-B",
+        lower = c(-Inf, -Inf, 0.7, 0))
+
+mod_dat <- 
+  water_budget[site == "135",
+               .(sample_date, sample_year, wl_initial_cm, best_precip_cm)
+  ][kenton[sample_year %in% unique(water_budget[site == "135", sample_year]),
+           .(sample_date, 
+             pet_cm = -pet_cm,
+             rain_cm,
+             melt_cm,
+             total_input_cm,
+             tmax_c,
+             tmin_c,
+             tmean_c)],
+    on = "sample_date"]
+
+# Drop anomalous melt
+mod_dat[between(melt_cm, 0, 0.1) & month(sample_date) %in% 6:9, 
+         `:=`(total_input_cm = total_input_cm - melt_cm,
+              melt_cm = 0)]
+
+# Drop anomalous pet
+mod_dat[tmax_c <= 0,
+         pet_cm := 0]
+
+# Calculate YTD after dropping above points
+mod_dat[, 
+       `:=`(ytd_pet_cm = cumsum(pet_cm),
+            ytd_p_cm = cumsum(rain_cm),
+            ytd_m_cm = cumsum(melt_cm),
+            ytd_input_cm = cumsum(rain_cm + melt_cm)),
+       by = .(year(sample_date))]
+
+# Split Data
+tr_dat <- 
+  mod_dat[sample_year %in% c(2012, 2013)]
+
+tr_params <- 
+  pow_opt(start = list(b0 = b0, b1 = b1, b2 = b2, I = 0.5),
+          wobs = tr_dat$wl_initial_cm, 
+          met = tr_dat[, .(pet_cm, rain_cm, melt_cm)],
+          control = list(fnscale = -1),
+          method = "L-BFGS-B",
+          lower = c(-Inf, -Inf, 0.7, 0))
+
+mod_dat[, wl_hat_cm := power_curve_wl(PET = pet_cm,
+                                      P = fcoalesce(best_precip_cm, rain_cm), 
+                                      M = melt_cm, 
+                                      I = tr_params$par[["I"]],
+                                      b0 = tr_params$par[["b0"]],
+                                      b1 = tr_params$par[["b1"]],
+                                      b2 = tr_params$par[["b2"]],
+                                      wd = -10)]
+
+ggplot(mod_dat,
+       aes(x = sample_date)) +
+  geom_line(aes(y = wl_initial_cm),
+            col = "gray40") +
+  geom_line(aes(y = wl_hat_cm)) +
+  facet_wrap(~sample_year,
+             scales = "free")
+
+hydroGOF::gof(sim = mod_dat[!is.na(wl_initial_cm), wl_hat_cm], 
+              obs = mod_dat[!is.na(wl_initial_cm), wl_initial_cm])
