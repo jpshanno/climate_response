@@ -43,7 +43,7 @@ kenton <-
 
 dat <- 
   water_budget[site == "152" & sample_year == 2012,
-               .(sample_date, wl_initial_cm, best_precip_cm)
+               .(site, sample_date, wl_initial_cm, best_precip_cm)
   ][kenton[sample_year == 2012,
            .(sample_date, 
              pet_cm = -pet_cm,
@@ -58,6 +58,8 @@ dat <-
              tmin_c,
              tmean_c)],
     on = "sample_date"]
+
+dat[, site := unique(na.omit(site))]
 
 # Drop anomalous melt
 dat[between(melt_cm, 0, 0.1) & month(sample_date) %in% 6:9, 
@@ -262,7 +264,7 @@ quad_curve_wl <-
       
       if(P[t] <= abs(PET[t])){
         wl_hat[t] <-
-          wl_hat[t-1] + (PET[t] + P[t]) * gradient[t]
+          wl_hat[t-1] + (PET[t]) * gradient[t]
       } else {
         wl_hat[t] <-
           wl_hat[t-1] + (P[t] - PET[t]) * gradient[t]
@@ -295,6 +297,63 @@ quad_curve_wl <-
     data.table(wl_hat, wa_hat, gradient, q_hat)
     
   }
+
+
+# Derived Quadratic ESy ---------------------------------------------------
+
+# For site = 152
+
+wd <- -17.5
+b1 <- -9.9395498 
+b2 <- -0.2015975 
+max.wl <- 12.1105430 
+
+esy_mod <- 
+  lm(quad_prime(ytd_water_balance, b1, b2) ~ 
+       0 + wl_initial_cm, 
+     data = dat[1:which.min(wl_initial_cm), 
+                .(sample_date, 
+                  wl_initial_cm = wl_initial_cm - max.wl, 
+                  ytd_water_balance = ytd_water_balance - 17.5)])
+  
+m <- 
+  coef(esy_mod)[[1]]
+
+n <- 
+  length(dat$pet_cm)
+
+wl_hat <- gradient <- 
+  numeric(n)
+
+wl_hat[1] <- max.wl
+
+for(t in 2:n){
+
+  gradient[t] <- 
+    pmax(4*m * (wl_hat[t] - max.wl))
+  
+  if(dat$rain_cm[t] <= abs(dat$pet_cm[t])){
+    wl_hat[t] <-
+      wl_hat[t-1] + (dat$rain_cm[t] + dat$pet_cm[t]) * gradient[t]
+  } else {
+    wl_hat[t] <-
+      wl_hat[t-1] + (dat$rain_cm[t]) * gradient[t]
+  }
+  
+  wl_hat[t] <-
+    wl_hat[t] + dat$melt_cm[t]
+
+  if(wl_hat[t] > max.wl){
+    wl_hat[t] <- 
+      wl_hat[t] - (wl_hat[t] - max.wl)/2
+  }
+    
+}
+
+
+lplot(wl_initial_cm ~ sample_date, data = dat, col = "gray40")
+lplot(wl_hat ~ dat$sample_date)
+lplot(gradient ~ dat$sample_date)
 
 
 # Sigmoidal Curve ---------------------------------------------------------
@@ -553,13 +612,13 @@ quad_opt <-
           quad_curve_wl(PET = met$pet_cm,
                         P = met$rain_cm, 
                         M = met$melt_cm, 
-                        max.wl = max.wl,
+                        max.wl = params[["max.wl"]],
                         b1 = params[["b1"]],
                         b2 = params[["b2"]],
                         wd = wd)$wl_hat
         
         hydroGOF::NSE(wl_hat[!is.na(wobs)], wobs[!is.na(wobs)])
-        
+        # dtw::dtw(wl_hat[!is.na(wobs)], wobs[!is.na(wobs)])$distance
       }
     
     optim(par = start,
@@ -570,19 +629,22 @@ quad_opt <-
 
 # Initial Parameters from nlrob for 152, 2012
 # Could make it self-start
-quad_opt(start = list(b1 = -2.2413, 
-                     b2 = -0.1003),
-        wobs = dat$wl_initial_cm, 
-        met = dat[, .(pet_cm, rain_cm, melt_cm)],
-        wd = -17.5,
-        max.wl = 8,
-        control = list(fnscale = -1))
+test_opt <- 
+  quad_opt(start = list(b1 = -3, 
+                        b2 = -0.1,
+                        max.wl = 10),
+           wobs = dat$wl_initial_cm, 
+           met = dat[, .(pet_cm, rain_cm, melt_cm)],
+           wd = -17.5,
+           control = list(fnscale = -1))
 
-lplot(WL ~ D, col = "gray40")
-lines(quad_curve_wl(PET, P, M, 
-                    max.wl = 8, 
-                    b1 = -0.001,
-                    b2 = -0.088,
+lplot(wl_initial_cm ~ sample_date,
+      data = dat, 
+      col = "gray40")
+lines(quad_curve_wl(dat$pet_cm, dat$rain_cm, dat$melt_cm, 
+                    max.wl = test_opt$par[["max.wl"]], 
+                    b1 = test_opt$par[["b1"]],
+                    b2 = test_opt$par[["b2"]],
                     wd = -17.5)$wl_hat ~ D)
 
 mod_dat <- 
@@ -629,11 +691,11 @@ tr_dat <-
 
 tr_params <- 
   quad_opt(start = list(b1 = -2.2413, 
-                        b2 = -0.1003),
+                        b2 = -0.1003,
+                        max.wl = density(tr_dat$wl_initial_cm, na.rm = TRUE)$x[which.max(density(tr_dat$wl_initial_cm, na.rm = TRUE)$y)]),
            wobs = tr_dat$wl_initial_cm, 
            met = tr_dat[, .(pet_cm, rain_cm, melt_cm)],
            wd = -17.5,
-           max.wl = density(tr_dat$wl_initial_cm, na.rm = TRUE)$x[which.max(density(tr_dat$wl_initial_cm, na.rm = TRUE)$y)],
            control = list(fnscale = -1))
   # pow_opt(start = list(b0 = b0, b1 = b1, b2 = b2, I = 0.5),
   #         wobs = tr_dat$wl_initial_cm, 
@@ -645,7 +707,7 @@ tr_params <-
 
 mod_dat[, c("wl_hat_cm", "wa_hat_cm", "gradient", "q_hat") := 
           quad_curve_wl(PET = pet_cm,
-                        P = fcoalesce(idw_precip_cm, rain_cm), 
+                        P = rain_cm, 
                         M = melt_cm, 
                         max.wl = density(tr_dat$wl_initial_cm, na.rm = TRUE)$x[which.max(density(tr_dat$wl_initial_cm, na.rm = TRUE)$y)],
                         b1 = tr_params$par[["b1"]],
@@ -660,5 +722,36 @@ ggplot(mod_dat,
   facet_wrap(~sample_year,
              scales = "free")
 
+ggplot(mod_dat,
+       aes(x = sample_date)) +
+  geom_line(aes(y = ytd_water_balance_cm),
+            col = "gray40") +
+  geom_line(aes(y = wa_hat_cm)) +
+  facet_wrap(~sample_year,
+             scales = "free")
+
+
+# lm(quad_prime(ytd_water_balance, b1 = test_opt$par[["b1"]], b2 = test_opt$par[["b2"]]) ~ 0 + wl_initial_cm, data = dat[1:which.min(wl_initial_cm), .(sample_date, wl_initial_cm = wl_initial_cm - test_opt$par[["max.wl"]], ytd_water_balance = ytd_water_balance - 17.5)])
+ggplot(mod_dat,
+       aes(x = sample_date)) +
+  geom_line(aes(y = gradient)) +
+  # geom_line(aes(y = -0.05961 * (wl_initial_cm - tr_params$par[["max.wl"]])),
+            # color = "gray40") +
+  facet_wrap(~sample_year,
+             scales = "free")
+
 hydroGOF::gof(sim = mod_dat[!is.na(wl_initial_cm), wl_hat_cm], 
               obs = mod_dat[!is.na(wl_initial_cm), wl_initial_cm])
+
+
+
+
+
+
+
+for(i in 1:n){
+  if(i == i){
+    lmax <- x[1]
+    lmaxi <- 1
+  }
+}
