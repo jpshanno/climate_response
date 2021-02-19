@@ -41,218 +41,8 @@
 kenton <- 
   external_met[station_name == "kenton"]
 
-SITE <- 
-  "135"
-align_var <- 
-  # "melt_cm"
-  "water_availability_cm"
-
-drying_dates <- 
-  kenton[, .SD[
-    # Index of maximum water availability (melt period)
-    which.max(get(align_var)):
-      # Index of max WA + Index of min WA that occurs after max WA
-      (which.max(get(align_var)) + which.min(.SD[which.max(get(align_var)):.N, water_availability_cm]))], 
-    by = .(sample_year)][, sample_date]
-
-drying_curves <- 
-  water_budget[site == SITE & sample_date %in% drying_dates]
-# , 
-#                .SD[
-#                  # Index of maximum water availability (melt period)
-#                  which.max(water_availability_cm):
-#                    # Index of max WA + Index of min WA that occurs after max WA
-#                    (which.max(water_availability_cm) + which.min(.SD[which.max(water_availability_cm):.N, water_availability_cm]))], 
-#                by = .(sample_year)]
-
-# The offset to align the curves lay in the selection of the start period for
-# the drawdown. When I offset each curve to the water availability at the start
-# of the drawdown, the curves sync much better. Still some work to identify the
-# best start ands top points for the drawdown curve to get the best curve fit.
-# It also seems like just using water avilability will work too
-drying_curves <- 
-  drying_curves[drying_curves[, .SD[1, .(sample_date, water_availability_cm)], 
-                              by = .(sample_year)], 
-                on = "sample_year", 
-                .(wl_initial_cm, sample_year, sample_date, site_status, pet_cm, Ds_cm,
-                  water_availability_cm = water_availability_cm - i.water_availability_cm)]
-
-# Power Curve
-# drying_mod <-
-#   robustbase::nlrob(wl_initial_cm ~ b + m1*water_availability_cm - m2**water_availability_cm,
-#                     start = list(b = 20,
-#                                  m1 = 1,
-#                                  m2 = 0.86),
-#                     na.action = na.exclude,
-#                     maxit = 50,
-#                     data = drying_curves[sample_year != 2015])
-# 
-# hyst_function <-
-#   deriv(bquote(.(b) + .(m1)*water.availability - .(m2)**water.availability,
-#                where = list(b = coef(drying_mod)[["b"]],
-#                             m1 = coef(drying_mod)[["m1"]],
-#                             m2 = coef(drying_mod)[["m2"]])),
-#         namevec = "water.availability",
-#         func = TRUE)
-
-# Sigmoid Curve
-
-# 2015 does not have a good identification of drawdown curve
-drying_mod <-
-  robustbase::nlrob(wl_initial_cm ~ c + (d-c)*(1-exp(-exp(b*(water_availability_cm - e)))),
-                    drying_curves[sample_year != 2015],
-                    na.action = na.exclude,
-                    start = list(c = 20, d = -70, b = -0.25, e = -25))
-
-hyst_function <-
-  deriv(bquote(.(c) + (.(d) - .(c))*(1-exp(-exp(.(b)*(water.availability - .(e))))),
-               where = as.list(coef(drying_mod))),
-        namevec = "water.availability",
-        func = TRUE)
-
-
-ggplot(drying_curves, 
-       aes(x = water_availability_cm, 
-           y = wl_initial_cm)) + 
-  geom_point(aes(color = factor(sample_year))) + 
-  geom_function(fun = hyst_function)
-
-D <- kenton[between(sample_year, 2007, 2019), sample_date]
-PET <- kenton[between(sample_year, 2007, 2019), pet_cm]
-P <- kenton[between(sample_year, 2007, 2019), total_input_cm]
-R <- kenton[between(sample_year, 2007, 2019), rain_cm]
-M <- kenton[between(sample_year, 2007, 2019), melt_cm]
-
-# Drawdown should be controlled by this function:
-plot(x = drying_curves[sample_year != 2015, wl_initial_cm],
-     y = attr(hyst_function(drying_curves[sample_year!= 2015, water_availability_cm]), "gradient")[,1],
-     main = "Drying Curve Gradient",
-     xlab = "Water Level (cm)",
-     ylab = expression(delta/delta~X))
-
-gradient_mod <- 
-  mcp::mcp(list(gradient ~ wl_initial_cm, ~ 0 + wl_initial_cm),
-      data = drying_curves[sample_year != 2015 & !is.na(wl_initial_cm), 
-                           .(wl_initial_cm,
-                             gradient = attr(hyst_function(water_availability_cm), "gradient")[,1])],
-      cores = 1)
-
-plot(gradient_mod, 
-     q_predict = TRUE)
-
-grad_coefs <- 
-  mcp::fixef(gradient_mod)
-
-# gradient_function <- 
-#   as.function(list(water.level = NULL,
-#                    bquote(.(int_1) + .(cp_1) * .(wl_initial_cm_1) + (water.level - .(cp_1)) * .(wl_initial_cm_2),
-#                           where = set_names(as.list(grad_coefs$mean), grad_coefs$name))))
-
-gradient_function <-
-  as.function(list(water.level = NULL,
-                   bquote((.(cp_1) >= water.level) * (.(int_1) + water.level * .(wl_initial_cm_1)) +
-                            (.(cp_1) < water.level) * (.(int_1) + .(cp_1) * .(wl_initial_cm_1) + (water.level - .(cp_1)) * .(wl_initial_cm_2)),
-                          where = set_names(as.list(grad_coefs$mean), grad_coefs$name))))
-
-for(t in 1:(length(P) - 1)){
-  
-  # Set up on first iteration
-  if(t == 1){
-    
-    # X is water calculated water availability
-    # Y is predicted water level
-    # y_hat is water level output from model
-    # gradient is the derivative of the model slope 
-    # dWA is the change in X
-    X <- Y <- y_hat <- gradient <- dX <- 
-      numeric(length(P))
-    
-    # Start the predictions at water yield == 0
-    Y[t] <- 
-      hyst_function(X[t])
-    
-    # gradient[t] <- 
-    #   gradient_function(Y[t])
-    # 
-    # Y[t+1] <-
-    #   X[t] + (gradient[t]*P[t] - PET[t])
-    
-    # Move onto t = 2
-    # next
-  }
-  
-  # Save slope of gradient at t
-  gradient[t] <- 
-    gradient_function(Y[t])
-  
-  # Calculate dX at step t
-  dX[t] <- 
-    P[t] - PET[t]
-  
-  X[t + 1] <- 
-    X[t] + dX[t]
-  
-  if(format(D[t], "%m%d") == "1231"){
-    X[t + 1] <- 
-      (P[t+1] - PET[t+1]) - max(cumsum(P[(t+1):(t+365)] - PET[(t+1):(t+365)]))
-    # e + log(-log(-((Y[t]-c)/(d-c) - 1)))/b
-  }
-  
-  
-  if(dX[t] < 0){
-    Y[t+1] <-
-      # hyst_function(X[t])
-      # Y[t] - pmax(PET[t], PET[t] * gradient[t]) #+ pmin(dX[t], dX[t] * gradient[t])
-      Y[t] + pmin(0, (hyst_function(X[t]) - ifelse(t > 1, hyst_function(X[t-1]), 0)))
-  } else {
-    Y[t+1] <-
-      Y[t] + gradient[t] * P[t]
-  }
- 
-}
-
-
-ggplot(water_budget[site == SITE], 
-       aes(y = wl_initial_cm, x = sample_date)) +
-  geom_line(color = 'gray40') +
-  geom_line(data = data.table(sample_date = D, 
-                              wl_initial_cm = Y,
-                              sample_year = year(D))[sample_year %between% c(2012, 2019)], 
-            color = "blue",
-            linetype = "dotted") + 
-  facet_wrap(~sample_year, scales = "free")
-
-ggplot(kenton[sample_year %between% c(2012, 2019)], 
-       aes(y = ytd_water_availability_cm, x = sample_date)) +
-  geom_line(color = 'gray40') +
-  geom_line(data = data.table(sample_date = D, 
-                              ytd_water_availability_cm = X,
-                              sample_year = year(D))[sample_year %between% c(2012, 2019)], 
-            color = "blue",
-            linetype = "dotted") + 
-  facet_wrap(~sample_year, scales = "free_x")
-
-
-
-
-
-
-
-
-
-
-
-# Hyst Optimization -------------------------------------------------------
-
-# Drawdown is power function for ytd_pet_cm
-# Recovery is the slope of the power function when rain falls
-
-# Set melt < 0.01 == 0
-# Need to investigate CN parameters a bit more
-
-
 dat <- 
-  water_budget[site == "135" & sample_year == 2012,
+  water_budget[site == "152" & sample_year == 2012,
                .(sample_date, wl_initial_cm, best_precip_cm)
   ][kenton[sample_year == 2012,
            .(sample_date, 
@@ -346,9 +136,9 @@ robustbase::nlrob(wl_initial_cm ~ pow(water_balance,
                   maxit = 50,
                   start = list(b0 = 20, b1 = 1, b2 = 0.9))
 
-b0 <- 24.9487008
-b1 <- 0.7650523
-b2 <- 0.8731924
+# b0 <- 24.9487008
+# b1 <- 0.7650523
+# b2 <- 0.8731924
 
 power_curve_wl <- 
   function(PET, P, M, I, b0, b1, b2, wd){
@@ -407,7 +197,7 @@ power_curve_wl <-
     # lplot(c + cumsum(gradient * P + gradient * PET))
     # c + last(cumsum(gradient * P + gradient * PET))
     
-    wl_hat
+    data.table(wl_hat, wa_hat, gradient)
     
   }
 
@@ -633,7 +423,7 @@ pow_max_nse <-
                      b1 = params[["b1"]],
                      b2 = params[["b2"]],
                      I = params[["I"]],
-                     wd = -10)
+                     wd = -10)$wl_hat
     
     hydroGOF::NSE(wl_hat[!is.na(wobs)], wobs[!is.na(wobs)])
     
@@ -657,7 +447,7 @@ lplot(power_curve_wl(PET = PET,
                      b2 = 0.8784166,
                      wd = -10) ~ D); lines(WL ~ D, col = 'gray40')
 
-
+# Optimized coefficients from testing with 135 & 2012
 cbind(
   hydroGOF::gof(sigmoid_wl(PET = PET,
                            P = P, 
@@ -694,7 +484,7 @@ pow_opt <-
                          b1 = params[["b1"]],
                          b2 = params[["b2"]],
                          I = params[["I"]],
-                         wd = -10)
+                         wd = -10)$wl_hat
         
         hydroGOF::NSE(wl_hat[!is.na(wobs)], wobs[!is.na(wobs)])
         
@@ -716,17 +506,20 @@ pow_opt(start = list(b0 = b0, b1 = b1, b2 = b2, I = 0.5),
         lower = c(-Inf, -Inf, 0.7, 0))
 
 mod_dat <- 
-  water_budget[site == "135",
-               .(sample_date, sample_year, wl_initial_cm, best_precip_cm)
-  ][kenton[sample_year %in% unique(water_budget[site == "135", sample_year]),
-           .(sample_date, 
-             pet_cm = -pet_cm,
-             rain_cm,
-             melt_cm,
-             total_input_cm,
-             tmax_c,
-             tmin_c,
-             tmean_c)],
+  kenton[sample_year %in% unique(water_budget[site == "135", sample_year]),
+         .(sample_date, 
+           sample_year,
+           pet_cm = -pet_cm,
+           rain_cm,
+           melt_cm,
+           total_input_cm,
+           tmax_c,
+           tmin_c,
+           tmean_c)
+  ][water_budget[site == "135",
+                 .(sample_date, wl_initial_cm, best_precip_cm)],
+    `:=`(wl_initial_cm = i.wl_initial_cm,
+         best_precip_cm = i.best_precip_cm),
     on = "sample_date"]
 
 # Drop anomalous melt
@@ -746,9 +539,13 @@ mod_dat[,
             ytd_input_cm = cumsum(rain_cm + melt_cm)),
        by = .(year(sample_date))]
 
+mod_dat[, 
+        `:=`(ytd_water_balance_cm = ytd_pet_cm + ytd_p_cm + ytd_m_cm,
+             water_balance_cm = cumsum(pet_cm + rain_cm + melt_cm))]
+
 # Split Data
 tr_dat <- 
-  mod_dat[sample_year %in% c(2012, 2013)]
+  mod_dat[sample_year %in% c(2012, 2015)]
 
 tr_params <- 
   pow_opt(start = list(b0 = b0, b1 = b1, b2 = b2, I = 0.5),
@@ -756,10 +553,11 @@ tr_params <-
           met = tr_dat[, .(pet_cm, rain_cm, melt_cm)],
           control = list(fnscale = -1),
           method = "L-BFGS-B",
-          lower = c(-Inf, -Inf, 0.7, 0))
+          lower = c(0, -Inf, 0, 0),
+          upper = c(Inf, Inf, 2, Inf))
 
-mod_dat[, wl_hat_cm := power_curve_wl(PET = pet_cm,
-                                      P = fcoalesce(best_precip_cm, rain_cm), 
+mod_dat[, c("wl_hat_cm", "wa_hat_cm", "gradient") := power_curve_wl(PET = pet_cm,
+                                      P = rain_cm, 
                                       M = melt_cm, 
                                       I = tr_params$par[["I"]],
                                       b0 = tr_params$par[["b0"]],
