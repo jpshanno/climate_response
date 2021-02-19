@@ -42,10 +42,9 @@ kenton <-
   external_met[station_name == "kenton"]
 
 dat <- 
-  water_budget[site == "152" & sample_year == 2012,
-               .(site, sample_date, wl_initial_cm, best_precip_cm)
-  ][kenton[sample_year == 2012,
+  kenton[water_year == 2012 & format(sample_date, "%m%d") != "0229",
            .(sample_date, 
+             water_year,
              pet_cm = -pet_cm,
              # ytd_pet_cm = cumsum(-pet_cm),
              rain_cm,
@@ -56,8 +55,11 @@ dat <-
              # ytd_input_cm = cumsum(total_input_cm),
              tmax_c,
              tmin_c,
-             tmean_c)],
-    on = "sample_date"]
+             tmean_c)
+         ][water_budget[site == SITE],
+           `:=`(site = i.site,
+                wl_initial_cm = i.wl_initial_cm),
+           on = "sample_date"]
 
 dat[, site := unique(na.omit(site))]
 
@@ -76,7 +78,7 @@ dat[,
          ytd_p_cm = cumsum(rain_cm),
          ytd_m_cm = cumsum(melt_cm),
          ytd_input_cm = cumsum(rain_cm + melt_cm)),
-    by = .(year(sample_date))]
+    by = .(water_year)]
 
 dat[, ytd_water_balance := ytd_pet_cm + ytd_p_cm + ytd_m_cm]
 
@@ -220,54 +222,109 @@ quad_prime <-
 # wd is water deficit from previous year
 
 # Initial Parameters:
-robustbase::nlrob(wl_initial_cm ~ quad(water_balance, 
+(init_mod <- 
+  robustbase::nlrob(wl_initial_cm ~ quad(ytd_water_balance, 
                                        b0 = b0, b1 = b1, b2 = b2),
-                  dat[1:which.min(wl_initial_cm), .(wl_initial_cm, water_balance = wd + ytd_p_cm + ytd_pet_cm + ytd_m_cm)],
+                  data = dat[1:which.min(wl_initial_cm), .(wl_initial_cm = wl_initial_cm - 8, ytd_water_balance = ytd_water_balance - max(ytd_water_balance))],
                   na.action = na.exclude,
                   maxit = 50,
-                  start = list(b0 = 20, b1 = 1, b2 = -1))
+                  start = list(b0 = 8, b1 = 1, b2 = -1)))
 
-# b0 <- 24.9487008
-# b1 <- 0.7650523
-# b2 <- 0.8731924
+b0 <- coef(init_mod)[["b0"]]
+b1 <- coef(init_mod)[["b1"]]
+b2 <- coef(init_mod)[["b2"]]
+wd <- 0
+max.wl <- 
+  density(water_budget[site == SITE, na.omit(wl_initial_cm)])$x[which.max(density(water_budget[site == SITE, na.omit(wl_initial_cm)])$y)]
+PET <- dat$pet_cm
+P <- dat$rain_cm
+M <- dat$melt_cm
+D <- dat$sample_date
+WL <- dat$wl_initial_cm
+WA <- dat$ytd_water_balance - max(dat$ytd_water_balance)
+
+
+# By water year
+# water_balance = water_balance - max(water balance)
+
+# mod_dat[, wytd := cumsum(pet_cm + rain_cm + melt_cm), by = .(water_year)]
+# ggplot(mod_dat[, .(sample_date, wl_initial_cm = wl_initial_cm - 15.86, wytd = wytd - max(wytd)), by = .(water_year)],
+#        aes(x = sample_date)) +
+#   geom_line(aes(y = wytd),
+#             col = 'blue') +
+#   geom_hline(aes(yintercept = 0)) +
+#   geom_line(aes(y = wl_initial_cm)) +
+#   facet_wrap(~water_year,
+#              scales = "free_x")
 
 quad_curve_wl <- 
-  function(PET, P, M, max.wl, b1, b2, wd){
+  function(PET, P, M, max.wl, b0, b1, b2){
     
     n <- 
       length(PET)
     
-    wa_hat <- wl_hat <- gradient <- q_hat <- 
+    wa_hat <- wl_hat <- gradient <- q_hat <- g_hat <- 
+      max_wa <- 
       numeric(n)
     
     wl_hat[1] <- max.wl
     
-    wa_hat[1] <- wd
+    max_wa[1:365] <- 
+      -max(cumsum(PET + P + M)[1:365])
+    
+    wa_hat[1] <- 
+      -max(cumsum(PET + P + M)[1:365])
     
     for(t in 2:n){
-      # Keep WA at or below 0. excess WA shold be allowed to raise
-      # water levels by some degree with Q increasing
-      wa_hat[t] <- 
-        wa_hat[t-1] + PET[t] + M[t] + P[t]
       
-      if(wa_hat[t] > 0){
-        q_hat[t] <- 
-          -wa_hat[t] / 2
-      
-        wa_hat[t] <-
-          wa_hat[t] + q_hat[t]
+      # Reset WA
+      if((t-1) %% 365 == 0){
+        
+        max_wa[t:(t+364)] <- 
+          max(cumsum(PET[t:(t+364)] + P[t:(t+364)] + M[t:(t+364)]))
+        
+        wa_hat[t] <- 
+          -max_wa[t]
+      } else {
+        wa_hat[t] <- 
+          wa_hat[t-1] + PET[t] + M[t] + P[t]        
       }
+      
+
+      
+      # if(wa_hat[t] > 0){
+      #   q_hat[t] <- 
+      #     -wa_hat[t] / 2
+      # 
+      #   wa_hat[t] <-
+      #     wa_hat[t] + q_hat[t]
+      # }
       
       gradient[t] <- 
         # pow_prime(wa_hat[t], b1 = b1, b2 = b2)
         quad_prime(wa_hat[t], b1 = b1, b2 = b2)
       
-      if(P[t] <= abs(PET[t])){
-        wl_hat[t] <-
-          wl_hat[t-1] + (PET[t]) * gradient[t]
+      if(gradient[t] <= 0){
+        
+        g_hat[t] <- 
+          (quad((-b1/(2*b2)), b0, b1, b2) - quad(wa_hat[t], b0, b1, b2))/4
+        
+        wl_hat[t] <- 
+          wl_hat[t-1] + g_hat[t]
+        
       } else {
-        wl_hat[t] <-
-          wl_hat[t-1] + (P[t] - PET[t]) * gradient[t]
+        
+        if((P[t] + PET[t]) <= 0){
+          
+          wl_hat[t] <-
+            wl_hat[t-1] + (PET[t]) * gradient[t]
+        
+          } else {
+          
+            wl_hat[t] <-
+              wl_hat[t-1] + (P[t] - PET[t]) * gradient[t]
+            
+          }
         
       }
       
@@ -275,26 +332,27 @@ quad_curve_wl <-
         wl_hat[t] + M[t]
       
       if(wl_hat[t-1] > max.wl){
+        
+        q_hat[t] <- 
+          (wl_hat[t-1] - max.wl)/2
+        
         wl_hat[t] <- 
-          wl_hat[t] - (wl_hat[t-1] - max.wl)/2
+          wl_hat[t] - q_hat[t]
       }
       
-      # Reset WA
-      if(t %% 365 == 0){
-        wa_hat[t] <-
-          wa_hat[t] - wa_hat[t-364]
-      }
     }
     
     # This looks good
     # lplot(wl_hat ~ D); lines(WL ~ D, col = 'gray40')
     # lplot(wa_hat ~ D)
+    # lplot(q_hat ~ D)
+    # lplot(g_hat ~ D)
     # lplot(gradient ~ D)
     # hydroGOF::gof(wl_hat[!is.na(WL)], WL[!is.na(WL)])
     # lplot(c + cumsum(gradient * P + gradient * PET))
     # c + last(cumsum(gradient * P + gradient * PET))
     
-    data.table(wl_hat, wa_hat, gradient, q_hat)
+    data.table(wl_hat, wa_hat, gradient, q_hat, g_hat, max_wa)
     
   }
 
@@ -606,16 +664,16 @@ quad_opt <-
     
     
     nse <- 
-      function(params, wobs, met, wd, max.wl){
+      function(params, wobs, met, max.wl){
         
         wl_hat <- 
           quad_curve_wl(PET = met$pet_cm,
                         P = met$rain_cm, 
                         M = met$melt_cm, 
-                        max.wl = params[["max.wl"]],
+                        max.wl = max.wl,
+                        b0 = params[["b0"]],
                         b1 = params[["b1"]],
-                        b2 = params[["b2"]],
-                        wd = wd)$wl_hat
+                        b2 = params[["b2"]])$wl_hat
         
         hydroGOF::NSE(wl_hat[!is.na(wobs)], wobs[!is.na(wobs)])
         # dtw::dtw(wl_hat[!is.na(wobs)], wobs[!is.na(wobs)])$distance
@@ -630,27 +688,27 @@ quad_opt <-
 # Initial Parameters from nlrob for 152, 2012
 # Could make it self-start
 test_opt <- 
-  quad_opt(start = list(b1 = -3, 
-                        b2 = -0.1,
-                        max.wl = 10),
+  quad_opt(start = list(b0 = coef(init_mod)[["b0"]],
+                        b1 = coef(init_mod)[["b1"]], 
+                        b2 = coef(init_mod)[["b2"]]),
            wobs = dat$wl_initial_cm, 
            met = dat[, .(pet_cm, rain_cm, melt_cm)],
-           wd = -17.5,
+           max.wl = max.wl,
            control = list(fnscale = -1))
 
 lplot(wl_initial_cm ~ sample_date,
       data = dat, 
       col = "gray40")
-lines(quad_curve_wl(dat$pet_cm, dat$rain_cm, dat$melt_cm, 
-                    max.wl = test_opt$par[["max.wl"]], 
+lines(y = quad_curve_wl(dat$pet_cm, dat$rain_cm, dat$melt_cm, 
+                    max.wl = max.wl,
+                    b0 = test_opt$par[["b0"]],
                     b1 = test_opt$par[["b1"]],
-                    b2 = test_opt$par[["b2"]],
-                    wd = -17.5)$wl_hat ~ D)
-
+                    b2 = test_opt$par[["b2"]])$wl_hat, x= dat$sample_date)
+# 2014 & 2018 need work
 mod_dat <- 
-  kenton[between(sample_year, 2012, 2019),
+  kenton[between(water_year, 2012, 2019),
          .(sample_date, 
-           sample_year,
+           water_year,
            pet_cm = -pet_cm,
            rain_cm,
            melt_cm,
@@ -658,11 +716,15 @@ mod_dat <-
            tmax_c,
            tmin_c,
            tmean_c)
-  ][water_budget[site == "152",
+  ][water_budget[site == "135",
                  .(sample_date, wl_initial_cm, idw_precip_cm)],
     `:=`(wl_initial_cm = i.wl_initial_cm,
          idw_precip_cm = i.idw_precip_cm),
     on = "sample_date"]
+
+# Drop Leap year
+mod_dat <- 
+  mod_dat[format(sample_date, "%m%d") != "0229"]
 
 # Drop anomalous melt
 mod_dat[between(melt_cm, 0, 0.1) & month(sample_date) %in% 6:9, 
@@ -679,7 +741,7 @@ mod_dat[,
             ytd_p_cm = cumsum(rain_cm),
             ytd_m_cm = cumsum(melt_cm),
             ytd_input_cm = cumsum(rain_cm + melt_cm)),
-       by = .(year(sample_date))]
+       by = .(water_year)]
 
 mod_dat[, 
         `:=`(ytd_water_balance_cm = ytd_pet_cm + ytd_p_cm + ytd_m_cm,
@@ -687,15 +749,15 @@ mod_dat[,
 
 # Split Data
 tr_dat <- 
-  mod_dat[sample_year %in% c(2012, 2013)]
+  mod_dat[water_year %in% c(2012, 2013)]
 
 tr_params <- 
-  quad_opt(start = list(b1 = -2.2413, 
-                        b2 = -0.1003,
-                        max.wl = density(tr_dat$wl_initial_cm, na.rm = TRUE)$x[which.max(density(tr_dat$wl_initial_cm, na.rm = TRUE)$y)]),
+  quad_opt(start = list(b0 = coef(init_mod)[["b0"]],
+                        b1 = coef(init_mod)[["b1"]],
+                        b2 = coef(init_mod)[["b2"]]),
            wobs = tr_dat$wl_initial_cm, 
            met = tr_dat[, .(pet_cm, rain_cm, melt_cm)],
-           wd = -17.5,
+           max.wl = density(mod_dat$wl_initial_cm, na.rm = TRUE)$x[which.max(density(mod_dat$wl_initial_cm, na.rm = TRUE)$y)],
            control = list(fnscale = -1))
   # pow_opt(start = list(b0 = b0, b1 = b1, b2 = b2, I = 0.5),
   #         wobs = tr_dat$wl_initial_cm, 
@@ -705,21 +767,21 @@ tr_params <-
   #         lower = c(0, -Inf, 0, 0),
   #         upper = c(Inf, Inf, 2, Inf))
 
-mod_dat[, c("wl_hat_cm", "wa_hat_cm", "gradient", "q_hat") := 
+mod_dat[, c("wl_hat_cm", "wa_hat_cm", "gradient", "q_hat", "g_hat", "max_wa") := 
           quad_curve_wl(PET = pet_cm,
-                        P = rain_cm, 
+                        P = fcoalesce(idw_precip_cm, rain_cm), 
                         M = melt_cm, 
-                        max.wl = density(tr_dat$wl_initial_cm, na.rm = TRUE)$x[which.max(density(tr_dat$wl_initial_cm, na.rm = TRUE)$y)],
+                        max.wl = density(mod_dat$wl_initial_cm, na.rm = TRUE)$x[which.max(density(mod_dat$wl_initial_cm, na.rm = TRUE)$y)],
+                        b0 = tr_params$par[["b0"]],
                         b1 = tr_params$par[["b1"]],
-                        b2 = tr_params$par[["b2"]],
-                        wd = -17.59145796)]
+                        b2 = tr_params$par[["b2"]])]
 
 ggplot(mod_dat,
        aes(x = sample_date)) +
   geom_line(aes(y = wl_initial_cm),
             col = "gray40") +
   geom_line(aes(y = wl_hat_cm)) +
-  facet_wrap(~sample_year,
+  facet_wrap(~water_year,
              scales = "free")
 
 ggplot(mod_dat,
@@ -727,18 +789,21 @@ ggplot(mod_dat,
   geom_line(aes(y = ytd_water_balance_cm),
             col = "gray40") +
   geom_line(aes(y = wa_hat_cm)) +
-  facet_wrap(~sample_year,
+  facet_wrap(~water_year,
              scales = "free")
 
-
-# lm(quad_prime(ytd_water_balance, b1 = test_opt$par[["b1"]], b2 = test_opt$par[["b2"]]) ~ 0 + wl_initial_cm, data = dat[1:which.min(wl_initial_cm), .(sample_date, wl_initial_cm = wl_initial_cm - test_opt$par[["max.wl"]], ytd_water_balance = ytd_water_balance - 17.5)])
 ggplot(mod_dat,
        aes(x = sample_date)) +
   geom_line(aes(y = gradient)) +
-  # geom_line(aes(y = -0.05961 * (wl_initial_cm - tr_params$par[["max.wl"]])),
-            # color = "gray40") +
-  facet_wrap(~sample_year,
+  facet_wrap(~water_year,
              scales = "free")
+
+ggplot(mod_dat,
+       aes(x = sample_date)) +
+  geom_line(aes(y = g_hat-q_hat)) +
+  facet_wrap(~water_year,
+             scales = "free")
+
 
 hydroGOF::gof(sim = mod_dat[!is.na(wl_initial_cm), wl_hat_cm], 
               obs = mod_dat[!is.na(wl_initial_cm), wl_initial_cm])
