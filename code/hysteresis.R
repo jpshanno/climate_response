@@ -21,22 +21,12 @@
 # on the slope of the recession curve at the time), or with the melt equation 
 # calibration.
 
-# Drawdown curves are best calculated from peak melt or peak water avilability
-# depending on the site. * sites have water level issues to resolve
-# 006 - WA
-# 009 - WA
-# 053 - WA *
-# 077 - WA
-# 111 - WA
-# 113 - WA *
-# 119 - WA *
-# 135 - WA
-# 139 - WA
-# 140 - WA
-# 151 - WA
-# 152 - WA
-# 156 - WA *
-# 157 - melt
+source("code/load_project.R")
+tar_load(external_met)
+tar_load(water_budget)
+
+SITE <- 
+  "152"
 
 kenton <- 
   external_met[station_name == "kenton"]
@@ -82,131 +72,6 @@ dat[,
 
 dat[, ytd_water_balance := ytd_pet_cm + ytd_p_cm + ytd_m_cm]
 
-# Fit this loop on a single site/year, then possibly attempt to optimize for
-# m & b once you know the loop works
-# f(PET) <- b - m**(-ytdPET)
-# for t in 1:N
-# ytdPET[t] <- 
-#  ytdPET[t-1] + PET[t]
-# If [P[t] == 0] 
-# Then
-#   WL[t] <- WL[t-1] - PET[t] * f`(PET[t])
-# Else
-#   WL[t] <- WL[t-1] + P[t] * f`(PET[t])
-#   ytdPET[t] <- ytdPET[t-1] - (?P[t] * f`(PET[t]) or just P[t] possible)
-
-plot(wl_initial_cm ~ ytd_water_balance,
-     data = dat, type = 'l')
-
-# This will give a starting point, but it will likely be a slightly high estimate
-# of b
-nls(wl_initial_cm ~ c - b**(ytd_pet_cm), 
-    data = dat[1:which.min(ytd_input_cm + ytd_pet_cm)], 
-    na.action = na.exclude,
-    start = list(c = 20, b = 0.8))
-
-
-
-f_prime <- 
-  function(x, b = b){
-    -b**(x)*log(b)
-  }
-
-plot(wl_initial_cm ~ ytd_pet_cm,
-     data = dat, type = 'l')
-lines(na.omit(dat$wl_initial_cm)[1] + 
-        cumsum(f_prime(dat[, ytd_pet_cm], 0.94)*
-                 dat[order(ytd_pet_cm), pet_cm]) ~ dat[, ytd_pet_cm], 
-      lty = 2)
-
-
-# Power Curve -------------------------------------------------------------
-
-pow <- 
-  function(wa, b0, b1, b2){
-    b0 + b1*(wa) - b2**(wa)
-  }
-
-pow_prime <- 
-  function(wa, b1, b2){
-    b1 - b2^(wa) * log(b2)
-  }
-
-# wd is water deficit from previous year
-
-# Initial Parameters:
-robustbase::nlrob(wl_initial_cm ~ pow(water_balance, 
-                                      b0 = b0, b1 = b1, b2 = b2),
-                  dat[1:which.min(wl_initial_cm), .(wl_initial_cm, water_balance = wd + ytd_p_cm + ytd_pet_cm + ytd_m_cm)],
-                  na.action = na.exclude,
-                  maxit = 50,
-                  start = list(b0 = 20, b1 = 1, b2 = 0.9))
-
-# b0 <- 24.9487008
-# b1 <- 0.7650523
-# b2 <- 0.8731924
-
-power_curve_wl <- 
-  function(PET, P, M, I, b0, b1, b2, wd){
-    
-    n <- 
-      length(PET)
-    
-    wa_hat <- wl_hat <- gradient <- 
-      numeric(n)
-    
-    wl_hat[1] <- b0
-    
-    wa_hat[1] <- wd
-    
-    # ind_min <-
-    #   which.min(cumsum(P + PET))
-    
-    for(t in 2:n){
-      wa_hat[t] <- 
-        wa_hat[t-1] + PET[t] + M[t] + P[t]
-      
-      gradient[t] <- 
-        pow_prime(wa_hat[t], b1 = b1, b2 = b2)
-      
-      if(P[t] <= abs(PET[t])){
-        wl_hat[t] <-
-          wl_hat[t-1] + (PET[t] + P[t]) * gradient[t]
-      } else {
-        wl_hat[t] <-
-          wl_hat[t-1] + (P[t] - PET[t]) * gradient[t]
-
-        # if(t >= ind_min){
-        #   wa_hat[t] <-
-        #     pmin(0, YTD[t] + P[t])
-        # }
-      }
-      
-      wl_hat[t] <-
-        wl_hat[t] + M[t]
-      
-      if(wl_hat[t-1] > b0){
-        wl_hat[t] <- 
-          wl_hat[t] - (wl_hat[t-1] - b0)/2
-      }
-      
-      # Reset YTD
-      # if(n %% 365 == 0){
-      #   YTD[t] <- 
-      #     c + (cumsum(gradient[(t-365):t] * (P[(t-365):t] + PET[(t-365):t])))
-      # }
-    }
-    
-    # This looks good
-    # lplot(wl_hat ~ D); lines(WL ~ D, col = 'gray40')
-    # hydroGOF::gof(wl_hat[!is.na(WL)], WL[!is.na(WL)])
-    # lplot(c + cumsum(gradient * P + gradient * PET))
-    # c + last(cumsum(gradient * P + gradient * PET))
-    
-    data.table(wl_hat, wa_hat, gradient)
-    
-  }
-
 # Quadratic ---------------------------------------------------------------
 
 quad <- 
@@ -230,10 +95,18 @@ quad_prime <-
                   maxit = 50,
                   start = list(b0 = 8, b1 = 1, b2 = -1)))
 
+ggplot(data = dat[1:which.min(wl_initial_cm), 
+                  .(wl_initial_cm = wl_initial_cm - 8, 
+                    ytd_water_balance = ytd_water_balance - max(ytd_water_balance))],
+       aes(x = ytd_water_balance,
+           y = wl_initial_cm)) +
+  geom_path() +
+  geom_function(fun = ~predict(init_mod, newdata = data.frame(ytd_water_balance = .x)),
+                color = palette()[4])
+
 b0 <- coef(init_mod)[["b0"]]
 b1 <- coef(init_mod)[["b1"]]
 b2 <- coef(init_mod)[["b2"]]
-wd <- 0
 max.wl <- 
   density(water_budget[site == SITE, na.omit(wl_initial_cm)])$x[which.max(density(water_budget[site == SITE, na.omit(wl_initial_cm)])$y)]
 PET <- dat$pet_cm
@@ -243,84 +116,97 @@ D <- dat$sample_date
 WL <- dat$wl_initial_cm
 WA <- dat$ytd_water_balance - max(dat$ytd_water_balance)
 
-
-# By water year
-# water_balance = water_balance - max(water balance)
-
-# mod_dat[, wytd := cumsum(pet_cm + rain_cm + melt_cm), by = .(water_year)]
-# ggplot(mod_dat[, .(sample_date, wl_initial_cm = wl_initial_cm - 15.86, wytd = wytd - max(wytd)), by = .(water_year)],
-#        aes(x = sample_date)) +
-#   geom_line(aes(y = wytd),
-#             col = 'blue') +
-#   geom_hline(aes(yintercept = 0)) +
-#   geom_line(aes(y = wl_initial_cm)) +
-#   facet_wrap(~water_year,
-#              scales = "free_x")
-
 quad_curve_wl <- 
   function(PET, P, M, max.wl, b0, b1, b2){
     
+    # Length of weather vector
     n <- 
       length(PET)
     
-    wa_hat <- wl_hat <- gradient <- q_hat <- g_hat <- 
+    # Create empty vectors
+    wa_hat <- 
+      wl_hat <- 
+      gradient <- 
+      q_hat <- 
+      g_hat <- 
       max_wa <- 
       numeric(n)
     
-    wl_hat[1] <- max.wl
+    # Initialize model at full water level
+    wl_hat[1] <- 
+      max.wl
     
+    # Initialize water availability so that max annual water availability = 0
+    # (max_wa could be a single value rather than a vector, but was turned into
+    # a vector to make debugging easier)
     max_wa[1:365] <- 
       -max(cumsum(PET + P + M)[1:365])
     
     wa_hat[1] <- 
       -max(cumsum(PET + P + M)[1:365])
     
+    # Loop through weather data
     for(t in 2:n){
       
-      # Reset WA
+      # Reset WA after each year so that each annual max water availability = 0
       if((t-1) %% 365 == 0){
         
+        # Calculate maximum water availability for the next year of data
         max_wa[t:(t+364)] <- 
           max(cumsum(PET[t:(t+364)] + P[t:(t+364)] + M[t:(t+364)]))
         
+        # Reset wa_hat
         wa_hat[t] <- 
           -max_wa[t]
+        
       } else {
+        
+        # If not start of year adjust water availability according to drivers
         wa_hat[t] <- 
           wa_hat[t-1] + PET[t] + M[t] + P[t]        
       }
       
-
-      
-      # if(wa_hat[t] > 0){
-      #   q_hat[t] <- 
-      #     -wa_hat[t] / 2
-      # 
-      #   wa_hat[t] <-
-      #     wa_hat[t] + q_hat[t]
-      # }
-      
+      # Calculate gradient of drawdown 
       gradient[t] <- 
-        # pow_prime(wa_hat[t], b1 = b1, b2 = b2)
         quad_prime(wa_hat[t], b1 = b1, b2 = b2)
       
+      # If gradient is negative (water level is above b0 from model) assume
+      # that there is flow into the system
       if(gradient[t] <= 0){
         
+        # Calculate g_hat as the water level difference between where water
+        # availability leads to gradient == 0 & the modeled water level based
+        # on water availability. Divided by 4 right now because it was too big
+        # an input otherwise, this should probably be an optimized parameter
+        # To improve the model I need to put in a system to 'bank' excess water
+        # availablility and allow some of it to be drawn down more slowly. It 
+        # may be something as simple as increasing the maximum water level w/o
+        # increasing b0, so that there can be greater WL rise from g_hat before
+        # Q draws WL down. But better would be some system that keeps WA elevated
+        # for some amount of time after snowmelt
         g_hat[t] <- 
           (quad((-b1/(2*b2)), b0, b1, b2) - quad(wa_hat[t], b0, b1, b2))/4
         
+        # Add G to water previous water level
         wl_hat[t] <- 
           wl_hat[t-1] + g_hat[t]
         
+        # If gradient is positive:
       } else {
         
+        # Use net input to determine if water level increases or decreases
         if((P[t] + PET[t]) <= 0){
           
+          # Water level drawdown = PET, if P <= PET then it can be assumed to be
+          # less than interception (not necessarily true, but works as a 
+          # simplifying assumption)
           wl_hat[t] <-
             wl_hat[t-1] + (PET[t]) * gradient[t]
         
           } else {
-          
+
+            # Water rise is P - PET, which fit better, but need to rethink my
+            # justification for this, or try without it
             wl_hat[t] <-
               wl_hat[t-1] + (P[t] - PET[t]) * gradient[t]
             
@@ -328,13 +214,19 @@ quad_curve_wl <-
         
       }
       
+      # Directly add melt to water level. This should probably have some sort of
+      # multiplier
       wl_hat[t] <-
         wl_hat[t] + M[t]
+      
+      # If WL is above spill point threshold then lose some to streamflow. 
+      # This could probably be improved using the morphology models to determine
+      # streamflow
       
       if(wl_hat[t-1] > max.wl){
         
         q_hat[t] <- 
-          (wl_hat[t-1] - max.wl)/2
+          (wl_hat[t-1] - max.wl)
         
         wl_hat[t] <- 
           wl_hat[t] - q_hat[t]
@@ -356,308 +248,7 @@ quad_curve_wl <-
     
   }
 
-
-# Derived Quadratic ESy ---------------------------------------------------
-
-# For site = 152
-
-wd <- -17.5
-b1 <- -9.9395498 
-b2 <- -0.2015975 
-max.wl <- 12.1105430 
-
-esy_mod <- 
-  lm(quad_prime(ytd_water_balance, b1, b2) ~ 
-       0 + wl_initial_cm, 
-     data = dat[1:which.min(wl_initial_cm), 
-                .(sample_date, 
-                  wl_initial_cm = wl_initial_cm - max.wl, 
-                  ytd_water_balance = ytd_water_balance - 17.5)])
-  
-m <- 
-  coef(esy_mod)[[1]]
-
-n <- 
-  length(dat$pet_cm)
-
-wl_hat <- gradient <- 
-  numeric(n)
-
-wl_hat[1] <- max.wl
-
-for(t in 2:n){
-
-  gradient[t] <- 
-    pmax(4*m * (wl_hat[t] - max.wl))
-  
-  if(dat$rain_cm[t] <= abs(dat$pet_cm[t])){
-    wl_hat[t] <-
-      wl_hat[t-1] + (dat$rain_cm[t] + dat$pet_cm[t]) * gradient[t]
-  } else {
-    wl_hat[t] <-
-      wl_hat[t-1] + (dat$rain_cm[t]) * gradient[t]
-  }
-  
-  wl_hat[t] <-
-    wl_hat[t] + dat$melt_cm[t]
-
-  if(wl_hat[t] > max.wl){
-    wl_hat[t] <- 
-      wl_hat[t] - (wl_hat[t] - max.wl)/2
-  }
-    
-}
-
-
-lplot(wl_initial_cm ~ sample_date, data = dat, col = "gray40")
-lplot(wl_hat ~ dat$sample_date)
-lplot(gradient ~ dat$sample_date)
-
-
-# Sigmoidal Curve ---------------------------------------------------------
-
-# robustbase::nlrob(wl_initial_cm ~ c + (d-c)*(1-exp(-exp(b*((ytd_p_cm + ytd_pet_cm + ytd_m_cm) - e)))),
-#                   dat[1:278],
-#                   na.action = na.exclude,
-#                   maxit = 50,
-#                   start = list(c = 20, d = -70, b = -0.25, e = -25))
-# ggplot(dat, aes(x = ytd_p_cm + ytd_pet_cm, y = wl_initial_cm)) + geom_path() +
-#   geom_function(fun = ~.x*sig_prime(.x, -0.1599038, 17.8725671, -127.2214549, -21.2614489), col = 'blue')
-
-alt_gompertz <- 
-  function(wa, b, c, d, e){
-    c + (d-c)*(1-exp(-exp(b*(wa - e))))
-  }
-
-gompertz <- 
-  function(wa, b, c, d, e){
-    c + (d-c)*(exp(-exp(-b*(wa - e))))
-  }
-
-sig_prime <- 
-  function(x, b, c, d, e){
-    (d - c) * ((exp(-(exp(b * (x - e))))) * ((exp(b * (x - e))) * b))
-  }
-
-# From NLS on 2012 at site == 135 without melt (as opposed to the commented section above)
-uasym <- 17.637899; lasym <- -126.562612; inflection <- -33.180073; rate <- -0.161178
-
-plot(wl_initial_cm ~ ytd_pet_cm,
-     data = dat, type = 'l')
-lines(na.omit(dat$wl_initial_cm)[1] + 
-        cumsum(f_prime(dat[, ytd_pet_cm], 0.94)*
-                 dat[order(ytd_pet_cm), pet_cm]) ~ dat[, ytd_pet_cm], 
-      lty = 2)
-
-# Power Curve
-sigmoid_wl <- 
-  function(PET, P, M, uasym, lasym, rate, inflection, wd){
-    
-    n <- 
-      length(PET)
-    
-    wl_hat <- gradient <- wa_hat <- 
-      numeric(n)
-    
-    wl_hat[1] <- uasym
-    
-    wa_hat[1] <- wd
-    
-    ind_min <-
-      which.min(cumsum(P + PET))
-    
-    for(t in 2:n){
-      wa_hat[t] <- 
-        wa_hat[t-1] + PET[t] + M[t] + P[t]
-      
-      gradient[t] <- 
-        sig_prime(wa_hat[t], b = rate, c = uasym, d = lasym, e = inflection)
-      
-      if(P[t] == 0){
-        wl_hat[t] <-
-          wl_hat[t-1] + (PET[t]) * gradient[t]
-      } else {
-        wl_hat[t] <-
-          wl_hat[t-1] + (P[t] + PET[t]) * gradient[t]
-        
-        # wa_hat[t] <- 
-        #   wa_hat[t] + P[t]
-        # 
-        if(t >= ind_min){
-          wl_hat[t] <-
-            wl_hat[t] - (PET[t]) * gradient[t]
-        }
-      }
-      
-      wl_hat[t] <-
-        wl_hat[t] + M[t]
-      
-      if(wl_hat[t-1] > uasym){
-        wl_hat[t] <- 
-          wl_hat[t] - (wl_hat[t-1] - uasym)/2
-        
-        # wa_hat[t] <- 
-        #   wa_hat[t] - (wl_hat[t-1] - uasym)/2
-      }
-      
-    }
-    
-    # This looks good
-    # lplot(wl_hat ~ D); lines(WL ~ D, col = 'gray40')
-    # hydroGOF::KGE(wl_hat[!is.na(WL)], WL[!is.na(WL)])
-    # lplot(c + cumsum(gradient * P + gradient * PET))
-    # c + last(cumsum(gradient * P + gradient * PET))
-    
-    wl_hat
-    
-  }
-
-sig_wl <- 
-  sigmoid_wl(PET = PET,
-               P = P, 
-               M = M, 
-               uasym = uasym, 
-               lasym = lasym, 
-               rate = rate,
-               inflection = inflection,
-               wd = -10)
-
-lplot(sig_wl ~ D); lines(WL ~ D, col = 'gray40'); lines(wl_hat ~ D, col = 'blue')
-# lplot(sig_wl$gradient ~ D)
-
-hydroGOF::gof(sig_wl[!is.na(dat$wl_initial_cm)], dat[!is.na(wl_initial_cm), wl_initial_cm])
-hydroGOF::NSE(sig_wl[!is.na(dat$wl_initial_cm)], dat[!is.na(wl_initial_cm), wl_initial_cm])
-
 # Optimize ----------------------------------------------------------------
-
-
-sig_max_nse <- 
-  function(x, wobs, met){
-    
-    wl_hat <- 
-      sigmoid_wl(PET = met$pet_cm,
-                 P = met$rain_cm, 
-                 M = met$melt_cm, 
-                 uasym = x[1], 
-                 lasym = x[2], 
-                 rate = x[3],
-                 inflection = x[4],
-                 wd = -10)
-      
-    hydroGOF::NSE(wl_hat[!is.na(wobs)], wobs[!is.na(wobs)])
-    
-  }
-
-optim(par = c(uasym, lasym, rate, inflection),
-      fn = sig_max_nse,
-      gr = NULL,
-      wobs = dat$wl_initial_cm, 
-      met = dat[, .(pet_cm, rain_cm, melt_cm)],
-      control = list(fnscale = -1))
-
-lplot(sigmoid_wl(PET = PET,
-                   P = P, 
-                   M = M, 
-                   uasym = 16.4034215, 
-                   lasym = -121.8338205, 
-                   rate = -0.1449116,
-                   inflection = -31.7902495,
-                   wd = -10) ~ D); lines(WL ~ D, col = 'gray40')
-
-pow_max_nse <- 
-  function(params, wobs, met){
-    
-    wl_hat <- 
-      power_curve_wl(PET = met$pet_cm,
-                     P = met$rain_cm, 
-                     M = met$melt_cm, 
-                     b0 = params[["b0"]],
-                     b1 = params[["b1"]],
-                     b2 = params[["b2"]],
-                     I = params[["I"]],
-                     wd = -10)$wl_hat
-    
-    hydroGOF::NSE(wl_hat[!is.na(wobs)], wobs[!is.na(wobs)])
-    
-  }
-
-optim(par = list(b0 = b0, b1 = b1, b2 = b2, I = 0.5),
-      fn = pow_max_nse,
-      gr = NULL,
-      wobs = dat$wl_initial_cm, 
-      met = dat[, .(pet_cm, rain_cm, melt_cm)],
-      control = list(fnscale = -1),
-      method = "L-BFGS-B",
-      lower = c(-Inf, -Inf, 0.7, 0))
-
-lplot(power_curve_wl(PET = PET,
-                     P = P, 
-                     M = M, 
-                     I = 0.93788,
-                     b0 = 24.7347820,
-                     b1 = 2.4423119,
-                     b2 = 0.8784166,
-                     wd = -10) ~ D); lines(WL ~ D, col = 'gray40')
-
-# Optimized coefficients from testing with 135 & 2012
-cbind(
-  hydroGOF::gof(sigmoid_wl(PET = PET,
-                           P = P, 
-                           M = M, 
-                           uasym = 16.4034215, 
-                           lasym = -121.8338205, 
-                           rate = -0.1449116,
-                           inflection = -31.7902495,
-                           wd = -10)[!is.na(WL)],
-                WL[!is.na(WL)]),
-  hydroGOF::gof(power_curve_wl(PET = PET,
-                               P = P, 
-                               M = M, 
-                               I = 0.93788,
-                               b0 = 24.7347820,
-                               b1 = 2.4423119,
-                               b2 = 0.8784166,
-                               wd = -10)[!is.na(WL)],
-                WL[!is.na(WL)])
-)
-
-pow_opt <- 
-  function(start, wobs, met, ...){
-    
-    
-    nse <- 
-      function(params, wobs, met){
-        
-        wl_hat <- 
-          power_curve_wl(PET = met$pet_cm,
-                         P = met$rain_cm, 
-                         M = met$melt_cm, 
-                         b0 = params[["b0"]],
-                         b1 = params[["b1"]],
-                         b2 = params[["b2"]],
-                         I = params[["I"]],
-                         wd = -10)$wl_hat
-        
-        hydroGOF::NSE(wl_hat[!is.na(wobs)], wobs[!is.na(wobs)])
-        
-      }
-    
-    optim(par = start,
-          fn = nse,
-          gr = NULL,
-          wobs = wobs, 
-          met = met,
-          ...)
-  }
-
-
-
-pow_opt(start = list(b0 = b0, b1 = b1, b2 = b2, I = 0.5),
-        wobs = dat$wl_initial_cm, 
-        met = dat[, .(pet_cm, rain_cm, melt_cm)],
-        control = list(fnscale = -1),
-        method = "L-BFGS-B",
-        lower = c(-Inf, -Inf, 0.7, 0))
 
 quad_opt <- 
   function(start, ...){
@@ -804,7 +395,7 @@ ggplot(mod_dat,
   facet_wrap(~water_year,
              scales = "free")
 
-
+tr_params
 hydroGOF::gof(sim = mod_dat[!is.na(wl_initial_cm), wl_hat_cm], 
               obs = mod_dat[!is.na(wl_initial_cm), wl_initial_cm])
 
@@ -820,3 +411,33 @@ for(i in 1:n){
     lmaxi <- 1
   }
 }
+
+
+
+
+# Unused Curves -----------------------------------------------------------
+
+pow <- 
+  function(wa, b0, b1, b2){
+    b0 + b1*(wa) - b2**(wa)
+  }
+
+pow_prime <- 
+  function(wa, b1, b2){
+    b1 - b2^(wa) * log(b2)
+  }
+
+alt_gompertz <- 
+  function(wa, b, c, d, e){
+    c + (d-c)*(1-exp(-exp(b*(wa - e))))
+  }
+
+gompertz <- 
+  function(wa, b, c, d, e){
+    c + (d-c)*(exp(-exp(-b*(wa - e))))
+  }
+
+sig_prime <- 
+  function(x, b, c, d, e){
+    (d - c) * ((exp(-(exp(b * (x - e))))) * ((exp(b * (x - e))) * b))
+  }
