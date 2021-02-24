@@ -31,7 +31,8 @@ calculate_snowmelt <-
                                                InputsModel = .x,
                                                IndPeriod_WarmUp = 1:365,
                                                IndPeriod_Run = (365 + 1):.y,
-                                               IsHyst = FALSE)
+                                               IsHyst = FALSE,
+                                               MeanAnSolidPrecip = 250)
             )]
     
     cn_mods[, mod := map2(input_mod,
@@ -43,12 +44,22 @@ calculate_snowmelt <-
     daily_melt <- 
       cn_mods[, map_dfr(mod, 
                         ~data.table(sample_date = as.Date(.x[["DatesR"]]),
-                                    melt_cm = 0.1 * .x$CemaNeigeLayers$Layer01$Melt)),
+                                    rain_cm = 0.1 * .x$CemaNeigeLayers$Layer01$Pliq,
+                                    snow_cm = 0.1 * .x$CemaNeigeLayers$Layer01$Psol,
+                                    swe_cm = 0.1 * .x$CemaNeigeLayers$Layer01$SnowPack,
+                                    melt_cm = 0.1 * .x$CemaNeigeLayers$Layer01$Melt,
+                                    total_input_cm = 0.1 * .x$CemaNeigeLayers$Layer01$PliqAndMelt)),
               by = .(station_name)]
     
     data[daily_melt,
-         melt_cm := i.melt_cm,
+         `:=`(rain_cm = i.rain_cm,
+              snow_cm = i.snow_cm,
+              swe_cm = i.swe_cm,
+              melt_cm = i.melt_cm,
+              total_input_cm = i.total_input_cm),
          on = c("station_name", "sample_date")]
     
-    data
+    # Remove WY 2006 data as it has no CN model output
+    
+    data[water_year != 2006]
   }
