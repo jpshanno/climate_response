@@ -251,8 +251,32 @@ quad_curve_wl <-
 # Optimize ----------------------------------------------------------------
 
 quad_opt <- 
-  function(start, ...){
+  function(wobs, met,...){
     
+    mod_dat <- 
+      data.frame(wl = wobs)
+    
+    mod_dat$ytd_water_balance <- 
+      met$rain_cm + met$pet_cm + met$melt_cm
+    
+    mod_dat <- 
+      mod_dat[1:which.min(wobs), ]
+    
+    mod_dat$ytd_water_balance <- 
+      mod_dat$ytd_water_balance - max(mod_dat$ytd_water_balance)
+    
+    ss_mod <- 
+      robustbase::nlrob(wl ~ quad(ytd_water_balance, 
+                                  b0 = b0, b1 = b1, b2 = b2),
+                        data = mod_dat,
+                        na.action = na.exclude,
+                        maxit = 50,
+                        start = list(b0 = 8, b1 = 1, b2 = -1))
+    
+    opt_start <- 
+      list(b0 = coef(ss_mod)[["b0"]],
+           b1 = coef(ss_mod)[["b1"]],
+           b2 = coef(ss_mod)[["b2"]])
     
     nse <- 
       function(params, wobs, met, max.wl){
@@ -270,19 +294,18 @@ quad_opt <-
         # dtw::dtw(wl_hat[!is.na(wobs)], wobs[!is.na(wobs)])$distance
       }
     
-    optim(par = start,
+    optim(par = opt_start,
           fn = nse,
           gr = NULL,
+          met = met,
+          wobs = wobs,
           ...)
   }
 
 # Initial Parameters from nlrob for 152, 2012
 # Could make it self-start
 test_opt <- 
-  quad_opt(start = list(b0 = coef(init_mod)[["b0"]],
-                        b1 = coef(init_mod)[["b1"]], 
-                        b2 = coef(init_mod)[["b2"]]),
-           wobs = dat$wl_initial_cm, 
+  quad_opt(wobs = dat$wl_initial_cm, 
            met = dat[, .(pet_cm, rain_cm, melt_cm)],
            max.wl = max.wl,
            control = list(fnscale = -1))
@@ -343,10 +366,7 @@ tr_dat <-
   mod_dat[water_year %in% c(2012, 2013)]
 
 tr_params <- 
-  quad_opt(start = list(b0 = coef(init_mod)[["b0"]],
-                        b1 = coef(init_mod)[["b1"]],
-                        b2 = coef(init_mod)[["b2"]]),
-           wobs = tr_dat$wl_initial_cm, 
+  quad_opt(wobs = tr_dat$wl_initial_cm, 
            met = tr_dat[, .(pet_cm, rain_cm, melt_cm)],
            max.wl = density(mod_dat$wl_initial_cm, na.rm = TRUE)$x[which.max(density(mod_dat$wl_initial_cm, na.rm = TRUE)$y)],
            control = list(fnscale = -1))
