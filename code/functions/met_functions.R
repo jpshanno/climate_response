@@ -197,7 +197,7 @@ calculate_water_availability <-
   function(data){
     
     data[, 
-         water_availability_cm := cumsum(precip_cm - pet_cm),
+         water_availability_cm := cumsum(total_input_cm - pet_cm),
          by = .(station_name)]
     
     data[, ytd_water_availability_cm := (water_availability_cm - first(water_availability_cm)) - max(water_availability_cm - first(water_availability_cm)),
