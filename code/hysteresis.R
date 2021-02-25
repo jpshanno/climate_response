@@ -81,7 +81,7 @@ quad <-
 
 quad_prime <- 
   function(wa, b1, b2){
-    b1 + b2 * 2 * pmin(0, wa)
+    b1 + b2 * 2 * wa
   }
 
 # wd is water deficit from previous year
@@ -102,7 +102,7 @@ ggplot(data = dat[1:which.min(wl_initial_cm),
            y = wl_initial_cm)) +
   geom_path() +
   geom_function(fun = ~predict(init_mod, newdata = data.frame(ytd_water_balance = .x)),
-                color = palette()[4])
+                color = palette()[4]) 
 
 b0 <- coef(init_mod)[["b0"]]
 b1 <- coef(init_mod)[["b1"]]
@@ -117,7 +117,7 @@ WL <- dat$wl_initial_cm
 WA <- dat$ytd_water_balance - max(dat$ytd_water_balance)
 
 quad_curve_wl <- 
-  function(PET, P, M, max.wl, b0, b1, b2){
+  function(PET, P, M, max.wl, b0, b1, b2, MP = 1){
     
     # Length of weather vector
     n <- 
@@ -152,11 +152,11 @@ quad_curve_wl <-
       if((t-1) %% 365 == 0){
         
         # Calculate maximum water availability for the next year of data
-        max_wa[t:(t+364)] <- 
+        max_wa[t:(t+364)] <-
           max(cumsum(PET[t:(t+364)] + P[t:(t+364)] + M[t:(t+364)]))
-        
+
         # Reset wa_hat
-        wa_hat[t] <- 
+        wa_hat[t] <-
           -max_wa[t]
         
       } else {
@@ -208,7 +208,7 @@ quad_curve_wl <-
             # Water rise is P - PET, which fit better, but need to rethink my
             # justification for this, or try without it
             wl_hat[t] <-
-              wl_hat[t-1] + (P[t] - PET[t]) * gradient[t]
+              wl_hat[t-1] + MP * (P[t]) * gradient[t]
             
           }
         
@@ -234,24 +234,25 @@ quad_curve_wl <-
       
     }
     
-    # This looks good
-    # lplot(wl_hat ~ D); lines(WL ~ D, col = 'gray40')
-    # lplot(wa_hat ~ D)
-    # lplot(q_hat ~ D)
-    # lplot(g_hat ~ D)
-    # lplot(gradient ~ D)
-    # hydroGOF::gof(wl_hat[!is.na(WL)], WL[!is.na(WL)])
-    # lplot(c + cumsum(gradient * P + gradient * PET))
-    # c + last(cumsum(gradient * P + gradient * PET))
-    
-    data.table(wl_hat, wa_hat, gradient, q_hat, g_hat, max_wa)
+    data.table(wl_hat, wa_hat, gradient, q_hat, g_hat, max_wa, s_hat)
     
   }
+
+# This looks good
+lplot(wl_hat ~ D); lines(WL ~ D, col = 'gray40')
+# lplot(wa_hat ~ D)
+# lplot(q_hat ~ D)
+lplot(g_hat ~ D)
+lplot(s_hat ~ D)
+# lplot(gradient ~ D)
+# hydroGOF::gof(wl_hat[!is.na(WL)], WL[!is.na(WL)])
+# lplot(c + cumsum(gradient * P + gradient * PET))
+# c + last(cumsum(gradient * P + gradient * PET))
 
 # Optimize ----------------------------------------------------------------
 
 quad_opt <- 
-  function(wobs, met,...){
+  function(wobs, met, MP, ...){
     
     mod_dat <- 
       data.frame(wl = wobs)
@@ -276,10 +277,11 @@ quad_opt <-
     opt_start <- 
       list(b0 = coef(ss_mod)[["b0"]],
            b1 = coef(ss_mod)[["b1"]],
-           b2 = coef(ss_mod)[["b2"]])
+           b2 = coef(ss_mod)[["b2"]],
+           MP = MP)
     
     nse <- 
-      function(params, wobs, met, max.wl){
+      function(params, wobs, met, max.wl, wa.init){
         
         wl_hat <- 
           quad_curve_wl(PET = met$pet_cm,
@@ -288,9 +290,10 @@ quad_opt <-
                         max.wl = max.wl,
                         b0 = params[["b0"]],
                         b1 = params[["b1"]],
-                        b2 = params[["b2"]])$wl_hat
+                        b2 = params[["b2"]],
+                        MP = params[["MP"]])$wl_hat
         
-        hydroGOF::NSE(wl_hat[!is.na(wobs)], wobs[!is.na(wobs)])
+        hydroGOF::md(wl_hat[!is.na(wobs)], wobs[!is.na(wobs)])
         # dtw::dtw(wl_hat[!is.na(wobs)], wobs[!is.na(wobs)])$distance
       }
     
@@ -308,6 +311,7 @@ test_opt <-
   quad_opt(wobs = dat$wl_initial_cm, 
            met = dat[, .(pet_cm, rain_cm, melt_cm)],
            max.wl = max.wl,
+           MP = 1,
            control = list(fnscale = -1))
 
 lplot(wl_initial_cm ~ sample_date,
@@ -317,7 +321,8 @@ lines(y = quad_curve_wl(dat$pet_cm, dat$rain_cm, dat$melt_cm,
                     max.wl = max.wl,
                     b0 = test_opt$par[["b0"]],
                     b1 = test_opt$par[["b1"]],
-                    b2 = test_opt$par[["b2"]])$wl_hat, x= dat$sample_date)
+                    b2 = test_opt$par[["b2"]],
+                    MP = test_opt$par[["MP"]])$wl_hat, x= dat$sample_date)
 # 2014 & 2018 need work
 mod_dat <- 
   kenton[between(water_year, 2012, 2019),
@@ -330,7 +335,7 @@ mod_dat <-
            tmax_c,
            tmin_c,
            tmean_c)
-  ][water_budget[site == "135",
+  ][water_budget[site == "157",
                  .(sample_date, wl_initial_cm, idw_precip_cm)],
     `:=`(wl_initial_cm = i.wl_initial_cm,
          idw_precip_cm = i.idw_precip_cm),
@@ -367,31 +372,39 @@ tr_dat <-
 
 tr_params <- 
   quad_opt(wobs = tr_dat$wl_initial_cm, 
+           MP = 1,
            met = tr_dat[, .(pet_cm, rain_cm, melt_cm)],
            max.wl = density(mod_dat$wl_initial_cm, na.rm = TRUE)$x[which.max(density(mod_dat$wl_initial_cm, na.rm = TRUE)$y)],
            control = list(fnscale = -1))
-  # pow_opt(start = list(b0 = b0, b1 = b1, b2 = b2, I = 0.5),
-  #         wobs = tr_dat$wl_initial_cm, 
-  #         met = tr_dat[, .(pet_cm, rain_cm, melt_cm)],
-  #         control = list(fnscale = -1),
-  #         method = "L-BFGS-B",
-  #         lower = c(0, -Inf, 0, 0),
-  #         upper = c(Inf, Inf, 2, Inf))
 
-mod_dat[, c("wl_hat_cm", "wa_hat_cm", "gradient", "q_hat", "g_hat", "max_wa") := 
+mod_dat[, c("wl_hat_cm", "wa_hat_cm", "gradient", "q_hat", "g_hat", "max_wa", "s_hat") := 
           quad_curve_wl(PET = pet_cm,
                         P = fcoalesce(idw_precip_cm, rain_cm), 
                         M = melt_cm, 
                         max.wl = density(mod_dat$wl_initial_cm, na.rm = TRUE)$x[which.max(density(mod_dat$wl_initial_cm, na.rm = TRUE)$y)],
+                        MP = tr_params$par[["MP"]],
                         b0 = tr_params$par[["b0"]],
                         b1 = tr_params$par[["b1"]],
                         b2 = tr_params$par[["b2"]])]
+
+mod_dat[, wl_hat_annual := quad_curve_wl(PET = pet_cm,
+                                         P = fcoalesce(idw_precip_cm, rain_cm),
+                                         M = melt_cm,
+                                         max.wl = density(mod_dat$wl_initial_cm, na.rm = TRUE)$x[which.max(density(mod_dat$wl_initial_cm, na.rm = TRUE)$y)],
+                                         MP = tr_params$par[["MP"]],
+                                         b0 = tr_params$par[["b0"]],
+                                         b1 = tr_params$par[["b1"]],
+                                         b2 = tr_params$par[["b2"]]),
+        by = .(water_year)]
 
 ggplot(mod_dat,
        aes(x = sample_date)) +
   geom_line(aes(y = wl_initial_cm),
             col = "gray40") +
   geom_line(aes(y = wl_hat_cm)) +
+  geom_line(aes(y = wl_hat_annual),
+            linetype = 'dotted',
+            color = 'blue') +
   facet_wrap(~water_year,
              scales = "free")
 
