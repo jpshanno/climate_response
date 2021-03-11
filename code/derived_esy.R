@@ -202,81 +202,93 @@ dat[, ytd_water_balance := ytd_pet_cm + ytd_p_cm + ytd_m_cm]
 train <- 
   dat[water_year == 2012]
 
-# Calculate Drawdown ------------------------------------------------------
+# max.wl <- 
+  # density(water_budget[site == SITE, na.omit(wl_initial_cm)])$x[which.max(density(water_budget[site == SITE, na.omit(wl_initial_cm)])$y)]
 
-max.wl <- 
-  density(water_budget[site == SITE, na.omit(wl_initial_cm)])$x[which.max(density(water_budget[site == SITE, na.omit(wl_initial_cm)])$y)]
+# Optimze ESy -------------------------------------------------------------
 
-(init_mod <- 
-    robustbase::nlrob(wl_initial_cm ~ quad(ytd_water_balance, 
-                                           b0 = b0, b1 = b1, b2 = b2),
-                      data = train[1:which.min(wl_initial_cm)],
-                      na.action = na.exclude,
-                      maxit = 50,
-                      start = list(b0 = 8, b1 = 1, b2 = -1)))
-
-ggplot(data = train[1:which.min(wl_initial_cm), 
-                  .(wl_initial_cm = wl_initial_cm, 
-                    ytd_water_balance = ytd_water_balance)],
-       aes(x = ytd_water_balance,
-           y = wl_initial_cm)) +
-  geom_path() +
-  geom_function(fun = ~predict(init_mod, newdata = data.frame(ytd_water_balance = .x)),
-                color = palette()[4]) 
-
-b1 <- coef(init_mod)[["b1"]]
-b2 <- coef(init_mod)[["b2"]]
-
-train[, esy := quad_prime(ytd_water_balance, b1, b2)]
-
-ggplot(data = train[1:which.min(wl_initial_cm)]) + 
-  aes(x = wl_initial_cm, 
-      y = esy) +
-  geom_point() 
-
-esy_mod <- 
-  robustbase::nlrob(esy ~ (a - (a - b) * exp (- c * wl_initial_cm)),
-                    start = c(a = 10, b = 0, c = -0.3), na.action = na.exclude,
-                    data = train[1:which.min(wl_initial_cm)])
-  # lm(quad_prime(WA, b1, b2)[1:which.min(WL)] ~ negWL[1:which.min(WL)] + I(negWL[1:which.min(WL)]^0.5))
-  # quantreg::rq(quad_prime(WA, b1, b2)[1:which.min(WL)] ~ WL[1:which.min(WL)])
-  # mle2(esy ~ dlst(a - (a - b) * exp (c * wl), sigma = sigma, df = nu), 
-  #      start = list(a = 10, b = 0, c = -0.3, sigma = 1, nu = 3), 
-  #      data = data.frame(esy = quad_prime(WA, b1, b2)[1:which.min(WL)], wl= negWL[1:which.min(WL)])[!is.na(data.frame(esy = quad_prime(WA, b1, b2)[1:which.min(WL)], wl= negWL[1:which.min(WL)])$wl), ],
-  #      method = "L-BFGS-B",
-  #      lower = list(a = -Inf, b = 0, c = -Inf, sigma = .Machine$double.eps, nu = 1),
-  #      upper = list(a = Inf, b = Inf, c = 0, sigma = 1, nu = sum(!is.na(WL[1:which.min(WL)]))-1))
 esy_fun <- 
   as.function(list(wl = NULL,
-                   bquote(pmax(1, .(a) - (.(a) - .(b)) * exp(-.(c) * wl)),
-                          where = as.list(coef(esy_mod)))))
-  # as.function(list(wl = NULL,
-  #                  offset = NULL,
-  #                  bquote(ifelse(wl > offset, 
-  #                                1,
-  #                                pmax(1, .(b) + .(m1) * (-wl + offset) + .(m2) * (-wl + offset)^0.5)),
-  #                         where = list(b = coef(esy_mod)[[1]],
-  #                                      m1 = coef(esy_mod)[[2]],
-  #                                      m2 = coef(esy_mod)[[3]]))))
-  # as.function(list(wl = NULL, 
-  #                  bquote(pmax(.(b), .(b) + .(m)*wl),
-  #                         where = list(b = coef(esy_mod)[[1]],
-  #                                      m = coef(quantreg::rq(quad_prime(WA, b1, b2)[1:which.min(WL)] ~ WL[1:which.min(WL)]))[[2]]))))
+                   min.esy = 1,
+                   asym = FALSE,
+                   bquote(if(asym){return(.(a))} else{pmax(min.esy, .(a) - (.(a) - .(b)) * exp (.(c) * wl))},
+                          where = as.list(optim(par = list(a = 13, b = 2, c = 0.02,
+                                                           sigma = 1, nu = 3),
+                                                # method = "L-BFGS-B",
+                                                # lower = c(MP = 0, MM = 0, MQ = 0, MPET = 1),
+                                                control = list(fnscale = 1, 
+                                                               maxit = 2000),
+                                                fn = 
+                                                  function(params){
+                                                    
+                                                    a <- params[["a"]]
+                                                    b <- params[["b"]]
+                                                    c <- params[["c"]]
+                                                    sigma <- params[["sigma"]]
+                                                    nu <- params[["nu"]]
+                                                    
+                                                    WL <- train[1:which.min(wl_initial_cm)][!is.na(wl_initial_cm), wl_initial_cm]
+                                                    dWA <- train[1:which.min(wl_initial_cm)][!is.na(wl_initial_cm), c(0, diff(ytd_water_balance))]
+                                                    
+                                                    n <- 
+                                                      length(dWA)
+                                                    
+                                                    wl_hat <- 
+                                                      gradient <- 
+                                                      numeric(n)
+                                                    
+                                                    # Initialize model at full water level
+                                                    wl_hat[1] <- 
+                                                      WL[1]
+                                                    
+                                                    # Loop through weather data
+                                                    for(t in 2:n){
+                                                      
+                                                      # Calculate gradient of drawdown 
+                                                      gradient[t] <- 
+                                                        a - (a - b) * exp (c * wl_hat[t-1])
+                                                      
+                                                      wl_hat[t] <- 
+                                                        dWA[t-1] * gradient[t] + wl_hat[t-1]
+                                                    }
+                                                    
+                                                    resids <- 
+                                                      (wl_hat - WL)[!is.na(WL)]
+                                                    
+                                                    # -sum(dnorm(resids, log = TRUE))
+                                                    -sum(dlst(resids, 
+                                                              df = nu,
+                                                              sigma = sigma,
+                                                              log = TRUE))
+                                                    
+                                                  })$par))))
 
-last_plot() +
-  geom_function(fun = esy_fun)
+
+max.wl <- 
+  esy_fun(asym = TRUE)
+
+# Parametize Water Balance Coefs ------------------------------------------
+
+ggplot(dat,
+       aes(x = sample_date,
+           y = wl_initial_cm)) +
+  geom_line() +
+  facet_wrap(~water_year,
+             scales = "free_x")
 
 param_train <- 
-  dat[water_year == 2014]
+  dat[water_year == c(2012)]
 
 (mod_opt <- 
-    optimize_params(par = list(MP = 1.5, MM = 1.5, MQ = 0.5),
-                    fixed = list(MPET = 1)))
+    optimize_params(par = list(MP = 1.5, MQ = 0.5, ESY = 1, MPET = 1),
+                    method = "L-BFGS-B",
+                    lower = list(MP = 0, MQ = 0, ESY = 0, MPET = 0),
+                    upper = list(MP = 10, MQ = 10, ESY = 20, MPET = 10)))
 
 # Test Fit Model ----------------------------------------------------------
 
 test <- 
-  dat[water_year %in% 2013]
+  dat[water_year %in% 2016]
 
 {PET2 <- test$pet_cm
 P2 <- test$rain_cm
