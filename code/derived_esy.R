@@ -18,11 +18,6 @@ optimize_params <-
                  fn = 
                    function(params, fixed = NULL){
                      
-                     PET <- param_train$pet_cm
-                     P <- param_train$rain_cm
-                     M <- param_train$melt_cm
-                     WL <- param_train$wl_initial_cm
-                     
                      params <- 
                        c(params, fixed)
                      
@@ -43,6 +38,18 @@ optimize_params <-
                      
                      # MG <- 
                      #   params[["MG"]]
+                     
+                     phiM <- 
+                       params[["phiM"]]
+                     
+                     phiP <- 
+                       params[["phiP"]]
+                     
+                     PET <- param_train$pet_cm
+                     P <- as.numeric(filter(param_train$rain_cm, filter = phiP, method = "rec", sides = 1))
+                     M <- as.numeric(filter(param_train$melt_cm, filter = phiM, method = "rec", sides = 1))
+                     WL <- param_train$wl_initial_cm
+                     
                      
                      n <- 
                        length(PET)
@@ -99,10 +106,13 @@ optimize_params <-
                        # This could probably be improved using the morphology models to determine
                        # streamflow
                        
-                       if(wl_hat[t] > max.wl){
+                       if(wl_hat[t-1] > max.wl){
                          
                          q_hat[t] <-
-                           MQ * (wl_hat[t] - max.wl)
+                           MQ * (wl_hat[t-1] - max.wl)
+                         
+                         q_hat[t] <- 
+                           pmin(q_hat[t], wl_hat[t] - max.wl)
                          
                          wl_hat[t] <-
                            wl_hat[t] - q_hat[t]
@@ -136,7 +146,7 @@ tar_load(water_budget)
 
 
 SITE <- 
-  "135"
+  "152"
 
 kenton <- 
   external_met[station_name == "kenton"]
@@ -190,67 +200,83 @@ train <-
 # max.wl <- 
   # density(water_budget[site == SITE, na.omit(wl_initial_cm)])$x[which.max(density(water_budget[site == SITE, na.omit(wl_initial_cm)])$y)]
 
-# Optimze ESy -------------------------------------------------------------
+# Optimize ESy -------------------------------------------------------------
+
+# Need to still fit the drawdown model then use quad_prime to get reasonable
+# starting values for esy optimization
 
 esy_fun <- 
   as.function(list(wl = NULL,
-                   min.esy = 1,
-                   asym = FALSE,
-                   bquote(if(asym){return(.(a))} else{pmax(min.esy, .(a) - (.(a) - .(b)) * exp (.(c) * wl))},
-                          where = as.list(optim(par = list(a = 13, b = 2, c = 0.02,
-                                                           sigma = 1, nu = 3),
-                                                # method = "L-BFGS-B",
-                                                # lower = c(MP = 0, MM = 0, MQ = 0, MPET = 1),
-                                                control = list(fnscale = 1, 
-                                                               maxit = 2000),
-                                                fn = 
-                                                  function(params){
-                                                    
-                                                    a <- params[["a"]]
-                                                    b <- params[["b"]]
-                                                    c <- params[["c"]]
-                                                    sigma <- params[["sigma"]]
-                                                    nu <- params[["nu"]]
-                                                    
-                                                    WL <- train[1:which.min(wl_initial_cm)][!is.na(wl_initial_cm), wl_initial_cm]
-                                                    dWA <- train[1:which.min(wl_initial_cm)][!is.na(wl_initial_cm), c(0, diff(ytd_water_balance))]
-                                                    
-                                                    n <- 
-                                                      length(dWA)
-                                                    
-                                                    wl_hat <- 
-                                                      gradient <- 
-                                                      numeric(n)
-                                                    
-                                                    # Initialize model at full water level
-                                                    wl_hat[1] <- 
-                                                      WL[1]
-                                                    
-                                                    # Loop through weather data
-                                                    for(t in 2:n){
-                                                      
-                                                      # Calculate gradient of drawdown 
-                                                      gradient[t] <- 
-                                                        a - (a - b) * exp (c * wl_hat[t-1])
-                                                      
-                                                      wl_hat[t] <- 
-                                                        dWA[t-1] * gradient[t] + wl_hat[t-1]
-                                                    }
-                                                    
-                                                    resids <- 
-                                                      (wl_hat - WL)[!is.na(WL)]
-                                                    
-                                                    # -sum(dnorm(resids, log = TRUE))
-                                                    -sum(dlst(resids, 
-                                                              df = nu,
-                                                              sigma = sigma,
-                                                              log = TRUE))
-                                                    
-                                                  })$par))))
+                   min.esy = 0,
+                   max.wl = FALSE,
+                   bquote(
+                     if(max.wl) {
+                       return(log((.(a)/(.(a)-.(b)))) / .(c))
+                     } else {
+                       pmax(min.esy, .(a) - (.(a) - .(b)) * exp (.(c) * wl))
+                     },
+                     where = as.list(optim(par = list(a = 10, b = 1, c = 0.02, sigma = 0.5, nu = 3),
+                                           # method = "L-BFGS-B",
+                                           # lower = list(a = .Machine$double.eps,
+                                           #              b = .Machine$double.eps,
+                                           #              c = .Machine$double.eps,
+                                           #              sigma = .Machine$double.eps,
+                                           #              nu = 1),
+                                           # upper = list(a = 12,
+                                           #              b = 20,
+                                           #              c = 1 - .Machine$double.eps, 
+                                           #              sigma = 2 * sqrt(var(train[1:which.min(wl_initial_cm)][!is.na(wl_initial_cm), wl_initial_cm])/length(train[1:which.min(wl_initial_cm)][!is.na(wl_initial_cm), wl_initial_cm])),
+                                           #              nu = length(train[1:which.min(wl_initial_cm)][!is.na(wl_initial_cm), wl_initial_cm]) - 1),
+                                           control = list(fnscale = 1, 
+                                                          maxit = 2000),
+                                           fn = 
+                                             function(params){
+                                               
+                                               a <- params[["a"]]
+                                               b <- params[["b"]]
+                                               c <- params[["c"]]
+                                               sigma <- params[["sigma"]]
+                                               nu <- params[["nu"]]
+                                               
+                                               WL <- train[1:which.min(wl_initial_cm)][!is.na(wl_initial_cm), wl_initial_cm]
+                                               dWA <- train[1:which.min(wl_initial_cm)][!is.na(wl_initial_cm), c(0, diff(ytd_water_balance))]
+                                               
+                                               n <- 
+                                                 length(dWA)
+                                               
+                                               wl_hat <- 
+                                                 gradient <- 
+                                                 numeric(n)
+                                               
+                                               # Initialize model at full water level
+                                               wl_hat[1] <- 
+                                                 WL[1]
+                                               
+                                               # Loop through weather data
+                                               for(t in 2:n){
+                                                 
+                                                 # Calculate gradient of drawdown 
+                                                 gradient[t] <- 
+                                                   a - (a - b) * exp (c * wl_hat[t-1])
+                                                 
+                                                 wl_hat[t] <- 
+                                                   dWA[t-1] * gradient[t] + wl_hat[t-1]
+                                               }
+                                               
+                                               resids <- 
+                                                 (wl_hat - WL)[!is.na(WL)]
+                                               
+                                               # -sum(dnorm(resids, log = TRUE))
+                                               -sum(dlst(resids,
+                                                         df = nu,
+                                                         sigma = sigma,
+                                                         log = TRUE))
+                                               
+                                             })$par))))
 
 
 max.wl <- 
-  esy_fun(asym = TRUE)
+  esy_fun(max.wl = TRUE)
 
 # Parametize Water Balance Coefs ------------------------------------------
 
@@ -262,21 +288,24 @@ ggplot(dat,
              scales = "free_x")
 
 param_train <- 
-  dat[water_year %in% c(2012)]
+  dat[water_year %in% c(2013)]
 
 (mod_opt <- 
-    optimize_params(par = list(MP = 1.5, MQ = 0.1, MM = 1, ESY = 1, MPET = 1),
+    optimize_params(par = list(MP = 1.5, MM = 0.1, ESY = 1, MPET = 1, phiM = 0.9, MQ = 0.5, phiP = 0.5),
                     method = "L-BFGS-B",
-                    lower = list(MP = 0, MQ = 0, MM = 0, ESY = 0, MPET = 0)))
+                    lower = list(MP = 0, MM = 0, ESY = 0, MPET = 0, phiM = 0, MQ = 0, phiP = 0),
+                    upper = list(MP = Inf, MM = Inf, ESY = Inf, MPET = Inf, phiM = 0.9, MQ = 0.9, phiP = 0.9)))
 
 # Test Fit Model ----------------------------------------------------------
 
 test <- 
-  dat[water_year %in% 2013]
+  dat[water_year %in% 2017]
 
 {PET2 <- test$pet_cm
 P2 <- test$rain_cm
+P2 <- M2 <- as.numeric(filter(P2, filter = mod_opt$par[["phiP"]], method = "rec", sides = 1))
 M2 <- test$melt_cm
+M2 <- as.numeric(filter(M2, filter = mod_opt$par[["phiM"]], method = "rec", sides = 1))
 D2 <- test$sample_date
 WL2 <- test$wl_initial_cm
 
