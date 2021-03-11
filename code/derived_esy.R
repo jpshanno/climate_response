@@ -1,27 +1,12 @@
-################################################################################
-# MODEL PERFROMANCE SEEMED TO DEGRADE SINCE INITIAL COMMMIT. MAY NEED TO REWIND
-# AND TEST AGAIN. LOOKS LIKE ESY MAY BE GETTING OVER ESTIMATED FOR SOME SITES
-# PLACE BOUNDS ON PARAMS
-################################################################################
+# Need to get IDW data for all external met sites
 
 # Derived ESY Method
 
-# 1. Fit drawdown model of wl_initial_cm ~ quad(ytd_water_balance) for selected
-#    year (largest drawdown year is best)
-# 2. Use b1, b2 to calculate quad_prime() as an approximation of Esy
-# 3. Fit asymptotic regression model Esy ~ a - (a - b) * exp (- c * wl)
-# 4. Optimize MPET, MP, MM, and MQ for the training year
-# 5. Validate optimized model agains test datasets
-
-quad <- 
-  function(wa, b0, b1, b2){
-    b0 + b1*wa + b2*wa^2
-  }
-
-quad_prime <- 
-  function(wa, b1, b2){
-    b1 + b2 * 2 * wa
-  }
+# 1. Fit asymptotic regression model Esy ~ a - (a - b) * exp (- c * wl) with 
+#    dlst errors using optim. This supersedes having to fit a drawdown model and
+#    then fit a second model to the gradient of that function to estimate ESy
+# 2. Optimize MPET, MP, MM, and MQ for the training year
+# 3. Validate optimized model against test datasets
 
 optimize_params <- 
   function(par, fixed = NULL, ...){
@@ -151,7 +136,7 @@ tar_load(water_budget)
 
 
 SITE <- 
-  "135"
+  "157"
 
 kenton <- 
   external_met[station_name == "kenton"]
@@ -161,22 +146,22 @@ dat <-
          .(sample_date, 
            water_year,
            pet_cm = -pet_cm,
-           # ytd_pet_cm = cumsum(-pet_cm),
            rain_cm,
-           # ytd_p_cm = cumsum(rain_cm),
            melt_cm,
-           # ytd_m_cm = cumsum(melt_cm),
            total_input_cm,
-           # ytd_input_cm = cumsum(total_input_cm),
            tmax_c,
            tmin_c,
            tmean_c)
   ][water_budget[site == SITE],
     `:=`(site = i.site,
+         best_precip_cm = i.best_precip_cm,
+         idw_precip_cm = i.idw_precip_cm,
          wl_initial_cm = i.wl_initial_cm),
     on = "sample_date"]
 
 dat[, site := unique(na.omit(site))]
+
+dat[, coal_precip_cm := pmax(rain_cm, best_precip_cm, na.rm = TRUE)]
 
 # Drop anomalous melt
 dat[between(melt_cm, 0, 0.1) & month(sample_date) %in% 6:9, 
@@ -317,7 +302,7 @@ for(t in 2:n){
   
   # Calculate gradient2 of drawdown 
   gradient2[t] <- 
-    esy_fun(wl_hat2[t-1])
+    esy_fun(wl_hat2[t-1], mod_opt$par[["ESY"]])
   
   # Use net input to determine if water level increases or decreases
   if((P2[t] + PET2[t]) <= 0){
@@ -344,7 +329,7 @@ for(t in 2:n){
   # Directly add melt to water level. This should probably have some sort of
   # multiplier
   wl_hat2[t] <-
-    wl_hat2[t] + mod_opt$par[["MM"]] * M2[t] * gradient2[t]
+    wl_hat2[t] + mod_opt$par[["MP"]] * M2[t] * gradient2[t]
   
   # If WL is above spill point threshold then lose some to streamflow. 
   # This could probably be improved using the morphology models to determine
