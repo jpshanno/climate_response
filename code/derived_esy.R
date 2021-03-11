@@ -32,8 +32,8 @@ optimize_params <-
                      MP <- 
                        params[["MP"]]
                      
-                     # MM <- 
-                     #   params[["MM"]]
+                     MM <-
+                       params[["MM"]]
                      
                      MQ <-
                        params[["MQ"]]
@@ -93,7 +93,7 @@ optimize_params <-
                        # Directly add melt to water level. This should probably have some sort of
                        # multiplier
                        wl_hat[t] <-
-                         wl_hat[t] + MP * M[t] * gradient[t]
+                         wl_hat[t] + MM * M[t] * gradient[t]
                        
                        # If WL is above spill point threshold then lose some to streamflow. 
                        # This could probably be improved using the morphology models to determine
@@ -136,7 +136,7 @@ tar_load(water_budget)
 
 
 SITE <- 
-  "157"
+  "135"
 
 kenton <- 
   external_met[station_name == "kenton"]
@@ -262,18 +262,17 @@ ggplot(dat,
              scales = "free_x")
 
 param_train <- 
-  dat[water_year == c(2012)]
+  dat[water_year %in% c(2012)]
 
 (mod_opt <- 
-    optimize_params(par = list(MP = 1.5, MQ = 0.5, ESY = 1, MPET = 1),
+    optimize_params(par = list(MP = 1.5, MQ = 0.1, MM = 1, ESY = 1, MPET = 1),
                     method = "L-BFGS-B",
-                    lower = list(MP = 0, MQ = 0, ESY = 0, MPET = 0),
-                    upper = list(MP = 10, MQ = 10, ESY = 20, MPET = 10)))
+                    lower = list(MP = 0, MQ = 0, MM = 0, ESY = 0, MPET = 0)))
 
 # Test Fit Model ----------------------------------------------------------
 
 test <- 
-  dat[water_year %in% 2016]
+  dat[water_year %in% 2013]
 
 {PET2 <- test$pet_cm
 P2 <- test$rain_cm
@@ -290,6 +289,7 @@ wl_hat2 <-
   gradient2 <- 
   q_hat2 <- 
   g_hat2 <- 
+  m_hat2 <- 
   numeric(n)
 
 # Initialize model at full water level
@@ -328,8 +328,12 @@ for(t in 2:n){
   # }
   # Directly add melt to water level. This should probably have some sort of
   # multiplier
+  
+  m_hat2[t] <- 
+    mod_opt$par[["MM"]] * M2[t] * gradient2[t]
+  
   wl_hat2[t] <-
-    wl_hat2[t] + mod_opt$par[["MP"]] * M2[t] * gradient2[t]
+    wl_hat2[t] + m_hat2[t]
   
   # If WL is above spill point threshold then lose some to streamflow. 
   # This could probably be improved using the morphology models to determine
@@ -345,7 +349,7 @@ for(t in 2:n){
   }
   
 }
-lplot(wl_hat2 ~ D2); lines(WL2 ~ D2, col = 'gray40')
+lplot(wl_hat2 ~ D2, ylim = c(min(c(wl_hat2, WL2), na.rm = TRUE), max(c(wl_hat2, WL2), na.rm = TRUE))); lines(WL2 ~ D2, col = 'gray40')
 hydroGOF::md(wl_hat2[!is.na(WL2)], WL2[!is.na(WL2)])
 }
 
