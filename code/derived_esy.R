@@ -8,6 +8,26 @@
 # 2. Optimize MPET, MP, MM, and MQ for the training year
 # 3. Validate optimized model against test datasets
 
+quad <- 
+  function(wa, b0, b1, b2){
+    b0 + b1*wa + b2*wa^2
+  }
+
+quad_prime <- 
+  function(mod = NULL, wa, b1, b2){
+    if(!is.null(mod)){
+      b1 <- coef(mod)[["b1"]]
+      b2 <- coef(mod)[["b2"]]
+      }
+    
+    grads <- b1 + b2 * 2 * wa
+    
+    attr(grads, "intercept") <- 
+      b1
+    
+    grads
+  }
+
 optimize_params <- 
   function(par, fixed = NULL, ...){
     opt <- optim(par = par,
@@ -141,6 +161,8 @@ optimize_params <-
 
 
 source("code/load_project.R")
+library(extraDistr, 
+        include.only = "dlst")
 tar_load(external_met)
 tar_load(water_budget)
 
