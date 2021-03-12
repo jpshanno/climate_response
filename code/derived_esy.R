@@ -161,21 +161,169 @@ optimize_params <-
 
 
 source("code/load_project.R")
+library(stringr)
 library(extraDistr, 
         include.only = "dlst")
 tar_load(external_met)
 tar_load(water_budget)
 
 
-SITE <- 
-  "152"
-
 kenton <- 
   external_met[station_name == "kenton"]
 
-dat <- 
+
+train <- 
   kenton[water_year %in% 2012:2019 & format(sample_date, "%m%d") != "0229",
          .(sample_date, 
+           water_year,
+           pet_cm = -pet_cm,
+           rain_cm,
+           melt_cm,
+           total_input_cm,
+           tmax_c,
+           tmin_c,
+           tmean_c)
+  ]
+
+train[between(melt_cm, 0, 0.1) & month(sample_date) %in% 6:9, 
+      `:=`(total_input_cm = total_input_cm - melt_cm,
+           melt_cm = 0)]
+
+# Drop anomalous pet
+train[tmax_c <= 0,
+      pet_cm := 0]
+
+# Calculate YTD after dropping above points
+train[, 
+      `:=`(ytd_pet_cm = cumsum(pet_cm),
+           ytd_p_cm = cumsum(rain_cm),
+           ytd_m_cm = cumsum(melt_cm),
+           ytd_input_cm = cumsum(rain_cm + melt_cm)),
+      by = .(water_year)]
+
+train[, ytd_water_balance := ytd_pet_cm + ytd_p_cm + ytd_m_cm]
+train[, dWB := c(0, diff(ytd_water_balance))]
+
+train <-
+  train[water_year == 2012][
+    water_budget[, .(site, sample_date, wl_initial_cm)],
+    on = "sample_date",
+    nomatch = NULL
+  ]
+
+train[, 
+      esy_emp := quad_prime(mod = robustbase::nlrob(wl_initial_cm ~ quad(ytd_water_balance, 
+                                                                         b0 = b0, b1 = b1, b2 = b2),
+                                                    data = .SD[1:which.min(wl_initial_cm)], 
+                                                    na.action = na.exclude,
+                                                    maxit = 50,
+                                                    start = list(b0 = 8, b1 = 1, b2 = -1)),
+                            wa = .SD[, ytd_water_balance]),
+      by = .(site)]
+
+train[,
+      esy_intercept := attr(quad_prime(mod = robustbase::nlrob(wl_initial_cm ~ quad(ytd_water_balance, 
+                                                                                    b0 = b0, b1 = b1, b2 = b2),
+                                                               data = .SD[1:which.min(wl_initial_cm)], 
+                                                               na.action = na.exclude,
+                                                               maxit = 50,
+                                                               start = list(b0 = 8, b1 = 1, b2 = -1)),
+                                       wa = .SD[, ytd_water_balance]),
+                            "intercept"),
+      by = .(site)]
+
+train[, hydro_period := rep(c("drawdown", "rebound"), 
+                            times = c(which.min(wl_initial_cm), .N - which.min(wl_initial_cm))),
+      by = .(site)]
+
+ggplot(train[hydro_period == "drawdown"],
+       aes(x = wl_initial_cm,
+           y = esy_emp,
+           color = site)) +
+  geom_point()
+
+
+
+
+# Calculate ESy Functions -------------------------------------------------
+
+esy_form <- 
+  bf(esy_emp ~ a - (a - b) * exp (c * wl_initial_cm),
+     a + b + c ~ 0 + site,
+     nl = TRUE)
+
+esy_priors <- 
+  prior(nlpar = "a", normal(10, 0.5), lb = 0) +
+  prior(nlpar = "b", normal(2, 0.25), lb = 0) +
+  prior(nlpar = "c", normal(0.01, 0.002), lb = 0) +
+  prior(gamma(2, .1), class = nu)
+
+brm_esy <- 
+  brm(esy_form,
+      prior = esy_priors,
+      family = student,
+      cores = 4,
+      data = train[hydro_period == "drawdown"])
+
+esy_coefs <- 
+  fixef(brm_esy)
+
+esy_a <- 
+  esy_coefs[str_detect(rownames(esy_coefs), "a_"), "Estimate"] %>% 
+  set_names(~str_extract(., "[0-9]{3}"))
+
+esy_c <- 
+  esy_coefs[str_detect(rownames(esy_coefs), "c_"), "Estimate"] %>% 
+  set_names(~str_extract(., "[0-9]{3}"))
+
+esy_b <- 
+  esy_coefs[str_detect(rownames(esy_coefs), "b_"), "Estimate"] %>% 
+  set_names(~str_extract(., "[0-9]{3}"))
+
+train[, `:=`(a = esy_a[[.BY[[1]]]],
+             b = esy_b[[.BY[[1]]]],
+             c = esy_c[[.BY[[1]]]]), 
+      by = .(site)]
+
+train[, esy_hat := a - (a - b) * exp (c * wl_initial_cm)]
+
+esy_fun <- 
+  train[, .(pred_fun = list(as.function(list(wl = NULL,
+                                        bquote(.(a) - (.(a) - .(b)) * exp (.(c) * wl),
+                                               where = .SD[1, .(a, b, c)]))))), 
+        by = .(site)]
+
+# 119 isn't great (has an early peak in spring). Could also work to identify 
+# better local min(wl_initial_)
+ggplot(train[hydro_period == "drawdown"],
+       aes(x = wl_initial_cm,
+           y = esy_emp)) +
+  geom_point(aes(color = site)) +
+  geom_line(aes(y = esy_hat)) +
+  facet_wrap(~site)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+SITE <- 
+  "135"
+
+
+
+dat <-
+  kenton[water_year %in% 2012:2019 & format(sample_date, "%m%d") != "0229",
+         .(sample_date,
            water_year,
            pet_cm = -pet_cm,
            rain_cm,
