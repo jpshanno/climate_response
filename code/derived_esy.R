@@ -234,24 +234,21 @@ train <-
   ]
 
 train[, 
-      esy_emp := quad_prime(mod = robustbase::nlrob(wl_initial_cm ~ quad(ytd_water_balance, 
-                                                                         b0 = b0, b1 = b1, b2 = b2),
-                                                    data = .SD[1:which.min(wl_initial_cm)], 
-                                                    na.action = na.exclude,
-                                                    maxit = 50,
-                                                    start = list(b0 = 8, b1 = 1, b2 = -1)),
-                            wa = .SD[, ytd_water_balance]),
-      by = .(site)]
-
-train[,
-      esy_intercept := attr(quad_prime(mod = robustbase::nlrob(wl_initial_cm ~ quad(ytd_water_balance, 
-                                                                                    b0 = b0, b1 = b1, b2 = b2),
-                                                               data = .SD[1:which.min(wl_initial_cm)], 
-                                                               na.action = na.exclude,
-                                                               maxit = 50,
-                                                               start = list(b0 = 8, b1 = 1, b2 = -1)),
-                                       wa = .SD[, ytd_water_balance]),
-                            "intercept"),
+      c("esy_emp",
+        "esy_x_intercept") := {
+          
+          mod <- 
+            robustbase::nlrob(wl_initial_cm ~ quad(ytd_water_balance, 
+                                                   b0 = b0, b1 = b1, b2 = b2),
+                              data = .SD[1:which.min(wl_initial_cm)], 
+                              na.action = na.exclude,
+                              maxit = 50,
+                              start = list(b0 = 8, b1 = 1, b2 = -1))
+            
+          list(esy_emp = quad_prime(mod = mod, wa = .SD[, ytd_water_balance]),
+               esy_x_intercept = quad_x_intercept(mod))
+          
+          },
       by = .(site)]
 
 train[, hydro_period := rep(c("drawdown", "rebound"), 
@@ -268,6 +265,9 @@ ggplot(train[hydro_period == "drawdown"],
 
 
 # Calculate ESy Functions -------------------------------------------------
+# Could potentially be improved by also looking at water balance. Something like
+# a 'ghost' water level measurement that doesn't recover until water
+# availability increases
 
 esy_form <- 
   bf(esy_emp ~ a - (a - b) * exp (c * wl_initial_cm),
@@ -294,12 +294,12 @@ esy_a <-
   esy_coefs[str_detect(rownames(esy_coefs), "a_"), "Estimate"] %>% 
   set_names(~str_extract(., "[0-9]{3}"))
 
-esy_c <- 
-  esy_coefs[str_detect(rownames(esy_coefs), "c_"), "Estimate"] %>% 
-  set_names(~str_extract(., "[0-9]{3}"))
-
 esy_b <- 
   esy_coefs[str_detect(rownames(esy_coefs), "b_"), "Estimate"] %>% 
+  set_names(~str_extract(., "[0-9]{3}"))
+
+esy_c <- 
+  esy_coefs[str_detect(rownames(esy_coefs), "c_"), "Estimate"] %>% 
   set_names(~str_extract(., "[0-9]{3}"))
 
 train[, `:=`(a = esy_a[[.BY[[1]]]],
@@ -309,10 +309,12 @@ train[, `:=`(a = esy_a[[.BY[[1]]]],
 
 train[, esy_hat := a - (a - b) * exp (c * wl_initial_cm)]
 
-esy_fun <- 
-  train[, .(pred_fun = list(as.function(list(wl = NULL,
-                                        bquote(.(a) - (.(a) - .(b)) * exp (.(c) * wl),
-                                               where = .SD[1, .(a, b, c)]))))), 
+esy_functions <- 
+  train[, .(pred_fun = list(as.function(list(wl = NULL, min.esy = NULL,
+                                        bquote(pmin(min.esy,
+                                                    .(a) - (.(a) - .(b)) * exp (.(c) * wl)),
+                                               where = .SD[1, .(a, b, c)])))),
+            max_wl = density(na.omit(wl_initial_cm))$x[which.max(density(na.omit(wl_initial_cm))$y)]), 
         by = .(site)]
 
 # 119 isn't great (has an early peak in spring). Could also work to identify 
@@ -322,15 +324,9 @@ ggplot(train[hydro_period == "drawdown"],
            y = esy_emp)) +
   geom_point(aes(color = site)) +
   geom_line(aes(y = esy_hat)) +
+  geom_vline(data = esy_fun,
+             aes(xintercept = max_wl)) +
   facet_wrap(~site)
-
-
-
-
-
-
-
-
 
 
 
