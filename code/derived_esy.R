@@ -13,6 +13,28 @@ quad <-
     b0 + b1*wa + b2*wa^2
   }
 
+# No convergence for 113, 119, 139. Initial looks make it seem like a better fit
+# for the drawdown curve, so it should be used
+quad_cp <- 
+  function(wa, b0, cp, b2){
+    b0 + (wa <= cp) * b2*(wa + cp)^2
+  }
+
+quad_prime_cp <- 
+  function(mod = NULL, wa, cp, b2){
+    if(!is.null(mod)){
+      cp <- coef(mod)[["cp"]]
+      b2 <- coef(mod)[["b2"]]
+    }
+    
+    (wa <= cp) * b2 * 2 * (wa + cp)
+  }
+
+quad_x_intercept_cp <- 
+  function(mod = NULL, cp, b2){
+    
+  }
+
 quad_prime <- 
   function(mod = NULL, wa, b1, b2){
     if(!is.null(mod)){
