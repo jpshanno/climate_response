@@ -50,127 +50,163 @@ quad_prime <-
     grads
   }
 
+quad_x_intercept <- 
+  function(mod = NULL, b1, b2){
+    if(!is.null(mod)){
+      b1 <- coef(mod)[["b1"]]
+      b2 <- coef(mod)[["b2"]]
+    }
+    
+    -b1 / (b2 * 2)
+  }
+
+wetland_model <- 
+  function(data, params){
+    MPET <-
+      params[["MPET"]]
+    
+    MP <- 
+      params[["MP"]]
+    
+    MM <-
+      params[["MM"]]
+    
+    MQ <-
+      params[["MQ"]]
+    
+    minESY <- 
+      params[["minESY"]]
+    
+    # MG <- 
+    #   params[["MG"]]
+    
+    phiM <- 
+      params[["phiM"]]
+    
+    phiP <- 
+      params[["phiP"]]
+    
+    maxWL <- 
+      params[["maxWL"]]
+    
+    esy_fun <- 
+      params[["minESY"]]
+    
+    PET <- data$pet_cm
+    P <- as.numeric(filter(data$rain_cm, filter = phiP, method = "rec", sides = 1))
+    M <- as.numeric(filter(data$melt_cm, filter = phiM, method = "rec", sides = 1))
+    WL <- data$wl_initial_cm
+    
+    
+    n <- 
+      length(PET)
+    
+    # Create empty vectors
+    wl_hat <- 
+      gradient <- 
+      q_hat <- 
+      m_hat <- 
+      p_hat <- 
+      pet_hat <- 
+      g_hat <- 
+      numeric(n)
+    
+    # Initialize model at full water level
+    wl_hat[1] <- 
+      maxWL
+    
+    # Loop through weather data
+    for(t in 2:n){
+      
+      # Calculate gradient2 of drawdown 
+      gradient[t] <- 
+        esy_fun(wl_hat[t-1], minESY)
+      
+      # Use net input to determine if water level increases or decreases
+      if((P[t] + PET[t]) <= 0){
+        
+        # Water level drawdown = PET2, if P2 <= PET2 then it can be assumed to be
+        # less than interception (not necessarily true, but works as a 
+        # simplifying assumption)
+        pet_hat[t] <- 
+          (MPET * PET[t]) * gradient[t]
+        
+        wl_hat[t] <-
+          wl_hat[t-1] + pet_hat[t]
+        
+      } else {
+        
+        # Water rise is P2 - PET2, which fits better, but need to rethink my
+        # justification for this
+        p_hat[t] <- 
+          (MP * P[t]) * gradient[t]
+        
+        wl_hat[t] <-
+          wl_hat[t-1] + p_hat[t]
+        
+      }
+      
+      # # Add in G
+      # if(P[t-1] + PET[t-1] > 0){
+      #   wl_hat[t] <- 
+      #     wl_hat[t] + MG * P[t-1]
+      # }
+      
+      
+      # Directly add melt to water level. This should probably have some sort of
+      # multiplier
+      
+      m_hat[t] <- 
+        MM * M[t] * gradient[t]
+      
+      wl_hat[t] <-
+        wl_hat[t] + m_hat
+      
+      # If WL is above spill point threshold then lose some to streamflow. 
+      # This could probably be improved using the morphology models to determine
+      # streamflow
+      
+      if(wl_hat[t-1] > maxWL){
+        
+        q_hat[t] <-
+          MQ * (wl_hat[t-1] - maxWL)
+        
+        q_hat[t] <- 
+          pmin(q_hat[t], wl_hat[t] - maxWL)
+        
+        wl_hat[t] <-
+          wl_hat[t] - q_hat[t]
+      }
+      
+    }
+    data.table::data.table(wl_hat, q_hat, m_hat, p_hat, pet_hat)
+  }
+
 optimize_params <- 
-  function(par, fixed = NULL, ...){
+  function(data, par, fixed = NULL, ...){
     opt <- optim(par = par,
                  fixed = fixed,
                  ...,
                  control = list(fnscale = -1, 
                                 maxit = 2000),
                  fn = 
-                   function(params, fixed = NULL){
+                   function(params, fixed = NULL, data = data){
                      
                      params <- 
                        c(params, fixed)
                      
-                     MPET <-
-                       params[["MPET"]]
-                     
-                     MP <- 
-                       params[["MP"]]
-                     
-                     MM <-
-                       params[["MM"]]
-                     
-                     MQ <-
-                       params[["MQ"]]
-                     
-                     ESY <- 
-                       params[["ESY"]]
-                     
-                     # MG <- 
-                     #   params[["MG"]]
-                     
-                     phiM <- 
-                       params[["phiM"]]
-                     
-                     phiP <- 
-                       params[["phiP"]]
-                     
-                     PET <- param_train$pet_cm
-                     P <- as.numeric(filter(param_train$rain_cm, filter = phiP, method = "rec", sides = 1))
-                     M <- as.numeric(filter(param_train$melt_cm, filter = phiM, method = "rec", sides = 1))
-                     WL <- param_train$wl_initial_cm
-                     
-                     
-                     n <- 
-                       length(PET)
-                     
-                     # Create empty vectors
                      wl_hat <- 
-                       gradient <- 
-                       q_hat <- 
-                       g_hat <- 
-                       numeric(n)
-                     
-                     # Initialize model at full water level
-                     wl_hat[1] <- 
-                       max.wl
-                     
-                     # Loop through weather data
-                     for(t in 2:n){
-                       
-                       # Calculate gradient2 of drawdown 
-                       gradient[t] <- 
-                         esy_fun(wl_hat[t-1], ESY)
-                       
-                       # Use net input to determine if water level increases or decreases
-                       if((P[t] + PET[t]) <= 0){
-                         
-                         # Water level drawdown = PET2, if P2 <= PET2 then it can be assumed to be
-                         # less than interception (not necessarily true, but works as a 
-                         # simplifying assumption)
-                         wl_hat[t] <-
-                           wl_hat[t-1] + (MPET * PET[t]) * gradient[t]
-                         
-                       } else {
-                         
-                         # Water rise is P2 - PET2, which fits better, but need to rethink my
-                         # justification for this
-                         wl_hat[t] <-
-                           wl_hat[t-1] + (MP * P[t]) * gradient[t]
-                         
-                       }
-                       
-                       # # Add in G
-                       # if(P[t-1] + PET[t-1] > 0){
-                       #   wl_hat[t] <- 
-                       #     wl_hat[t] + MG * P[t-1]
-                       # }
-                       
-                       
-                       # Directly add melt to water level. This should probably have some sort of
-                       # multiplier
-                       wl_hat[t] <-
-                         wl_hat[t] + MM * M[t] * gradient[t]
-                       
-                       # If WL is above spill point threshold then lose some to streamflow. 
-                       # This could probably be improved using the morphology models to determine
-                       # streamflow
-                       
-                       if(wl_hat[t-1] > max.wl){
-                         
-                         q_hat[t] <-
-                           MQ * (wl_hat[t-1] - max.wl)
-                         
-                         q_hat[t] <- 
-                           pmin(q_hat[t], wl_hat[t] - max.wl)
-                         
-                         wl_hat[t] <-
-                           wl_hat[t] - q_hat[t]
-                       }
-                       
-                     }
+                       wetland_model(data, params)$wl_hat
                      
                      resids <- 
-                       (wl_hat - WL)[!is.na(WL)]
+                       (wl_hat - data$wl_initial_cm)[!is.na(data$wl_initial_cm)]
                      
                      # -sum(dnorm(resids, 
                      #            mean = 0,
                      #            sd = sd(resids),
                      #            log = TRUE))
                      
-                     hydroGOF::md(wl_hat[!is.na(WL)], WL[!is.na(WL)])
+                     hydroGOF::md(wl_hat[!is.na(data$wl_initial_cm)], data$wl_initial_cm[!is.na(data$wl_initial_cm)])
                    })
     
     opt$par <- c(opt$par, unlist(fixed))
