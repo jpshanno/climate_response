@@ -236,7 +236,7 @@ kenton <-
   external_met[station_name == "kenton"]
 
 
-train <- 
+kenton <- 
   kenton[water_year %in% 2012:2019 & format(sample_date, "%m%d") != "0229",
          .(sample_date, 
            water_year,
@@ -249,27 +249,27 @@ train <-
            tmean_c)
   ]
 
-train[between(melt_cm, 0, 0.1) & month(sample_date) %in% 6:9, 
+kenton[between(melt_cm, 0, 0.1) & month(sample_date) %in% 6:9, 
       `:=`(total_input_cm = total_input_cm - melt_cm,
            melt_cm = 0)]
 
 # Drop anomalous pet
-train[tmax_c <= 0,
+kenton[tmax_c <= 0,
       pet_cm := 0]
 
 # Calculate YTD after dropping above points
-train[, 
+kenton[, 
       `:=`(ytd_pet_cm = cumsum(pet_cm),
            ytd_p_cm = cumsum(rain_cm),
            ytd_m_cm = cumsum(melt_cm),
            ytd_input_cm = cumsum(rain_cm + melt_cm)),
       by = .(water_year)]
 
-train[, ytd_water_balance := ytd_pet_cm + ytd_p_cm + ytd_m_cm]
-train[, dWB := c(0, diff(ytd_water_balance))]
+kenton[, ytd_water_balance := ytd_pet_cm + ytd_p_cm + ytd_m_cm]
+kenton[, dWB := c(0, diff(ytd_water_balance))]
 
 train <-
-  train[water_year == 2012][
+  kenton[water_year == 2012][
     water_budget[, .(site, sample_date, wl_initial_cm)],
     on = "sample_date",
     nomatch = NULL
@@ -304,6 +304,20 @@ ggplot(train[hydro_period == "drawdown"],
   geom_point()
 
 
+# NEED MODELS FOR SITES WITHOUT 2012 DATA
+# CHECK FOR TREATEMENT SITES LISTED AS CONTORL IN 2014
+
+test <- 
+  kenton[CJ(site = unique(train$site),
+            sample_date = kenton$sample_date),
+         on = "sample_date"]
+
+test[water_budget,
+     `:=`(site_status = i.site_status,
+          wl_initial_cm = wl_initial_cm,
+          best_precip_cm = best_precip_cm,
+          idw_precip_cm = idw_precip_cm),
+     on = c("site", "sample_date")]  
 
 
 # Calculate ESy Functions -------------------------------------------------
@@ -327,7 +341,8 @@ brm_esy <-
       prior = esy_priors,
       family = student,
       cores = 4,
-      data = train[hydro_period == "drawdown"])
+      save_model = "output/models/esy_model.stan", 
+      data = train[hydro_period == "drawdown" & !is.na(wl_initial_cm)])
 
 esy_coefs <- 
   fixef(brm_esy)
@@ -353,11 +368,11 @@ train[, esy_hat := a - (a - b) * exp (c * wl_initial_cm)]
 
 esy_functions <- 
   train[, .(pred_fun = list(as.function(list(wl = NULL, min.esy = NULL,
-                                        bquote(pmin(min.esy,
+                                        bquote(pmax(min.esy,
                                                     .(a) - (.(a) - .(b)) * exp (.(c) * wl)),
                                                where = .SD[1, .(a, b, c)])))),
             max_wl = density(na.omit(wl_initial_cm))$x[which.max(density(na.omit(wl_initial_cm))$y)]), 
-        by = .(site)]
+        keyby = .(site)]
 
 # 119 isn't great (has an early peak in spring). Could also work to identify 
 # better local min(wl_initial_)
@@ -366,38 +381,186 @@ ggplot(train[hydro_period == "drawdown"],
            y = esy_emp)) +
   geom_point(aes(color = site)) +
   geom_line(aes(y = esy_hat)) +
-  geom_vline(data = esy_fun,
+  geom_vline(data = esy_functions,
              aes(xintercept = max_wl)) +
   facet_wrap(~site)
 
 
 
+# Optimize Control Period Parameters --------------------------------------
+
+optim_res <- 
+  train[, .(res = 
+              list(optimize_params(
+                data = .SD, 
+                par = list(MPET = 1,
+                           MP = 1.5,
+                           MM = 1,
+                           MQ = 0.5,
+                           minESY = 1,
+                           phiM = 0.9,
+                           phiP = 0.5),
+                fixed = list(maxWL = esy_functions[.BY[[1]], max_wl],
+                             funESY = esy_functions[.BY[[1]], pred_fun[[1]]]),
+                method = "L-BFGS-B",
+                lower = list(MPET = 0, 
+                             MP = 0, 
+                             MM = 0, 
+                             MQ = 0, 
+                             minESY = 0, 
+                             phiM = 0, 
+                             phiP = 0),
+                upper = list(MPET = Inf, 
+                             MP = Inf, 
+                             MM = Inf, 
+                             minESY = Inf, 
+                             phiM = 0.9, 
+                             MQ = 0.9, 
+                             phiP = 0.9)))),
+keyby = .(site)]
 
 
+optim_res[, modified_index_of_aggreement := map(res, pluck, "value")]
+optim_res[, params := map(res, pluck, "par")]
+optim_res[, names(optim_res$res[[1]]$par) := map_dfr(res, ~ as.data.table(.x[["par"]]))]
+
+train <- 
+  train[, cbind(.SD, wetland_model(.SD, optim_res[.BY[[1]], params[[1]]])),
+      by = .(site)]
+
+ggplot(train,
+       aes(x = sample_date)) +
+  geom_line(aes(y = wl_initial_cm,
+                color = "Observed",
+                linetype = "Observed")) +
+  geom_line(aes(y = wl_hat,
+                color = "Modeled",
+                linetype = "Modeled")) +
+  geom_text(data = optim_res,
+             aes(x = as.Date("2012-04-01"),
+                 y = maxWL,
+                 label = sprintf("md: %1.2f", modified_index_of_aggreement)),
+             vjust = 2,
+             hjust = -0.1) +
+  scale_color_manual(name = "legend",
+                     values = c(Observed = "gray40",
+                                Modeled = "black")) +
+  scale_linetype_manual(name = "legend",
+                        values = c(Observed = "dashed",
+                                   Modeled = "solid")) +
+  ylab("Water Level (cm)") +
+  theme_classic() +
+  theme(panel.grid.major.y = element_line(),
+        legend.position = "top",
+        axis.title.x = element_blank(),
+        legend.title = element_blank()) +
+  facet_wrap(~site,
+             scales = "free")
+
+ggplot(train,
+       aes(x = sample_date)) +
+  geom_col(aes(y = m_hat + p_hat,
+               fill = "Precip")) +
+  geom_col(aes(y = pet_hat - q_hat,
+               fill = "Streamflow")) +
+  geom_col(aes(y = pet_hat,
+               fill = "ET")) +
+  geom_col(aes(y = m_hat,
+               fill = "Melt")) +
+  scale_fill_manual(breaks = c("Precip", "Melt", "ET", "Streamflow"),
+                    values = c(Precip = "#7aa49f", 
+                               Melt = "#207972",
+                               ET = "#bc956e",
+                               Streamflow = "#a47138")) +
+  ylab("Change in Water Level (cm)") +
+  xlab(NULL) +
+  guides(fill = guide_legend(title = "Contributing Source", ncol = 2)) +
+  theme_classic() +
+  theme(panel.grid.major.y = element_line(),
+        legend.position = c(0.95, 0.05),
+        legend.justification = c(1, 0)) +
+  facet_wrap(~site,
+             scales = "free")
+
+# Test Models -------------------------------------------------------------
+
+test <- 
+  test[, cbind(.SD, wetland_model(.SD, optim_res[.BY[[1]], params[[1]]])),
+       by = .(site)]
 
 
-SITE <- 
-  "135"
+ggplot(test[water_year == 2013],
+       aes(x = sample_date)) +
+  geom_line(aes(y = wl_initial_cm,
+                color = "Observed",
+                linetype = "Observed")) +
+  geom_line(aes(y = wl_hat,
+                color = "Modeled",
+                linetype = "Modeled")) +
+  scale_color_manual(values = c(Observed = "gray40",
+                                Modeled = "black")) +
+  scale_linetype_manual(values = c(Observed = "dashed",
+                                   Modeled = "solid")) +
+  ylab("Water Level (cm)") +
+  theme_classic() +
+  theme(panel.grid.major.y = element_line(),
+        legend.position = "top",
+        axis.title.x = element_blank(),
+        legend.title = element_blank()) +
+  facet_wrap(~site,
+             scales = "free")
 
+ggplot(test,
+       aes(x = sample_date)) +
+  geom_line(aes(y = wl_initial_cm,
+                color = "Observed",
+                linetype = "Observed")) +
+  geom_line(aes(y = wl_hat,
+                color = "Modeled",
+                linetype = "Modeled")) +
+  scale_color_manual(values = c(Observed = "gray40",
+                                Modeled = "black")) +
+  scale_linetype_manual(values = c(Observed = "dashed",
+                                   Modeled = "solid")) +
+  ylab("Water Level (cm)") +
+  theme_classic() +
+  theme(panel.grid.major.y = element_line(),
+        legend.position = "top",
+        axis.title.x = element_blank(),
+        legend.title = element_blank()) +
+  facet_wrap(~site,
+             scales = "free")
 
+metrics_control <- 
+  test[!is.na(wl_initial_cm) & site_status == "Control",
+       data.table(t(hydroGOF::gof(wl_hat, wl_initial_cm))),
+       by = .(site, water_year)]
 
-dat <-
-  kenton[water_year %in% 2012:2019 & format(sample_date, "%m%d") != "0229",
-         .(sample_date,
-           water_year,
-           pet_cm = -pet_cm,
-           rain_cm,
-           melt_cm,
-           total_input_cm,
-           tmax_c,
-           tmin_c,
-           tmean_c)
-  ][water_budget[site == SITE],
-    `:=`(site = i.site,
-         best_precip_cm = i.best_precip_cm,
-         idw_precip_cm = i.idw_precip_cm,
-         wl_initial_cm = i.wl_initial_cm),
-    on = "sample_date"]
+ggplot(test[water_year == 2013],
+       aes(x = sample_date)) +
+  geom_col(aes(y = m_hat + p_hat,
+               fill = "Precip")) +
+  geom_col(aes(y = pet_hat - q_hat,
+               fill = "Streamflow")) +
+  geom_col(aes(y = pet_hat,
+               fill = "ET")) +
+  geom_col(aes(y = m_hat,
+               fill = "Melt")) +
+  scale_fill_manual(breaks = c("Precip", "Melt", "ET", "Streamflow"),
+                    values = c(Precip = "#7aa49f", 
+                               Melt = "#207972",
+                               ET = "#bc956e",
+                               Streamflow = "#a47138")) +
+  ylab("Change in Water Level (cm)") +
+  xlab(NULL) +
+  guides(fill = guide_legend(title = "Contributing Source", ncol = 2)) +
+  theme_classic() +
+  theme(panel.grid.major.y = element_line(),
+        legend.position = c(0.95, 0.05),
+        legend.justification = c(1, 0)) +
+  facet_wrap(~site,
+             scales = "free")
+
 
 dat[, site := unique(na.omit(site))]
 
