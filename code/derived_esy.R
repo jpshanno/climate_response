@@ -89,8 +89,14 @@ wetland_model <-
     maxWL <- 
       params[["maxWL"]]
     
-    esy_fun <- 
-      params[["minESY"]]
+    if(inherits(params[["funESY"]], "list")){
+      esy_fun <- 
+        params[["funESY"]][[1]]
+            
+    } else {
+      esy_fun <- 
+        params[["funESY"]]
+    }
     
     PET <- data$pet_cm
     P <- as.numeric(filter(data$rain_cm, filter = phiP, method = "rec", sides = 1))
@@ -160,7 +166,7 @@ wetland_model <-
         MM * M[t] * gradient[t]
       
       wl_hat[t] <-
-        wl_hat[t] + m_hat
+        wl_hat[t] + m_hat[t]
       
       # If WL is above spill point threshold then lose some to streamflow. 
       # This could probably be improved using the morphology models to determine
@@ -190,13 +196,13 @@ optimize_params <-
                  control = list(fnscale = -1, 
                                 maxit = 2000),
                  fn = 
-                   function(params, fixed = NULL, data = data){
+                   function(params, fixed = NULL){
                      
                      params <- 
                        c(params, fixed)
                      
                      wl_hat <- 
-                       wetland_model(data, params)$wl_hat
+                       wetland_model(data = data, params)$wl_hat
                      
                      resids <- 
                        (wl_hat - data$wl_initial_cm)[!is.na(data$wl_initial_cm)]
