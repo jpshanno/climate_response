@@ -560,3 +560,127 @@ ggplot(test[water_year == 2013],
         legend.justification = c(1, 0)) +
   facet_wrap(~site,
              scales = "free")
+
+# Fit Treatment Conditions ------------------------------------------------
+
+# This could be done in a different way that let's regrowth show up. Instead of
+# fitting a new MPET, I could fit a % of MPET variable to multiple years and 
+# see if it increases over time. Training the model on 2018 data, seems to 
+# overestimate the drawdown of immediate post-treatment periods (2014 & 2015)
+# indicating that I may be able to detect the increase in transpiration 
+# following vegetation regrowth
+
+test_treat <- 
+  test[site_status == "Treated"]
+
+ggplot(test_treat,
+       aes(x = sample_date,
+           y = wl_initial_cm,
+           color = factor(water_year))) +
+  geom_line() +
+  facet_wrap(~site,
+             scales = "free")
+
+# Not worth using water year for this optimization because it's only the last 
+# month of sample year 2017's data
+train_treat <- 
+  test_treat[water_year == 2014 & year(sample_date) == 2014]
+
+optim_treat <- 
+  train_treat[, .(res = 
+              list(optimize_params(
+                data = .SD, 
+                par = list(MPET = optim_res[.BY[[1]], MPET]),
+                fixed = list(MP = optim_res[.BY[[1]], MP],
+                             MM = optim_res[.BY[[1]], MM],
+                             MQ = optim_res[.BY[[1]], MQ],
+                             minESY = optim_res[.BY[[1]], minESY],
+                             phiM = optim_res[.BY[[1]], phiM],
+                             phiP = optim_res[.BY[[1]], phiP],
+                             maxWL = esy_functions[.BY[[1]], max_wl],
+                             funESY = esy_functions[.BY[[1]], pred_fun[[1]]]),
+                method = "L-BFGS-B",
+                lower = list(MPET = 0, 
+                             MP = 0, 
+                             MM = 0, 
+                             MQ = 0, 
+                             minESY = 0, 
+                             phiM = 0, 
+                             phiP = 0),
+                upper = list(MPET = Inf, 
+                             MP = Inf, 
+                             MM = Inf, 
+                             minESY = Inf, 
+                             phiM = 0.9, 
+                             MQ = 0.9, 
+                             phiP = 0.9)))),
+        keyby = .(site)]
+
+
+optim_treat[, modified_index_of_aggreement := map(res, pluck, "value")]
+optim_treat[, params := map(res, pluck, "par")]
+optim_treat[, names(optim_treat$res[[1]]$par) := map_dfr(res, ~ as.data.table(.x[["par"]]))]
+
+train_treat <- 
+  train_treat[, c("wl_hat", "q_hat", "m_hat", "p_hat", "pet_hat") := wetland_model(.SD, optim_treat[.BY[[1]], params[[1]]]),
+        by = .(site)]
+
+ggplot(train_treat,
+       aes(x = sample_date)) +
+  geom_line(aes(y = wl_initial_cm,
+                color = "Observed",
+                linetype = "Observed")) +
+  geom_line(aes(y = wl_hat,
+                color = "Modeled",
+                linetype = "Modeled")) +
+  geom_text(data = optim_treat,
+            aes(x = as.Date("2014-04-01"),
+                y = maxWL,
+                label = sprintf("md: %1.2f", modified_index_of_aggreement)),
+            vjust = 2,
+            hjust = -0.1) +
+  scale_color_manual(name = "legend",
+                     values = c(Observed = "gray40",
+                                Modeled = "black")) +
+  scale_linetype_manual(name = "legend",
+                        values = c(Observed = "dashed",
+                                   Modeled = "solid")) +
+  ylab("Water Level (cm)") +
+  theme_classic() +
+  theme(panel.grid.major.y = element_line(),
+        legend.position = "top",
+        axis.title.x = element_blank(),
+        legend.title = element_blank()) +
+  facet_wrap(~site,
+             scales = "free")
+
+
+# Test Treated Models -----------------------------------------------------
+
+test_treat <- 
+  test_treat[, c("wl_hat", "q_hat", "m_hat", "p_hat", "pet_hat") := wetland_model(.SD, optim_treat[.BY[[1]], params[[1]]]),
+       by = .(site)]
+
+
+ggplot(test_treat[water_year == 2015],
+       aes(x = sample_date)) +
+  geom_line(aes(y = wl_initial_cm,
+                color = "Observed",
+                linetype = "Observed")) +
+  geom_line(aes(y = wl_hat,
+                color = "Modeled",
+                linetype = "Modeled")) +
+  scale_color_manual(name = "legend",
+                     values = c(Observed = "gray40",
+                                Modeled = "black")) +
+  scale_linetype_manual(name = "legend",
+                        values = c(Observed = "dashed",
+                                   Modeled = "solid")) +
+  ylab("Water Level (cm)") +
+  theme_classic() +
+  theme(panel.grid.major.y = element_line(),
+        legend.position = "top",
+        axis.title.x = element_blank(),
+        legend.title = element_blank()) +
+  facet_wrap(~site,
+             scales = "free")
