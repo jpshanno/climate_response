@@ -448,7 +448,7 @@ ggplot(train,
   geom_text(data = optim_res,
              aes(x = as.Date("2012-04-01"),
                  y = maxWL,
-                 label = sprintf("md: %1.2f", modified_index_of_aggreement)),
+                 label = sprintf("md: %1.2f", modified_index_of_agreement)),
              vjust = 2,
              hjust = -0.1) +
   scale_color_manual(name = "legend",
@@ -595,7 +595,7 @@ ggplot(test_treat,
 # Not worth using water year for this optimization because it's only the last 
 # month of the sample year 2014's data
 train_treat <- 
-  test_treat[water_year == 2014 & year(sample_date) == 2014]
+  test_treat[water_year %in% c(2014)]
 
 optim_treat <- 
   train_treat[, .(res = 
@@ -673,7 +673,7 @@ test_treat <-
        by = .(site)]
 
 
-ggplot(test_treat[water_year == 2015],
+ggplot(test_treat[water_year == 2018],
        aes(x = sample_date)) +
   geom_line(aes(y = wl_initial_cm,
                 color = "Observed",

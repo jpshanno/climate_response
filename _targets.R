@@ -41,8 +41,8 @@ targets <- list(
                                lat = 46.43133),
                     radius = 100,
                     start.date = as.Date("2005-11-01"),
-                    end.date = as.Date("2020-10-30"),
-                    force.download = FALSE),
+                    end.date = as.Date("2020-10-31"),
+                    force.download = TRUE),
     format = "file"
   )
   
@@ -52,7 +52,7 @@ targets <- list(
     mesowest_met,
     prepare_mesowest_data(dir = mesowest_dir, 
                           start.date = as.Date("2011-11-01"),
-                          end.date = as.Date("2020-10-30"))
+                          end.date = as.Date("2020-10-31"))
   )
   
   , tar_target(
@@ -88,24 +88,67 @@ targets <- list(
   , tar_target(
     water_budget,
     prepare_water_levels(path = study_path("well_levels", study_data_paths)) %>% 
+      subset(site != "006") %>% 
       append_study_precip(precip.path = study_path("precip", study_data_paths)) %>% 
       merge_external_met(external.met = external_met)
   )
   
   # Split Data --------------------------------------------------------------
+  # Training data for the control period for each site comes from the first 
+  # availabile year of data. For most sites this is 2012 (which is ideal because
+  # it has the largest drawdown period, which means it provides the best data
+  # for ESy models). For treatment data just choosing the first post-treatment
+  # year
+  
+  , tar_target(
+    training_data,
+    list(control = select_training_data(water_budget),
+         treated = water_budget[water_budget[!is.na(wl_initial_cm) & site_status == "Treated", 
+                                .(training_year = min(water_year)),
+                                by = .(site)],
+                                on = c("site", water_year = "training_year")]),
+    format = "rds"
+  )
+  
 
-  # , tar_target(
-  #   validation_data,
-  #   select_validation_data(data = water_budget,
-  #                           n.in.group = 1,
-  #                           groups = c("site", "site_status"))
-  # )
-  # 
-  # , tar_target(
-  #   training_data,
-  #   water_budget[!validation_data]
-  # )  
+  # Train Wetland Models ----------------------------------------------------
 
+  , tar_target(
+    esy_functions,
+    build_esy_functions(training_data[["control"]]),
+    format = "rds"
+  )
+  
+  , tar_target(
+    control_optimization,
+    fit_models(training_data[["control"]],
+               esy_functions,
+               par = list(MPET = 1,
+                          MP = 1.5,
+                          MM = 1,
+                          MQ = 0.5,
+                          minESY = 1,
+                          phiM = 0.9,
+                          phiP = 0.5)),
+    format = "rds"
+  )
+  
+  , tar_target(
+    treated_optimization,
+    refit_model(training_data[["treated"]],
+                control_optimization,
+                refit = list(MPET = 1)),
+    format = "rds"
+  )
+  
+  , tar_target(
+    model_params,
+    setkey(rbind(control_optimization[, .(site, site_status = "Control", params)],
+                 treated_optimization[, .(site, site_status = "Treated", params)]),
+           site, site_status)[],
+    format = "rds"
+  )
+ 
   # Build Water Level Models ------------------------------------------------
 
   # Make priors
