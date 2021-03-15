@@ -13,7 +13,7 @@ calculate_hargreaves_pet <-
     # 0.16 from precedeing paragraph)
     # Eq 3 from Hargreaves & Allen (2003), using Rs as calculated from 
     # Bristow-Campbell.
-    data[, pet_cm := 0.1 * 0.0135 * solrad_MJ_m2 / lambda.MJ.kg * (tmean_c + 17.8)][]
+    data[, pet_cm := pmax(0, 0.1 * 0.0135 * solrad_MJ_m2 / lambda.MJ.kg * (tmean_c + 17.8))][]
     
   }
 
@@ -28,7 +28,12 @@ calculate_hargreaves_pet <-
 ##' @export
 calculate_solar_radiation <- 
   function(data,
-           coefs) {
+           coefs,
+           stop.on.error = TRUE,
+           return.vector = TRUE) {
+    
+    data <- 
+      copy(data)
     
     # Calculate daily external solar radiation by DOY & lat to avoid duplicate 
     # calculations in met data
@@ -76,7 +81,7 @@ calculate_solar_radiation <-
       data[, bc_tmin := nafill(bc_tmin, "locf")]
       
       # If all errors are not explained by bc_tmin > tmax_c then throw an error
-      if(!data[is.na(solrad_MJ_m2), all(bc_tmin > tmax_c)]){
+      if(stop.on.error & !data[is.na(solrad_MJ_m2), all(bc_tmin > tmax_c)]){
         stop("There are unexplained NA values from solar radiation calculation 
              using bc().")
       }
@@ -96,11 +101,17 @@ calculate_solar_radiation <-
       data[, bc_tmin := NULL]
     }
 
+    if(return.vector){
+      return(data$solrad_MJ_m2)
+    }
+    
     if(!has_doy){
       data[, doy := NULL]
     }
     
     data[, et_solrad_MJ_m2 := NULL]
+    
+    
     
   }
 
@@ -201,7 +212,7 @@ calculate_water_availability <-
          by = .(station_name)]
     
     data[, ytd_water_availability_cm := (water_availability_cm - first(water_availability_cm)) - max(water_availability_cm - first(water_availability_cm)),
-         by = .(station_name, sample_year)]
+         by = .(station_name, water_year)]
 
     data    
   }
