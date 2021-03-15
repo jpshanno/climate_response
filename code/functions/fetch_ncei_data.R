@@ -18,13 +18,23 @@ fetch_ncei_data <-
     datasets <- 
       c("hpdn", "ghcnd")
     
+    base_url <- 
+      "https://www.ncei.noaa.gov/data/coop-hourly-precipitation/v2/station-inventory/"
+      
+    hpd_inventory_url <- 
+      xml2::read_html(base_url) %>% 
+      rvest::html_nodes("a") %>% 
+      map_chr(rvest::html_attr, "href") %>% 
+      keep(~str_detect(.x, "^HPD")) %>% 
+      paste0(base_url, .)
+    
     dat <- 
       data.table(dataset = datasets,
                  out_path = file.path(out.path, 
                                       datasets),
                  readme_url = c("https://www.ncei.noaa.gov/data/coop-hourly-precipitation/v2/doc/readme.csv.txt",
                                 "https://www1.ncdc.noaa.gov/pub/data/ghcn/daily/readme.txt"),
-                 inventory_url = c("https://www.ncei.noaa.gov/data/coop-hourly-precipitation/v2/station-inventory/HPD_v02r02_stationinv_c20210126.csv",
+                 inventory_url = c(hpd_inventory_url,
                                    "https://www1.ncdc.noaa.gov/pub/data/ghcn/daily/ghcnd-stations.txt"),
                  citation_text = c(paste0("Hourly Precipitation Data (HPD) Network, Version 2.r2, NOAA National Centers for Environmental Information. ",
                                           Sys.Date(), "."),
@@ -99,8 +109,18 @@ fetch_ncei_data <-
     # Download any missing files
     if(sum(missing_hpdn_files) > 0){
       download.file(selected_stations$hpdn_url[missing_hpdn_files],
-                    selected_stations$hpdn_file[missing_hpdn_files])
+                    selected_stations$hpdn_file[missing_hpdn_files],
+                    method = "libcurl")
     }
+    
+    # Some HPD files (Kenton) have errors with an extra field from an extra 
+    # column. This system call with take care of those
+    
+    system(
+      paste0("for i in $(ls ",
+            dat["hpdn", out_path],
+            "/*.csv); do if [[ $(awk -F ',' ' {if(NF>131) { print NR}} ' ${i} | wc -l) -ne 0 ]]; then sed -i 's/,,,/,,/g' ${i} ; fi; done"))
+    
     
     # Download GHCND Data -----------------------------------------------------
     # Not all HPD sites have GHCND data
@@ -112,10 +132,12 @@ fetch_ncei_data <-
                    col.names = c("ID", "LAT", "LON", "ELEV", "ST", "NAME","GSN", "HCN", "WMOID"),
                    comment.char="")
     
-    # Find sites withouth GHCND data
+    # Find & remove sites without GHCND data
     selected_stations[, has_ghcnd := ifelse(StnID %in% ghcnd_stations$ID,
                                             TRUE,
                                             FALSE)]
+    
+      selected_stations[(has_ghcnd)]
     
     # Create the ghcnd url
     # These are available as CSVs too, which are daily rows (much tidier than .dly)
@@ -144,9 +166,12 @@ fetch_ncei_data <-
       # cannot open URL 'ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/daily/all/USC00476939.dly': FTP status was '530 Not logged in'
       # for(i in selected_stations[(has_ghcnd) & missing_ghcnd_files, station_name]){
       download.file(selected_stations$ghcnd_url[missing_ghcnd_files],
-                    selected_stations$ghcnd_file[missing_ghcnd_files])
+                    selected_stations$ghcnd_file[missing_ghcnd_files],
+                    method = "libcurl")
       # }
     }
+    
+    
 
     list.files(out.path,
                pattern = "(csv|dly)$",
