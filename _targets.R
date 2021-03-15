@@ -71,16 +71,17 @@ targets <- list(
     external_met,
     prepare_ncei_data(path = ncei_files,
                       start.date = as.Date("2005-11-01"),
-                      end.date = as.Date("2020-10-30"),
+                      end.date = as.Date("2020-10-31"),
                       ghcnd.units = ghcnd_units) %>%
       fill_missing_data(additional.data = mesowest_met,
                         source = "ncei") %>%
       calculate_mean_temp() %>% 
-      calculate_solar_radiation(coefs = solrad_coefs[station_name == "PIEM4"]) %>% 
+      calculate_solar_radiation(coefs = solrad_coefs[station_name == "PIEM4"],
+                                return.vector = FALSE) %>% 
       calculate_hargreaves_pet(lambda.MJ.kg = 2.45) %>% 
-      calculate_water_availability() %>% 
-      subset(!(station_name %in% c("ironwood", "alberta_ford_for_center"))) %>% 
-      calculate_snowmelt()
+      subset(!(station_name %in% c("ironwood", "alberta_ford_for_center", "stambaugh_sse"))) %>% 
+      calculate_snowmelt() %>% 
+      calculate_water_availability()
   )
   
   # Prepare Water Budget Data ---------------------------------------------

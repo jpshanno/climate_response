@@ -40,20 +40,20 @@ prepare_water_levels <-
   site_info <- 
     fread(text = 
             "site,lon,lat,study,treatment,treatment_date,morphology
-             006,-89.19036,46.32392,planting,Girdle,2014-03-31,flowthrough
-             009,-89.71207,46.41624,eco,Ash Cut,2014-03-31,threshold
-             053,-89.53043,46.61028,pws,Ash Cut,2015-03-31,flowthrough
-             077,-88.86684,46.71778,eco,Ash Cut,2014-03-31,threshold
-             111,-89.71369,46.57636,planting,Control,2014-03-31,threshold
-             113,-89.80990,46.35090,pws,Control,2015-03-31,flowthrough
-             119,-89.59433,46.28794,eco,Girdle,2014-03-31,closed
-             135,-88.87838,46.75382,eco,Control,2014-03-31,flowthrough
-             139,-88.95577,46.59619,planting,Ash Cut,2014-03-31,threshold
-             140,-89.61962,46.43279,eco,Girdle,2014-03-31,flowthrough
-             151,-88.89502,46.67307,eco,Girdle,2014-03-31,threshold
-             152,-89.71468,46.41277,eco,Control,2014-03-31,flowthrough
-             156,-89.58431,46.28327,eco,Ash Cut,2014-03-31,closed
-             157,-89.58479,46.28173,eco,Control,2014-03-31,threshold",
+             006,-89.19036,46.32392,planting,Girdle,2013-11-01,flowthrough
+             009,-89.71207,46.41624,eco,Ash Cut,2013-11-01,threshold
+             053,-89.53043,46.61028,pws,Ash Cut,2014-11-01,flowthrough
+             077,-88.86684,46.71778,eco,Ash Cut,2013-11-01,threshold
+             111,-89.71369,46.57636,planting,Control,2013-11-01,threshold
+             113,-89.80990,46.35090,pws,Control,2014-11-01,flowthrough
+             119,-89.59433,46.28794,eco,Girdle,2013-11-01,closed
+             135,-88.87838,46.75382,eco,Control,2013-11-01,flowthrough
+             139,-88.95577,46.59619,planting,Ash Cut,2013-11-01,threshold
+             140,-89.61962,46.43279,eco,Girdle,2013-11-01,flowthrough
+             151,-88.89502,46.67307,eco,Girdle,2013-11-01,threshold
+             152,-89.71468,46.41277,eco,Control,2013-11-01,flowthrough
+             156,-89.58431,46.28327,eco,Ash Cut,2013-11-01,closed
+             157,-89.58479,46.28173,eco,Control,2013-11-01,threshold",
           select = c(site = "character",
                      lon = "numeric",
                      lat = "numeric",
@@ -63,6 +63,11 @@ prepare_water_levels <-
                      morphology = "character"),
           key = "site")
   
+  # Expanding dataset to all dates, even if there is no water levels, it makes
+  # dealing with the met data easier
+  daily_water_levels <- 
+    daily_water_levels[CJ(site = unique(daily_water_levels$site), 
+                          sample_date = seq(as.Date("2011-11-01"), as.Date("2020-10-31"), by = 1))]
   
   daily_water_levels[site_info, 
                      `:=`(lon = i.lon,
