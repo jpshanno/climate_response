@@ -59,7 +59,12 @@ calculate_snowmelt <-
               total_input_cm = i.total_input_cm),
          on = c("station_name", "sample_date")]
     
-    # Remove WY 2006 data as it has no CN model output
-    
+    # The uncalibrated CN model shows anamolous melt in the early/mid summer 
+    # (really long tail on melt)
+    data[between(melt_cm, 0, 0.1) & month(sample_date) %in% 6:9, 
+         `:=`(total_input_cm = total_input_cm - melt_cm,
+              melt_cm = 0)]
+
+    # Remove WY 2006 data as it has no CN model output    
     data[water_year != 2006]
   }

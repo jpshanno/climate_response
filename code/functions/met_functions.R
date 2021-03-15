@@ -15,6 +15,9 @@ calculate_hargreaves_pet <-
     # Bristow-Campbell.
     data[, pet_cm := pmin(0, -0.1 * 0.0135 * solrad_MJ_m2 / lambda.MJ.kg * (tmean_c + 17.8))][]
     
+    data[tmax_c <= 0, pet_cm := 0]
+    
+    data
   }
 
 ##' .. content for \description{} (no empty lines) ..
