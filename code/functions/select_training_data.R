@@ -7,15 +7,32 @@
 ##' @return
 ##' @author Joe Shannon
 ##' @export
-select_validation_years <- 
-  function(data, 
-           date.col,
-           n.in.group,
-           groups) {
+select_training_data <- 
+  function(data) {
     
     set.seed(1234)
     
-    data[, .sample_year := year(get(date.col))]
+    
+    # new Plan:
+    # Control Sites: 
+    #   2012 and two other random years
+    # Treatment Sites:
+    #   Control Status: Even years even months, odd years odd months
+    #   Treatment Status: Random three years from post-treatment
+    #   The only difficulty here is that Sy calculations may be more difficult
+    #   Because the water levels never get so low. To solve this create the 
+    #   Control models and then use the posterior distributions of the Esy coefs
+    #   as priors in the treatment models.
+    
+    data[, .sample_year := year(sample_date)]
+
+    # Identify site/status combinations that only have a single year of data
+    single_year_combinations <- 
+      data[, .(.n_years = uniqueN(.sample_year)), 
+           by = .(site, site_status)
+      ][.n_years == 1, 
+        .(site, site_status)]    
+    
     
     # If number of length(unique(years)) = 1 sample does not work as expected!
     # Simple work around is rep each value twice (since I'm already doing unique)
@@ -30,17 +47,18 @@ select_validation_years <-
     # combination (139 Control) with this issue.
     
     samples <- 
-      data[, 
-           .(.sample_year = as.numeric(sample(x = rep(unique(.sample_year), 2),
-                                             size = n.in.group))),
-           by = groups]
+      data[treatment == "Control" & .sample_year != 2012, 
+           .(.sample_year = as.numeric(sample(x = unique(.sample_year),
+                                              replace = FALSE,
+                                              size = 2))),
+           by = .(site)]
     
     # Identify site/status combinations that only have a single year of data
     single_year_combinations <- 
       data[, .(.n_years = uniqueN(.sample_year)), 
-           by = groups
+           by = .(site, site_status)
       ][.n_years == 1, 
-        ..groups]
+        .(site, site_status)]
     
     # Remove single year combinations from consideration as validation data (see
     # note above). I was removing this from the data before sampling, which 

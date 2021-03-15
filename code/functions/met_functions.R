@@ -13,7 +13,7 @@ calculate_hargreaves_pet <-
     # 0.16 from precedeing paragraph)
     # Eq 3 from Hargreaves & Allen (2003), using Rs as calculated from 
     # Bristow-Campbell.
-    data[, pet_cm := pmax(0, 0.1 * 0.0135 * solrad_MJ_m2 / lambda.MJ.kg * (tmean_c + 17.8))][]
+    data[, pet_cm := pmin(0, -0.1 * 0.0135 * solrad_MJ_m2 / lambda.MJ.kg * (tmean_c + 17.8))][]
     
   }
 
