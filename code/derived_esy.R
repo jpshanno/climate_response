@@ -593,7 +593,7 @@ ggplot(test_treat,
              scales = "free")
 
 # Not worth using water year for this optimization because it's only the last 
-# month of sample year 2017's data
+# month of the sample year 2014's data
 train_treat <- 
   test_treat[water_year == 2014 & year(sample_date) == 2014]
 
@@ -633,7 +633,7 @@ optim_treat[, params := map(res, pluck, "par")]
 optim_treat[, names(optim_treat$res[[1]]$par) := map_dfr(res, ~ as.data.table(.x[["par"]]))]
 
 train_treat <- 
-  train_treat[, c("wl_hat", "q_hat", "m_hat", "p_hat", "pet_hat") := wetland_model(.SD, optim_treat[.BY[[1]], params[[1]]]),
+  train_treat[, c("wl_hat", "q_hat", "m_hat", "p_hat", "pet_hat", "gradient") := wetland_model(.SD, optim_treat[.BY[[1]], params[[1]]]),
         by = .(site)]
 
 ggplot(train_treat,
@@ -669,7 +669,7 @@ ggplot(train_treat,
 # Test Treated Models -----------------------------------------------------
 
 test_treat <- 
-  test_treat[, c("wl_hat", "q_hat", "m_hat", "p_hat", "pet_hat") := wetland_model(.SD, optim_treat[.BY[[1]], params[[1]]]),
+  test_treat[, c("wl_hat", "q_hat", "m_hat", "p_hat", "pet_hat", "gradient") := wetland_model(.SD, optim_treat[.BY[[1]], params[[1]]]),
        by = .(site)]
 
 
