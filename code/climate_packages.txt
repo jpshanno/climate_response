@@ -9,3 +9,4 @@ ggplot2
 patchwork
 brms
 airGR
+stringr
