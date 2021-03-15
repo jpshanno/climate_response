@@ -185,7 +185,7 @@ wetland_model <-
       }
       
     }
-    data.table::data.table(wl_hat, q_hat, m_hat, p_hat, pet_hat)
+    data.table::data.table(wl_hat, q_hat, m_hat, p_hat, pet_hat, gradient)
   }
 
 optimize_params <- 
@@ -235,7 +235,6 @@ tar_load(water_budget)
 kenton <- 
   external_met[station_name == "kenton"]
 
-
 kenton <- 
   kenton[water_year %in% 2012:2019 & format(sample_date, "%m%d") != "0229",
          .(sample_date, 
@@ -243,15 +242,25 @@ kenton <-
            pet_cm = -pet_cm,
            rain_cm,
            melt_cm,
+           snow_cm,
            total_input_cm,
            tmax_c,
            tmin_c,
            tmean_c)
   ]
 
+# Drop anomalous melt
 kenton[between(melt_cm, 0, 0.1) & month(sample_date) %in% 6:9, 
       `:=`(total_input_cm = total_input_cm - melt_cm,
            melt_cm = 0)]
+
+# Drop October snowfall to avoid melt contributions to wetland water level 
+# rebound
+# kenton[month(sample_date) %in% c(9, 10),
+#        `:=`(total_input_cm = total_input_cm + snow_cm - melt_cm,
+#             rain_cm = rain_cm + snow_cm,
+#             melt_cm = 0,
+#             snow_cm = 0)]
 
 # Drop anomalous pet
 kenton[tmax_c <= 0,
@@ -414,13 +423,13 @@ optim_res <-
                              MP = Inf, 
                              MM = Inf, 
                              minESY = Inf, 
-                             phiM = 0.9, 
-                             MQ = 0.9, 
-                             phiP = 0.9)))),
+                             phiM = 1-.Machine$double.neg.eps, 
+                             MQ = 1-.Machine$double.neg.eps, 
+                             phiP = 1-.Machine$double.neg.eps)))),
 keyby = .(site)]
 
 
-optim_res[, modified_index_of_aggreement := map(res, pluck, "value")]
+optim_res[, modified_index_of_agreement := map(res, pluck, "value")]
 optim_res[, params := map(res, pluck, "par")]
 optim_res[, names(optim_res$res[[1]]$par) := map_dfr(res, ~ as.data.table(.x[["par"]]))]
 
@@ -484,12 +493,12 @@ ggplot(train,
 
 # Test Models -------------------------------------------------------------
 
-test <- 
-  test[, cbind(.SD, wetland_model(.SD, optim_res[.BY[[1]], params[[1]]])),
+test_control <-
+  test[site_status == "Control", 
+       cbind(.SD, wetland_model(.SD, optim_res[.BY[[1]], params[[1]]])),
        by = .(site)]
 
-
-ggplot(test[water_year == 2013],
+ggplot(test_control[water_year == 2017],
        aes(x = sample_date)) +
   geom_line(aes(y = wl_initial_cm,
                 color = "Observed",
@@ -497,9 +506,11 @@ ggplot(test[water_year == 2013],
   geom_line(aes(y = wl_hat,
                 color = "Modeled",
                 linetype = "Modeled")) +
-  scale_color_manual(values = c(Observed = "gray40",
+  scale_color_manual(name = 'legend',
+                     values = c(Observed = "gray40",
                                 Modeled = "black")) +
-  scale_linetype_manual(values = c(Observed = "dashed",
+  scale_linetype_manual(name = 'legend',
+                        values = c(Observed = "dashed",
                                    Modeled = "solid")) +
   ylab("Water Level (cm)") +
   theme_classic() +
