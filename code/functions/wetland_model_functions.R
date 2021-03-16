@@ -351,10 +351,10 @@ fit_models <-
                                  phiP = 0),
                     upper = list(MPET = Inf, 
                                  MP = Inf, 
-                                 MM = Inf, 
+                                 MM = Inf,  
+                                 MQ = 1-.Machine$double.neg.eps,
                                  minESY = Inf, 
                                  phiM = 1-.Machine$double.neg.eps, 
-                                 MQ = 1-.Machine$double.neg.eps, 
                                  phiP = 1-.Machine$double.neg.eps)))),
             keyby = .(site)]
     
@@ -371,14 +371,14 @@ fit_models <-
 
 refit_model <- 
   function(data, 
-           optimized_models,
+           optimized.models,
            refit = NULL,
            ...){
     
     if(is.null(refit)) stop("Specify at least one parameter to refit")
     
     existing_params <- 
-      names(optimized_models[["params"]][[1]])
+      names(optimized.models[["params"]][[1]])
     
     refit_params <- 
       names(refit)
@@ -388,36 +388,41 @@ refit_model <-
            refit[which(!(refit_params %in% existing_params))])
     }
         
-    esy_mods <- 
-      optimized_models[, .(site, 
-                           max_wl = map_dbl(res, pluck, "par", "maxWL"), 
-                           pred_fun = map(res, pluck, "par", "funESY"))]
-    
     fixed <- 
-      optimized_models[, 
+      optimized.models[, 
                        map_dfr(params, as.data.table), 
                        by = .(site)]
     
     lower_bound <- 
-      map(refit, ~0)
+      fixed[, .SD, .SDcols = c("site", refit_params)]
     
     upper_bound <- 
       fixed[, .SD, .SDcols = c("site", refit_params)]
       
     fixed <- 
-      fixed[, c(refit_params, "maxWL", "funESY"):=NULL]
+      fixed[, c(refit_params) :=NULL ]
+    
+    # Set upper and lower bounds based on expected increase or decrease due to
+    # treatment response (or based on physical parameters (0, -Inf, Inf, etc))
+    # variables not modified here will use the control optimization values for
+    # the upper/lower bound
+    
+    lower_bound <- 
+      modify_at(lower_bound, c("MPET", "MM", "MQ", "minESY", "phiM", "phiP"), ~0)
+    
+    upper_bound <- 
+      modify_at(upper_bound, c("MP", "MM", "minESY", "maxWL"), ~Inf) %>% 
+      modify_at(c("MQ", "phiM", "phiP"), ~1-.Machine$double.neg.eps)
     
     refit_res <- 
       data[, .(res = 
                  list(optimize_params(
                    data = .SD, 
                    par = refit,
-                   fixed = c(fixed[.BY[[1]], -c("site")],
-                             maxWL = esy_mods[.BY[[1]], max_wl],
-                             funESY = esy_mods[.BY[[1]], pred_fun[[1]]]),
+                   fixed = fixed[.BY[[1]], -c("site")],
                    ...,
                    method = "L-BFGS-B",
-                   lower = lower_bound,
+                   lower = lower_bound[.BY[[1]], -c("site")],
                    upper = upper_bound[.BY[[1]], -c("site")]))),
            keyby = .(site)]
     
