@@ -290,7 +290,7 @@ optimize_params <-
     opt <- optim(par = par,
                  fixed = fixed,
                  ...,
-                 control = list(fnscale = -1, 
+                 control = list(fnscale = 1, 
                                 maxit = 2000),
                  fn = 
                    function(params, fixed = NULL){
@@ -304,15 +304,21 @@ optimize_params <-
                      resids <- 
                        (wl_hat - data$wl_initial_cm)[!is.na(data$wl_initial_cm)]
                      
-                     # -sum(dnorm(resids, 
-                     #            mean = 0,
-                     #            sd = sd(resids),
-                     #            log = TRUE))
+                     -sum(dnorm(resids,
+                                mean = 0,
+                                sd = sd(diff(data$wl_initial_cm), na.rm = TRUE),
+                                log = TRUE))
                      
-                     hydroGOF::md(wl_hat[!is.na(data$wl_initial_cm)], data$wl_initial_cm[!is.na(data$wl_initial_cm)])
+                     # hydroGOF::md(wl_hat[!is.na(data$wl_initial_cm)], data$wl_initial_cm[!is.na(data$wl_initial_cm)])
                    })
     
     opt$par <- c(opt$par, unlist(fixed))
+    
+    wl_hat <- 
+      wetland_model(data = data, opt$par)$wl_hat
+    
+    opt$value <- 
+      hydroGOF::md(wl_hat[!is.na(data$wl_initial_cm)], data$wl_initial_cm[!is.na(data$wl_initial_cm)])
     
     opt
   }
