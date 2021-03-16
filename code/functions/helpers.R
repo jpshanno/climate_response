@@ -133,6 +133,18 @@ min_na <-
     min(x, na.rm = TRUE)
   }
 
+span_na <- 
+  function(x, class.out = class(x)){
+    if(sum(is.na(x)) == length(x)){
+      res <- NA
+      class(res) <- class.out
+      return(res)
+    }
+    
+    diff(range(x, na.rm = TRUE))
+  }
+
+
 ##' .. content for \description{} (no empty lines) ..
 ##'
 ##' .. content for \details{} ..
