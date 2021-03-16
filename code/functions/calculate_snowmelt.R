@@ -10,11 +10,14 @@
 calculate_snowmelt <- 
   function(data) {
     
+    # as.POSIXct gets tripped up with converting date to POSIX without specifying
+    # a time, it uses EDT even with tz="UTC" what so that 2020-10-31 becomes 2020-10-30.
+    # as.POSIXlt avoids that
     cn_mods <- 
       data[, 
            .(n_records = .N,
              input_mod = list(CreateInputsModel(FUN_MOD = RunModel_CemaNeigeGR4J, 
-                                                DatesR = as.POSIXct(sample_date, tz = "UTC"), 
+                                                DatesR = as.POSIXlt(sample_date), 
                                                 Precip = precip_cm * 10, 
                                                 PotEvap = pmax(0, pet_cm * 10),
                                                 TempMean = tmean_c,
