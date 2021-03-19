@@ -49,6 +49,13 @@ targets <- list(
   # Prepare Met Data ------------------------------------------------------
   
   , tar_target(
+  , tar_target(
+    swg_data,
+    prepare_swg_data(ncei.paths = ncei_files[grepl("\\.dly$", ncei_files)], 
+                     ghcnd.units = ghcnd_units,
+                     additional.stations = c("USC00200718", "USW00014858", "USC00208706", 
+                                             "USR0000MWAT", "USC00206220"))
+  )
     mesowest_met,
     prepare_mesowest_data(dir = mesowest_dir, 
                           start.date = as.Date("2011-11-01"),

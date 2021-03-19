@@ -194,4 +194,8 @@ prepare_ghcnd_data <-
       dcast(ghcnd, 
             station_name + sample_date ~ element, 
             value.var = "value")
+    
+    ghcnd[, station_id := dat$station_id[1]]
+    
+    ghcnd
   }
