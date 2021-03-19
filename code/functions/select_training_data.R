@@ -33,3 +33,17 @@ select_training_data <-
          on = .(site, water_year = training_year)]
     
   }
+
+selected_treatment_training_data <- 
+  function(data){
+    training_years <- 
+      data[, 
+            .(training_year = 
+                     data[!is.na(wl_initial_cm) & site == .BY[[1]] & site_status == "Treated" & month(sample_date) %in% 7:11, 
+                                  .(wl_range = span_na(wl_initial_cm)), 
+                          by = .(water_year)][wl_range == max_na(wl_range), water_year]), 
+           by = .(site)]
+    
+    data[training_years,
+         on = .(site, water_year = training_year)]
+  }

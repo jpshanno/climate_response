@@ -143,10 +143,11 @@ targets <- list(
   , tar_target(
     training_data,
     list(control = select_training_data(water_budget),
-         treated = water_budget[water_budget[!is.na(wl_initial_cm) & site_status == "Treated", 
-                                .(training_year = min(water_year)),
-                                by = .(site)],
-                                on = c("site", water_year = "training_year")]),
+         treated = selected_treatment_training_data(water_budget)),
+         # treated = water_budget[water_budget[!is.na(wl_initial_cm) & site_status == "Treated", 
+         #                        .(training_year = min(water_year)),
+         #                        by = .(site)],
+         #                        on = c("site", water_year = "training_year")]),
     format = "rds"
   )
   
@@ -177,7 +178,9 @@ targets <- list(
     treated_optimization,
     refit_model(training_data[["treated"]],
                 control_optimization,
-                refit = list(MPET = 1)),
+                refit = list(MPET = 1, 
+                             MP = 1,
+                             maxWL = 10)),
     format = "rds"
   )
   
