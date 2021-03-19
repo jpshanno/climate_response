@@ -47,6 +47,13 @@ targets <- list(
   )
   
   , tar_target(
+    loca_files,
+    list.files("data/loca_ccsm4_gfdlcm3/", 
+               pattern = "\\.nc$", 
+               full.names = TRUE),
+    format = "file"
+  )
+  
   , tar_target(
     climate_norms_file,
     "data/bergland_climate_normals.csv",
@@ -109,6 +116,13 @@ targets <- list(
       calculate_snowmelt() %>% 
       calculate_water_availability()
   )
+  
+  , tar_target(
+    loca_simulations,
+    extract_loca_simulations(nc.files = loca_files,
+                             coords = external_met[, .SD[1, .(lon = 360 + lon, lat)],  by = .(station_name)])
+  )
+  
   
   # Prepare Water Budget Data ---------------------------------------------
   , tar_target(
