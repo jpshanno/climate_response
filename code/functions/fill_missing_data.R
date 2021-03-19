@@ -67,7 +67,7 @@ fill_ncei_idw <-
     # Fill Missing Temperatures -----------------------------------------------
     
     temperature_dat <- 
-      rbind(data[, .(station_name, sample_date, lat, lon, tmin_c, tmax_c)],
+      rbind(data[, .(station_name, sample_date = as.Date(sample_date), lat, lon, tmin_c, tmax_c)],
             additional.data[, .(station_name, sample_date, lat, lon, tmin_c, tmax_c)])
     
     idw_temp <- 
