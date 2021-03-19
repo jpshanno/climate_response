@@ -46,9 +46,22 @@ targets <- list(
     format = "file"
   )
   
+  , tar_target(
+  , tar_target(
+    climate_norms_file,
+    "data/bergland_climate_normals.csv",
+    format = "file")
+  
   # Prepare Met Data ------------------------------------------------------
   
   , tar_target(
+    climate_norms,
+    prepare_climate_norms(norms.file = climate_norms_file,
+                          ncei.path = ncei_files,
+                          ghcnd.units = ghcnd_units,
+                          solrad.coefs = solrad_coefs[station_name == "PIEM4"]),
+  )
+  
   , tar_target(
     swg_data,
     prepare_swg_data(ncei.paths = ncei_files[grepl("\\.dly$", ncei_files)], 
@@ -56,6 +69,8 @@ targets <- list(
                      additional.stations = c("USC00200718", "USW00014858", "USC00208706", 
                                              "USR0000MWAT", "USC00206220"))
   )
+  
+  , tar_target(
     mesowest_met,
     prepare_mesowest_data(dir = mesowest_dir, 
                           start.date = as.Date("2011-11-01"),
@@ -74,12 +89,16 @@ targets <- list(
     fread("resources/ghcnd_element_codes.csv")
   )
   
+  # The removed stations may be okay looking at the raw GHCND data, but they 
+  # showed very strange trends in water availability, likely the result of an 
+  # instrumentation change or a the backfilling process
+  # For some reason ncei_data is not saving sample_date as Date, but as IDate
   , tar_target(
     external_met,
     prepare_ncei_data(path = ncei_files,
                       start.date = as.Date("2005-11-01"),
                       end.date = as.Date("2020-10-31"),
-                      ghcnd.units = ghcnd_units) %>%
+                      ghcnd.units = ghcnd_units) %>% 
       fill_missing_data(additional.data = mesowest_met,
                         source = "ncei") %>%
       calculate_mean_temp() %>% 
