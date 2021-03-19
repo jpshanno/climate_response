@@ -199,24 +199,32 @@ make_formula <-
 ##' @return
 ##' @author Joe Shannon
 ##' @export
-calculate_climate_season <- 
-  function(x){
+as.climate_season <- 
+  function(x, return.factor){
     stopifnot(is.numeric(x) | is.Date(x))
     
-    if(is.numeric(x) & any(data.table::between(x, 1, 12))){
+    if(is.numeric(x) & !all(data.table::between(x, 1, 12))){
       stop("If x is numeric then all values must be between 1 and 12")
     }
     
     if(is.Date(x)){
-      mon <- 
+      x <- 
         month(x)
+    } 
+    
+    seas <- 
+      data.table::fcase(x %in% c(12, 1, 2), "djf", 
+                        x %in% 3:5, "mam", 
+                        x %in% 6:8, "jja", 
+                        x %in% 9:11, "son")
+  
+    if(!return.factor){
+      return(seas)
     }
-    
-    data.table::fcase(mon %in% c(12, 1, 2), "djf", 
-                      mon %in% 3:5, "mam", 
-                      mon %in% 6:8, "jja", 
-                      mon %in% 9:11, "son")
-    
+      
+    factor(seas, 
+           levels = c("djf", "mam", "jja", "son"),
+           ordered = TRUE)
   }
 
 ##' .. content for \description{} (no empty lines) ..
