@@ -25,12 +25,15 @@ prepare_ncei_data <-
              ghcnd.units = ghcnd.units) %>% 
       rbindlist(fill = TRUE)
     
+    # Don't use fcoalesce() to backfill HPDN precip because HPDN precip is 
+    # well correlated with tipping bucket site data, but GHCND is not
     hpdn_data[ghcnd_data[, .(station_name, sample_date, tmin_c, tmax_c)],
               `:=`(tmin_c = i.tmin_c,
                    tmax_c = i.tmax_c),
               on = c("station_name", "sample_date")]
     
     hpdn_data[, sample_year := year(sample_date)]
+    # hpdn_data[, sample_date := as.Date(sample_date)]
     
     # Remove days where tmax <= tmin as they are likely errors, but keep missing
     # values
@@ -62,7 +65,7 @@ prepare_hpdn_data <-
     daily_precip[DlySum == -9999,
                  precip_cm := NA_real_]
     
-    # Set water year based on USGS approach (begins October 1)
+    # Set water year
     daily_precip[, water_year := as.water_year(sample_date, wy.month = 11)]
     
     # Set day of water year (dowy)
@@ -74,6 +77,10 @@ prepare_hpdn_data <-
                        water_year, 
                        dowy, 
                        precip_cm)]
+    
+    if(nrow(daily_precip[!is.na(precip_cm)]) == 0){
+      return(NULL)
+    }
     
     # Output data
     # na.exclude removes NAs induced by expanding data to include all 
