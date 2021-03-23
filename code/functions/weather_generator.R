@@ -8,7 +8,7 @@
 ##' @author Joe Shannon
 ##' @export
 swg_single_site <-   
-  function(con.data, swg.models = NULL, simulation.dates, n.simulations, seed = 1234, solar.coefs = NULL){
+  function(con.data, swg.models = NULL, simulation.dates, n.workers = 1, n.simulations, seed = 1234, solar.coefs = NULL){
   
   # For some reason this does not work when used with .SD inside a nested 
   # data.table. It hangs on exit. 
@@ -85,248 +85,255 @@ swg_single_site <-
   total_n <- 
     days_per_sim * n.simulations
   
-  # on.exit(plan(sequential))
-  # 
-  # plan(multisession,
-  #      workers = n.workers)
+  on.exit(plan(sequential))
+
+  plan(multisession,
+       workers = n.workers)
   # 
   # simulation_chunks <- 
   #   split(seq_len(n.simulations), paste0("chunk_", seq_len(n.simulations) %% 4))
+  
+  chunk_size <- 
+    n.simulations / n.workers
   
   simulations <- 
     # future_map_dfr(simulation_chunks,
                    # .options = furrr_options(seed = TRUE),
                    # .id = "simulation_id",
-    replicate(n = n.simulations,
-              simplify = FALSE,
-              {
-                simulation_season <- 
-                  sim_data$simulation_season
-                
-                simulation_month <- 
-                  sim_data$simulation_month
-                
-                sim_occur <- 
-                  sim_amount <- 
-                  sim_tmax <- 
-                  sim_tmin <- 
-                  numeric(days_per_sim)
-                
-                min_t_difference <- 0.5
-                
-                init_conditions <- 
-                  con.data[format(simulation.dates[1] - 1, "%m%d") == format(sample_date, "%m%d"),
-                           .(mean_precip_occur = mean(precip_occur, na.rm = TRUE), 
-                             mean_precip_amount = mean(precip_amount, na.rm = TRUE),
-                             sd_precip_amount = sd(precip_amount, na.rm = TRUE), 
-                             mean_tmax_c = mean(tmax_c, na.rm = TRUE),
-                             sd_tmax_c = sd(tmax_c, na.rm = TRUE), 
-                             mean_tmin_c = mean(tmin_c, na.rm = TRUE),
-                             sd_tmin_c = sd(tmin_c, na.rm = TRUE))]
-                
-                # initialize with a sample from binomial with probability equal to 
-                # the observed probability of occurrence for 31 Dec (all years)
-                sim_occur[1] <- sim_occur_l1 <- 
-                  rbinom(n=1, size=1, prob = init_conditions$mean_precip_occur)
-                
-                # initialize temperatures with the climatological mean of 31 Dec
-                initial_tdiff <- -10
-                
-                while(initial_tdiff < min_t_difference){
-                  
-                  sim_tmax[1] <- sim_tmax_l1 <- 
-                    rnorm(1, mean = init_conditions$mean_tmax_c, sd = init_conditions$sd_tmax_c)
-                  
-                  sim_tmin[1] <- sim_tmin_l1 <- 
-                    rnorm(1, mean = init_conditions$mean_tmin_c, sd = init_conditions$sd_tmin_c)
-                  
-                  initial_tdiff <- sim_tmax[1] - sim_tmin[1]
-                }
-                
-                # Sample a conditioning year at random each simulation
-                
-                conditioning <- 
-                  con.data[year(sample_date) == sample(unique(year(sample_date)), 1)]
-                
-                regional_precip_cm <- 
-                  as.list(conditioning[, map_dbl(.SD, ~.x[.x!=0][1]), 
-                                       .SDcols = patterns("regional_precip_cm")]) %>% 
-                  set_names(~stringr::str_extract(.x, "[a-z]{3}$")) %>% 
-                  imap(~ifelse(simulation_season == .y, .x, 0))
-                
-                regional_tmin_c <- 
-                  as.list(conditioning[, map_dbl(.SD, ~.x[.x!=0][1]), 
-                                       .SDcols = patterns("regional_tmin_c")]) %>% 
-                  set_names(~stringr::str_extract(.x, "[a-z]{3}$")) %>% 
-                  imap(~ifelse(simulation_season == .y, .x, 0))
-                
-                regional_tmax_c <- 
-                  as.list(conditioning[, map_dbl(.SD, ~.x[.x!=0][1]), 
-                                       .SDcols = patterns("regional_tmax_c")]) %>% 
-                  set_names(~stringr::str_extract(.x, "[a-z]{3}$")) %>% 
-                  imap(~ifelse(simulation_season == .y, .x, 0))
-                
-                # Scale depends on simulation dates & conditioning covariates
-                amount_scale <- 
-                  gamma.scale(coefs = swg.coefs$amount_coefs, 
-                              X = rbind(1, 
-                                        sim_data$harmonic_cos, 
-                                        sim_data$harmonic_sin, 
-                                        regional_precip_cm$djf,
-                                        regional_precip_cm$mam,
-                                        regional_precip_cm$jja,
-                                        regional_precip_cm$son),
-                              shape = swg.coefs$amount_shape)
-                
-                monthly_tmin_sd <- 
-                  swg.coefs$regional_monthly_sd_tmin_c
-                
-                monthly_tmax_sd <- 
-                  swg.coefs$regional_monthly_sd_tmax_c
-                
-                # Reduce subsets within loop to speed things up
-                regional_precip_cm_djf <- regional_precip_cm$djf
-                regional_precip_cm_mam <- regional_precip_cm$mam
-                regional_precip_cm_jja <- regional_precip_cm$jja
-                regional_precip_cm_son <- regional_precip_cm$son
-                
-                regional_tmin_c_djf <- regional_tmin_c$djf
-                regional_tmin_c_mam <- regional_tmin_c$mam
-                regional_tmin_c_jja <- regional_tmin_c$jja
-                regional_tmin_c_son <- regional_tmin_c$son
-                
-                regional_tmax_c_djf <- regional_tmax_c$djf
-                regional_tmax_c_mam <- regional_tmax_c$mam
-                regional_tmax_c_jja <- regional_tmax_c$jja
-                regional_tmax_c_son <- regional_tmax_c$son
-                
-                for(i in 2:days_per_sim){
-                  
-                  # A note from Verdin:
-                  # Set very small amounts equal to zero and then set those days to have zero 
-                  # occurence. Also set days with zero occurence to zero amount. Why are amounts
-                  # always simulated? Faster to simulate and remove than to have an IF statement
-                  # dependent on occrence? If amount is less than 0.1 should it actually be 
-                  # re-simulated within the SWG so that your occurance probabilities are not 
-                  # different than what you intended? Does this have a measurable impact? It 
-                  # probably could in areas with many small storms. -- It did have an impact
-                  # for my SWG, so I put in a while() loop to make sure it all amounts are
-                  # greater than 0.01. The while loop makes the number of days with precip 
-                  # slightly better aligned, but it overestimates precipitation totals at 
-                  # the monthly and annual scales
-                  
-                  
-                  while(sim_amount[i] < 0.01){
-                    # probit has variance 1 by definition, so we use a copula
-                    # to transform a mean zero, variance unity random sample
-                    sim_amount[i] <- qgamma(pnorm(rnorm(n = 1, mean = 0, sd = 1)), 
-                                            shape= swg.coefs$amount_shape, 
-                                            scale= amount_scale[i])
-                    
-                    # occurrence is mean function + rnorm(mean=0, sd=1)
-                    # covariates for mean function are POCC, ct, st
-                    # initial sim_occur is overwritten when i == 1, 
-                    # which is okay because it is using the initial values from outside the
-                    # while loop to provide starting conditions for the true i == 1 inside the
-                    # for loop
-                    sim_occur[i] <- 
-                      as.numeric((sum(swg.coefs$occur_coefs * 
-                                        c(1, 
-                                          sim_occur_l1, 
-                                          sim_data$harmonic_cos[i],
-                                          sim_data$harmonic_sin[i],
-                                          regional_precip_cm_djf[i],
-                                          regional_precip_cm_mam[i],
-                                          regional_precip_cm_jja[i],
-                                          regional_precip_cm_son[i])) + rnorm(1, 0, 1)) > 0)
-                  }
-                  
-                  sim_t_difference <- -10
-                  
-                  while(sim_t_difference < min_t_difference){
-                    
-                    # max is mean function + rnorm TMAX.sd according to month
-                    # covariates for mean function are PMN, PMX, ct, st, OCC, Rt
-                    sim_tmax[i] <- 
-                      sum(swg.coefs$tmax_coefs *
-                            c(1,
-                              sim_tmin_l1,
-                              sim_tmax_l1,
-                              sim_data$harmonic_cos[i],
-                              sim_data$harmonic_sin[i],
-                              sim_occur[i],
-                              sim_data$temperature_trend[i],
-                              regional_tmin_c_djf[i],
-                              regional_tmin_c_mam[i],
-                              regional_tmin_c_jja[i],
-                              regional_tmin_c_son[i],
-                              regional_tmax_c_djf[i],
-                              regional_tmax_c_mam[i],
-                              regional_tmax_c_jja[i],
-                              regional_tmax_c_son[i])) + 
-                      rnorm(n=1, mean=0, sd = monthly_tmin_sd[simulation_month[i]])
-                    
-                    
-                    # min is mean function + rnorm TMIN.sd according to month
-                    # covariates for mean function are PMN, PMX, ct, st, OCC, Rt
-                    sim_tmin[i] <- 
-                      sum(swg.coefs$tmin_coefs *
-                            c(1,
-                              sim_tmin_l1,
-                              sim_tmax_l1,
-                              sim_data$harmonic_cos[i],
-                              sim_data$harmonic_sin[i],
-                              sim_occur[i],
-                              sim_data$temperature_trend[i],
-                              regional_tmin_c_djf[i],
-                              regional_tmin_c_mam[i],
-                              regional_tmin_c_jja[i],
-                              regional_tmin_c_son[i],
-                              regional_tmax_c_djf[i],
-                              regional_tmax_c_mam[i],
-                              regional_tmax_c_jja[i],
-                              regional_tmax_c_son[i])) + 
-                      rnorm(n = 1, mean = 0, sd = monthly_tmax_sd[simulation_month[i]])
-                    
-                    
-                    sim_t_difference <- 
-                      sim_tmax[i] - sim_tmin[i]
-                  }
-                  
-                  sim_occur_l1 <- sim_occur[i]
-                  sim_tmin_l1 <- sim_tmin[i]
-                  sim_tmax_l1 <- sim_tmax[i]
-                }
-                
-                dat <- 
-                  data.table(station_name = station_name,
-                             lat = lat, 
-                             sample_date = simulation.dates,
-                             simulation_month = simulation_month,
-                             simulation_season = simulation_season,
-                             precip_cm = sim_amount * sim_occur,
-                             tmax_c = sim_tmax,
-                             tmin_c = sim_tmin,
-                             tmean_c = (sim_tmax + sim_tmin) / 2)
-                
-                if(!is.null(solar.coefs)){
-                  dat <- 
-                    dat %>% 
-                    calculate_solar_radiation(coefs = solar.coefs,
-                                              stop.on.error = FALSE,
-                                              return.vector = FALSE) %>% 
-                    calculate_hargreaves_pet(lambda.MJ.kg = 2.45) %>% 
-                    calculate_snowmelt(mean.snowfall = mean_snowfall)
-                }
-                  
-                setnames(dat, "sample_date", "simulation_date")
-                dat[, c("station_name", "lat") := NULL][]
-              })
+    future_map(seq_len(n.workers), 
+               .options = furrr_options(seed = TRUE),
+               ~{
+                 replicate(n = chunk_size,
+                           simplify = FALSE,
+                           {
+                             simulation_season <- 
+                               sim_data$simulation_season
+                             
+                             simulation_month <- 
+                               sim_data$simulation_month
+                             
+                             sim_occur <- 
+                               sim_amount <- 
+                               sim_tmax <- 
+                               sim_tmin <- 
+                               numeric(days_per_sim)
+                             
+                             min_t_difference <- 0.5
+                             
+                             init_conditions <- 
+                               con.data[format(simulation.dates[1] - 1, "%m%d") == format(sample_date, "%m%d"),
+                                        .(mean_precip_occur = mean(precip_occur, na.rm = TRUE), 
+                                          mean_precip_amount = mean(precip_amount, na.rm = TRUE),
+                                          sd_precip_amount = sd(precip_amount, na.rm = TRUE), 
+                                          mean_tmax_c = mean(tmax_c, na.rm = TRUE),
+                                          sd_tmax_c = sd(tmax_c, na.rm = TRUE), 
+                                          mean_tmin_c = mean(tmin_c, na.rm = TRUE),
+                                          sd_tmin_c = sd(tmin_c, na.rm = TRUE))]
+                             
+                             # initialize with a sample from binomial with probability equal to 
+                             # the observed probability of occurrence for 31 Dec (all years)
+                             sim_occur[1] <- sim_occur_l1 <- 
+                               rbinom(n=1, size=1, prob = init_conditions$mean_precip_occur)
+                             
+                             # initialize temperatures with the climatological mean of 31 Dec
+                             initial_tdiff <- -10
+                             
+                             while(initial_tdiff < min_t_difference){
+                               
+                               sim_tmax[1] <- sim_tmax_l1 <- 
+                                 rnorm(1, mean = init_conditions$mean_tmax_c, sd = init_conditions$sd_tmax_c)
+                               
+                               sim_tmin[1] <- sim_tmin_l1 <- 
+                                 rnorm(1, mean = init_conditions$mean_tmin_c, sd = init_conditions$sd_tmin_c)
+                               
+                               initial_tdiff <- sim_tmax[1] - sim_tmin[1]
+                             }
+                             
+                             # Sample a conditioning year at random each simulation
+                             
+                             conditioning <- 
+                               con.data[year(sample_date) == sample(unique(year(sample_date)), 1)]
+                             
+                             regional_precip_cm <- 
+                               as.list(conditioning[, map_dbl(.SD, ~.x[.x!=0][1]), 
+                                                    .SDcols = patterns("regional_precip_cm")]) %>% 
+                               set_names(~stringr::str_extract(.x, "[a-z]{3}$")) %>% 
+                               imap(~ifelse(simulation_season == .y, .x, 0))
+                             
+                             regional_tmin_c <- 
+                               as.list(conditioning[, map_dbl(.SD, ~.x[.x!=0][1]), 
+                                                    .SDcols = patterns("regional_tmin_c")]) %>% 
+                               set_names(~stringr::str_extract(.x, "[a-z]{3}$")) %>% 
+                               imap(~ifelse(simulation_season == .y, .x, 0))
+                             
+                             regional_tmax_c <- 
+                               as.list(conditioning[, map_dbl(.SD, ~.x[.x!=0][1]), 
+                                                    .SDcols = patterns("regional_tmax_c")]) %>% 
+                               set_names(~stringr::str_extract(.x, "[a-z]{3}$")) %>% 
+                               imap(~ifelse(simulation_season == .y, .x, 0))
+                             
+                             # Scale depends on simulation dates & conditioning covariates
+                             amount_scale <- 
+                               gamma.scale(coefs = swg.coefs$amount_coefs, 
+                                           X = rbind(1, 
+                                                     sim_data$harmonic_cos, 
+                                                     sim_data$harmonic_sin, 
+                                                     regional_precip_cm$djf,
+                                                     regional_precip_cm$mam,
+                                                     regional_precip_cm$jja,
+                                                     regional_precip_cm$son),
+                                           shape = swg.coefs$amount_shape)
+                             
+                             monthly_tmin_sd <- 
+                               swg.coefs$regional_monthly_sd_tmin_c
+                             
+                             monthly_tmax_sd <- 
+                               swg.coefs$regional_monthly_sd_tmax_c
+                             
+                             # Reduce subsets within loop to speed things up
+                             regional_precip_cm_djf <- regional_precip_cm$djf
+                             regional_precip_cm_mam <- regional_precip_cm$mam
+                             regional_precip_cm_jja <- regional_precip_cm$jja
+                             regional_precip_cm_son <- regional_precip_cm$son
+                             
+                             regional_tmin_c_djf <- regional_tmin_c$djf
+                             regional_tmin_c_mam <- regional_tmin_c$mam
+                             regional_tmin_c_jja <- regional_tmin_c$jja
+                             regional_tmin_c_son <- regional_tmin_c$son
+                             
+                             regional_tmax_c_djf <- regional_tmax_c$djf
+                             regional_tmax_c_mam <- regional_tmax_c$mam
+                             regional_tmax_c_jja <- regional_tmax_c$jja
+                             regional_tmax_c_son <- regional_tmax_c$son
+                             
+                             for(i in 2:days_per_sim){
+                               
+                               # A note from Verdin:
+                               # Set very small amounts equal to zero and then set those days to have zero 
+                               # occurence. Also set days with zero occurence to zero amount. Why are amounts
+                               # always simulated? Faster to simulate and remove than to have an IF statement
+                               # dependent on occrence? If amount is less than 0.1 should it actually be 
+                               # re-simulated within the SWG so that your occurance probabilities are not 
+                               # different than what you intended? Does this have a measurable impact? It 
+                               # probably could in areas with many small storms. -- It did have an impact
+                               # for my SWG, so I put in a while() loop to make sure it all amounts are
+                               # greater than 0.01. The while loop makes the number of days with precip 
+                               # slightly better aligned, but it overestimates precipitation totals at 
+                               # the monthly and annual scales
+                               
+                               
+                               while(sim_amount[i] < 0.01){
+                                 # probit has variance 1 by definition, so we use a copula
+                                 # to transform a mean zero, variance unity random sample
+                                 sim_amount[i] <- qgamma(pnorm(rnorm(n = 1, mean = 0, sd = 1)), 
+                                                         shape= swg.coefs$amount_shape, 
+                                                         scale= amount_scale[i])
+                                 
+                                 # occurrence is mean function + rnorm(mean=0, sd=1)
+                                 # covariates for mean function are POCC, ct, st
+                                 # initial sim_occur is overwritten when i == 1, 
+                                 # which is okay because it is using the initial values from outside the
+                                 # while loop to provide starting conditions for the true i == 1 inside the
+                                 # for loop
+                                 sim_occur[i] <- 
+                                   as.numeric((sum(swg.coefs$occur_coefs * 
+                                                     c(1, 
+                                                       sim_occur_l1, 
+                                                       sim_data$harmonic_cos[i],
+                                                       sim_data$harmonic_sin[i],
+                                                       regional_precip_cm_djf[i],
+                                                       regional_precip_cm_mam[i],
+                                                       regional_precip_cm_jja[i],
+                                                       regional_precip_cm_son[i])) + rnorm(1, 0, 1)) > 0)
+                               }
+                               
+                               sim_t_difference <- -10
+                               
+                               while(sim_t_difference < min_t_difference){
+                                 
+                                 # max is mean function + rnorm TMAX.sd according to month
+                                 # covariates for mean function are PMN, PMX, ct, st, OCC, Rt
+                                 sim_tmax[i] <- 
+                                   sum(swg.coefs$tmax_coefs *
+                                         c(1,
+                                           sim_tmin_l1,
+                                           sim_tmax_l1,
+                                           sim_data$harmonic_cos[i],
+                                           sim_data$harmonic_sin[i],
+                                           sim_occur[i],
+                                           sim_data$temperature_trend[i],
+                                           regional_tmin_c_djf[i],
+                                           regional_tmin_c_mam[i],
+                                           regional_tmin_c_jja[i],
+                                           regional_tmin_c_son[i],
+                                           regional_tmax_c_djf[i],
+                                           regional_tmax_c_mam[i],
+                                           regional_tmax_c_jja[i],
+                                           regional_tmax_c_son[i])) + 
+                                   rnorm(n=1, mean=0, sd = monthly_tmin_sd[simulation_month[i]])
+                                 
+                                 
+                                 # min is mean function + rnorm TMIN.sd according to month
+                                 # covariates for mean function are PMN, PMX, ct, st, OCC, Rt
+                                 sim_tmin[i] <- 
+                                   sum(swg.coefs$tmin_coefs *
+                                         c(1,
+                                           sim_tmin_l1,
+                                           sim_tmax_l1,
+                                           sim_data$harmonic_cos[i],
+                                           sim_data$harmonic_sin[i],
+                                           sim_occur[i],
+                                           sim_data$temperature_trend[i],
+                                           regional_tmin_c_djf[i],
+                                           regional_tmin_c_mam[i],
+                                           regional_tmin_c_jja[i],
+                                           regional_tmin_c_son[i],
+                                           regional_tmax_c_djf[i],
+                                           regional_tmax_c_mam[i],
+                                           regional_tmax_c_jja[i],
+                                           regional_tmax_c_son[i])) + 
+                                   rnorm(n = 1, mean = 0, sd = monthly_tmax_sd[simulation_month[i]])
+                                 
+                                 
+                                 sim_t_difference <- 
+                                   sim_tmax[i] - sim_tmin[i]
+                               }
+                               
+                               sim_occur_l1 <- sim_occur[i]
+                               sim_tmin_l1 <- sim_tmin[i]
+                               sim_tmax_l1 <- sim_tmax[i]
+                             }
+                             
+                             dat <- 
+                               data.table(station_name = station_name,
+                                          lat = lat, 
+                                          sample_date = simulation.dates,
+                                          simulation_month = simulation_month,
+                                          simulation_season = simulation_season,
+                                          precip_cm = sim_amount * sim_occur,
+                                          tmax_c = sim_tmax,
+                                          tmin_c = sim_tmin,
+                                          tmean_c = (sim_tmax + sim_tmin) / 2)
+                             
+                             if(!is.null(solar.coefs)){
+                               dat <- 
+                                 dat %>% 
+                                 calculate_solar_radiation(coefs = solar.coefs,
+                                                           stop.on.error = FALSE,
+                                                           return.vector = FALSE) %>% 
+                                 calculate_hargreaves_pet(lambda.MJ.kg = 2.45) %>% 
+                                 calculate_snowmelt(mean.snowfall = mean_snowfall)
+                             }
+                             
+                             setnames(dat, "sample_date", "simulation_date")
+                             dat[, c("station_name", "lat") := NULL][]
+                           })
+               })
   
   RPushbullet::pbPost("note", "Simulations Complete")
   # simulations <- copy(simulations)
   
-  simulations <- rbindlist(simulations)
+  simulations <- rbindlist(flatten(simulations))
   simulations[, simulation_id := rep(seq_len(n.simulations), each = days_per_sim)]
   setcolorder(simulations, "simulation_id")
   
