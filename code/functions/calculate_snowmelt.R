@@ -27,18 +27,24 @@ calculate_snowmelt <-
                                                 TempMax = tmax_c,
                                                 ZInputs = 380,
                                                 HypsoData = rep(380, 101),
-                                                NLayers = 1))),
+                                                NLayers = 1,
+                                                verbose = FALSE))),
            by = .(station_name)]
     
+    # Warm-up period is not necessary for running CN snow -> identical results
+    # with and without. Adjusting meanansolidprecip does not affect snowfall
+    # totals, but it does affect melt timing
     cn_mods[,
             run_opts := map2(input_mod, n_records,
                              ~CreateRunOptions(FUN_MOD = RunModel_CemaNeigeGR4J, 
                                                InputsModel = .x,
-                                               IndPeriod_WarmUp = 1:365,
-                                               IndPeriod_Run = (365 + 1):.y,
+                                               # IndPeriod_WarmUp = 1:365,
+                                               # IndPeriod_Run = (365 + 1):.y,
+                                               IndPeriod_Run = 1:.y,
                                                IsHyst = FALSE,
-                                               MeanAnSolidPrecip = 250)
                                                MeanAnSolidPrecip = mean.snowfall,
+                                               warnings = FALSE,
+                                               verbose = FALSE)
             )]
     
     # Return just mean snowfall for use in SWG
@@ -63,6 +69,10 @@ calculate_snowmelt <-
                                     total_input_cm = 0.1 * .x$CemaNeigeLayers$Layer01$PliqAndMelt)),
               by = .(station_name)]
     
+    # ggplot(daily_melt, aes(x = yday(sample_date), y = melt_cm)) +
+    #   geom_line(stat = "summary", fun = mean) +
+    #   scale_x_continuous(labels = function(x){as.Date("2000-01-01") + x})
+    
     data[daily_melt,
          `:=`(rain_cm = i.rain_cm,
               snow_cm = i.snow_cm,
@@ -77,6 +87,5 @@ calculate_snowmelt <-
          `:=`(total_input_cm = total_input_cm - melt_cm,
               melt_cm = 0)]
 
-    # Remove WY 2006 data as it has no CN model output    
-    data[water_year != 2006]
+    data
   }
