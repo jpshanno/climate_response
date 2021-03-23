@@ -99,8 +99,11 @@ as_loca_date <-
     as.numeric(as.Date(x) - as.Date("1900-01-01"))
   }
 
+# This needs to convert to character and then to date to avoid date values that
+# are not integers. Could probably do it by truncating x or doing as.integer x
+# but I haven't had a chance to experiment with that
 from_loca_date <- 
   function(x){
     stopifnot(is.numeric(x))
-    as.Date("1900-01-01") + x
+    as.Date(as.character(as.Date("1900-01-01") + x))
   }
