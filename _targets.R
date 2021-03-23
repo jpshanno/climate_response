@@ -71,10 +71,10 @@ targets <- list(
   
   , tar_target(
     swg_data,
-    prepare_swg_data(ncei.paths = ncei_files[grepl("\\.dly$", ncei_files)], 
-                     ghcnd.units = ghcnd_units,
-                     additional.stations = c("USC00200718", "USW00014858", "USC00208706", 
-                                             "USR0000MWAT", "USC00206220"))
+    prepare_ghcnd_swg_data(ncei.paths = ncei_files[grepl("\\.dly$", ncei_files)], 
+                           ghcnd.units = ghcnd_units,
+                           additional.stations = c("USC00200718", "USW00014858", "USC00208706", 
+                                                   "USR0000MWAT", "USC00206220"))
   )
   
   , tar_target(
@@ -100,6 +100,9 @@ targets <- list(
   # showed very strange trends in water availability, likely the result of an 
   # instrumentation change or a the backfilling process
   # For some reason ncei_data is not saving sample_date as Date, but as IDate
+  # 250 is taken from 2010 climate normals @ Bergland Dam. Running 
+  # CreateRunOptions() using Bergland Dam station 1980-2009 gives 341, but CMX
+  # gives 245 and Ironwood gives 233
   , tar_target(
     external_met,
     prepare_ncei_data(path = ncei_files,
@@ -113,14 +116,18 @@ targets <- list(
                                 return.vector = FALSE) %>% 
       calculate_hargreaves_pet(lambda.MJ.kg = 2.45) %>% 
       subset(!(station_name %in% c("ironwood", "alberta_ford_for_center", "stambaugh_sse"))) %>% 
-      calculate_snowmelt() %>% 
+      calculate_snowmelt(mean.snowfall = 274,
+                         cn.params = c(0.4, 2.9)) %>% 
       calculate_water_availability()
   )
   
   , tar_target(
     loca_simulations,
     extract_loca_simulations(nc.files = loca_files,
-                             coords = external_met[, .SD[1, .(lon = 360 + lon, lat)],  by = .(station_name)])
+                             coords = unique(rbind(swg_data[, .SD[1, .(lon = 360 + lon, lat)], by = .(station_name)],
+                                                   external_met[, .SD[1, .(lon = 360 + lon, lat)],  by = .(station_name)]),
+                                             by = "station_name")) %>% 
+    .[, swg_format_data(.SD), by = .(gcm, scenario)]
   )
   
   
@@ -192,27 +199,38 @@ targets <- list(
     format = "rds"
   )
  
-  # Build Water Level Models ------------------------------------------------
 
-  # Make priors
-    # Besy priors from min of empirical Sy
-    # Mesy prior from papers?
-    # 
-  # Run Models
-  # Evaluate Models
+  # Evaluate Models ---------------------------------------------------------
+  # This should probably be done breaking the water years up rather than doing 
+  # them sequentially. Need to also consider adjusting max.wl for different 
+  # water years within a given site.
   
-  # Simulate Wetland Runs ---------------------------------------------------
-  
-  # simulate_water_levels()
-  # , tar_target(
-  #   simulations,
-  #   run_simulations(n, ...) %>% 
-  #   simulate_water_levels(site_status, 
-  #                       hydrology_model = NULL, 
-  #                       initial.wl = NA,
-  #                       weather, 
-  #                       return.components = FALSE)
 
+  # Create Weather Series ---------------------------------------------------
+  
+  , tar_target(
+    swg_simulations_observed,
+    swg_single_site(con.data = swg_data[station_name == "bergland_dam"],
+                    n.simulations = 10000,
+                    n.workers = 4,
+                    solar.coefs = solrad_coefs[station_name == "PIEM4"],
+                    simulation.dates = seq(as.Date("2008-11-01"), as.Date("2009-10-31"), by = "days")),
+  )
+
+  # Perform one extra simulation because one is dropped when calculating CN snow
+  , tar_target(
+    swg_simulations_loca,
+    loca_simulations[station_name == "bergland_dam",
+                     swg_single_site(.SD, 
+                                     simulation.dates = seq(as.Date("2008-11-01"),
+                                                            as.Date("2009-10-31"),
+                                                            by = "days"),
+                                     n.simulations = 10000,
+                                     n.workers = 4,
+                                     solar.coefs = solrad_coefs[station_name == "PIEM4"]),
+                     by = .(gcm, scenario)]
+  )
+  
 )
 
 # End with a call to tar_pipeline() to wrangle the targets together.
