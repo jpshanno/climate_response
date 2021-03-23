@@ -8,7 +8,9 @@
 ##' @author Joe Shannon
 ##' @export
 calculate_snowmelt <- 
-  function(data) {
+  function(data, mean.snowfall = NULL, cn.params = c(0.4, 2.9), return.mean.snowfall = FALSE) {
+    # cn.params taken from basin 10 in Nemri, 2020
+    
     
     # as.POSIXct gets tripped up with converting date to POSIX without specifying
     # a time, it uses EDT even with tz="UTC" what so that 2020-10-31 becomes 2020-10-30.
@@ -36,13 +38,20 @@ calculate_snowmelt <-
                                                IndPeriod_Run = (365 + 1):.y,
                                                IsHyst = FALSE,
                                                MeanAnSolidPrecip = 250)
+                                               MeanAnSolidPrecip = mean.snowfall,
             )]
+    
+    # Return just mean snowfall for use in SWG
+    if(return.mean.snowfall){
+      return(cn_mods[, .(station_name, mean_snowfall_mm = map_dbl(run_opts, "MeanAnSolidPrecip"))])
+    }
+    
     
     cn_mods[, mod := map2(input_mod,
                           run_opts,
                           ~RunModel_CemaNeige(InputsModel = .x,
                                               RunOptions = .y,
-                                              Param = c(0.25, 3.74)))]
+                                              Param = cn.params))]
     
     daily_melt <- 
       cn_mods[, map_dfr(mod, 
