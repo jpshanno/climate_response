@@ -1,0 +1,321 @@
+---
+author: Joe Shannon
+title: Black Ash Wetland Response to Future Climate Conditions
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output: 
+  bookdown::word_document2:
+    reference_docx : output/dissertation_chapter/climate_change_impacts.docx
+    fig_caption: TRUE
+    number_sections: TRUE
+    toc: FALSE
+header-includes:
+- \usepackage{float}
+bibliography: resources/references.bib
+---
+
+## Black Ash Wetland Response to Future Climate Conditions
+
+### Introduction
+Shifts in temperature, and precipitation (timing, frequency, and quantity)
+associated with climate change will impact all wetlands [@burkett-2000]. Black
+ash wetlands face the same climate change impacts but also the loss of the major
+canopy species due to EAB. @iverson-2016 evaluated the potential replacement
+species for black ash in the context of habitat availability, species migration,
+and replacement species susceptibility to climate change impact, providing a
+useful resource for climate-informed species replacements for black ash. However,
+black ash grows in a range of geomorphic settings and site conditions can have a
+strong influence on hydrology, forest structure, and plant community among
+wetlands [@kolka-2018]. Considering both @iverson-2016 and
+@kolka-2018 we can identify four necessary components to evaluate mitigation
+efforts in black ash wetlands: climate-informed species selection, species
+tolerance of specific site conditions, site conditions following EAB infestation, and
+site conditions in a future climate. Researchers in Michigan
+[@bolton-2018], Minnesota [@looney-2015], and Wisconsin [@bolton-2018], have
+planted seedlings to evaluate potential canopy species at the wetland rather
+than landscape level. The plantings in @bolton-2018 and @looney-2015 took place
+under simulated EAB infestation, where the seedlings were subjected to adverse
+conditions due to the hydrologic impact of the loss of black ash [@slesak-2014;
+@vangrinsven-2017], as well as the increased competition from herbaceous growth
+in the increased light conditions [@looney-2016; @looney-2017a;
+@davis-2017].
+
+The above work in Michigan and Minnesota assessed mitigation in light of three
+of the four components of the combined impact of climate change and EAB on black
+ash wetlands. The researchers selected some species at the northern edge of
+their current range, evaluated them under present-day site conditions, and under
+simulated-EAB site conditions. It was not possible for the field studies to
+assess the interaction of EAB and climate change on site conditions. And just as
+we have seen EAB impacts cascade through black ash ecosystems affecting
+hydrology, plant communities, and nutrient cycling, we can expect the future
+changes to hydrology to result in additional impacts. In the Western Great Lakes
+region future climate conditions are expected to have increased temperatures,
+increased total precipitation, increased occurrence of drought conditions, and a
+shift from snow to rain [@janowiak-2014].
+
+Modeling the response of wetland water levels to simulated weather series under
+future climate conditions will provide insight into the altered hydrologic
+regimes of black ash wetlands. Focusing on the hydrologic regimes will inform us
+on the impacts to other wetland aspects as hydrology is the critical control on
+wetland ecosystems [@brinson-1993]. By developing models using data from control
+and simulated EAB infestation sites, it will be possible to estimate fully
+mitigated and fully impacted black ash wetlands under future conditions. This
+effort will require an understanding of the current hydrologic response to
+environmental drivers, future climate conditions, and simulated future time
+series of the environmental drivers.
+
+Management actions have been undertaken utilizing the hydrologic and species
+survival research results to-date. These results represent management actions
+that can be successful under the current conditions, specifically hydrologic
+conditions. As precipitation patterns are altered under a changing climate the
+best management action to mitigate the combined impact of EAB and climate change
+may not be the current best management option. Therefore it is necessary to
+simulate conditions of these wetlands under future climate scenarios. In
+addition to providing more climate-informed management options, simulated
+conditions would enable researchers to evaluate potential future changes in
+these systems, expanding existing research regarding water levels and stream
+connectivity, plant functional group composition, and changes in C-cycling.
+
+<!-- **assumes stationarity of response**   -->
+<!-- **does not account for the fact that potentially no replacement species will  -->
+<!-- truly occupy the niche of black ash, even if a full canopy is restored** -->
+
+### Climate Change in the Great Lakes
+"as with temperature these relatively small changes in annual average values mask
+much larger shifts at the subannual scale." - @hayhoe-2010
+
+### Stochastic Weather Generators
+
+"while stochastic model outputs behave statistically like weather data, it is not expected
+that any particular simulated weather sequence will be duplicated in weather observa-
+tions at a given time in either the past or future" - @wilks-1999
+
+### Hypotheses
+I anticipate that current wetland water levels will be controlled primarily by
+precipitation and evaporative demand. I expect to find that changes in 
+precipitation and evaporative demand will lead to overall drier growing season
+conditions in black ash wetlands, potentially allowing for a wider range of
+replacement species than is currently assumed.
+
+### Methods
+
+#### Data
+Precip for double mass analysis from NOAA NCDC (see project processing scripts
+for details)
+
+#### Wetland Hydrology Models
+The link between hydrology drivers and daily water level response has been shown
+to be non-linear and varying with stage [@loheideii-2008; @white-1932]. In
+wetland systems the relationship between the driver magnitude and response
+magnitude in these systems has been termed the ecosystem specific yield (E~Sy~)
+[@mclaughlin-2014]. E~Sy~ can be empirically derived as the ratio between
+precipatation inputs and water level rise ($\frac{P}{\Delta\;WL}$). The
+relationship between empirical E~Sy~ and water level is modeled to provide a
+continuous estimate of E~Sy~. Models fit to the E~Sy~\~Water Level relationship
+include exponential [@mclaughlin-2014; @watras-2017], quadratic
+[@mclaughlin-2014], and step-wise regression [@mclaughlin-2014]. Similar to the
+pond-side sites in @watras-2017 our study sites showed no clear relationship
+bewteen E~Sy~ and water level.
+
+As an alternative to determining E~Sy~ we fit a quadratic curve to the
+relationship between year-to-date water balance from the beginning of the
+growing season to the point of minimum wetland water level (Figure FIGAAA), where
+
+$$WB_{YTD}\;=\;P_{YTD} + M_{YTD} - PET_{YTD},$$  
+
+$WB_{YTD}$, $P_{YTD}$, $M_{YTD}$, and $PET_{YTD}$ are year-to-date water
+balance, rainfall, snow melt, and potential evapotranspiration, respectively.
+Empirical E~Sy~ was then considered as the first derivative of the quadratic
+curve. This approach resulted in an asymptotic relationship between E~Sy~ and
+water level, suggesting agreement with the exponential forms in
+[@mclaughlin-2014; @watras-2017]. Models for E~Sy~ were fit using the year with
+the greatest water level drawdown for each wetland to ensure the widest range of
+E~Sy~ variation. Each wetland had the same basic form of E~Sy~ function. The
+functions were fit using a single hierarchical model with each of the
+coefficents allowed to vary independently within sites. Models were fit using
+the `brms` package in R [@burkner-2017; @burkner-2018]. The asymptotic structure
+of the E~Sy~ function requires that a lower bound be placed on E~Sy~ predictions
+to avoid values less than or equal to zero. The minimum value of E~Sy~ was
+allowed to vary by wetland was fit along with other model parameters as
+described below.
+
+Wetland water levels were simulated on a continuous basis using daily time step
+models. Model inputs consist of daily precipitation, daily minimum temperature,
+and daily maximum temperature. Model inputs were used to derive additional
+wetland water level drivers: potential evapotranspiration (PET), snowfall,
+snowmelt, and rain. The modified Hargreaves-Samani equation was used to
+calculate PET [@hargreaves-2003]. Precipitation was partitioned into snowfall,
+rain, and snowmelt inputs using the CemaNeige snow accounting routine (SAR)
+[@valery-2014b]. The CemaNeige SAR is temperature-index based and uses two
+parameters to account for accumulation, snowpack cold content, and snowmelt and
+is implemented in the R package `airGR` [@coron-2017].  
+
+For each daily step wetland water level change was determined as a function of
+the current water level, daily rainfall, daily PET, daily snowmelt, and
+estimated streamflow (Eq. EQAAA). Maximum wetland water levels for the control
+period were estimated as the mode of the wetland water level record. Streamflow
+was assumed to occur whenever wetland water levels were at or above the maximum
+water level. This is similar to the approach in @mclaughlin-2019 where wetland
+surface water connectivity was determined from wetland water level records. The
+current water level was used to estimate $\hat_{E}~Sy~$ which was used as a
+multiplier for rainfall, PET, and snowmelt components. In addition each driver
+(R, PET, M, Q) had a coefficient (fitting described below). Snowmelt and
+precipitation were also fit with a first order autoregressive filter to simulate
+slow flow contributions to wetland water levels. Within a day only the larger of
+PET or P was used as driver of water level change.
+
+$$
+\begin{align*}
+& WL_{t+1} = WL_{t} + f_{E_{Sy}}(WL_{t-1})*(\hat{\beta}_DD + \hat{\beta}_MM) + \hat{\beta}_Q(WL_{t} - WL_{max})\\
+& \hat{\beta}_DD\;=\left\{R \le PET;\;\;\hat{\beta}_{PET}PET\atop{R > PET; \;\; \hat{\beta}_RR}\;\;\;\;\;\;\;\;\;\;\right.\\
+& f_{E_{Sy}}(WL_{t-1})\;=\;a - (a - b) * e^{(c * WL_{t-1})}
+\end{align*}
+$$
+
+```{r parameter-table, echo = FALSE, warning = FALSE, message=FALSE}
+
+tab <- data.table::fread("Parameter | Definition  
+t | Daily time step
+WL | Wetland water level (relative to ground surface)
+WL~max~ | Maximum wetland water level (relative to ground surface)
+M, $\\hat{\\beta}_M$ | Snowmelt and snowmelt coefficient
+Q, $\\hat{\\beta}_Q$ | Streamflow and streamflow coefficient
+R, $\\hat{\\beta}_R$ | Rainfall and rainfall coefficient
+PET, $\\hat{\\beta}_PET$ | Potential evapotranspiration and potential evapotranspiration coefficient
+$f_{E_{Sy}}$ | Estimate of ecosystem specific yield
+a, b, c | Fitted coefficients", sep = "|")
+
+flextable::autofit(ftExtra::colformat_md(flextable::flextable(tab)))
+
+```
+
+
+Training data for wetland water level models was selected for each wetland as
+the year with the greatest water level drawdown as training data. The remaining
+control-period years were used for wetland model evaluation. Wetland parameters
+were estimated using maximum likelihood estimation [@bolker-2020]. For treated
+sites, treatment-period training data were also selected to maximize water level
+drawdown in the training set. The wetland models were reparameterized for the
+$\hat{\beta}_{PET}$, $\hat{\beta}_{R}$, and $WL_{max}$ terms.
+
+Using existing wetland water level data for 14 sites I will create statistical
+wetland water level models. To fit the general trend of water level drawdown
+throughout the growing season I plan to use either a generalized additive model
+(GAM) or a less flexible harmonic model with a one year period. The amount and
+timing of drawdown as well as sub-seasonal variation will be controlled by
+rainfall and evaporative demand. Initiation of water level drawdown will be
+influenced by snow water equivalent (SWE) at the end of spring, which will
+influence both the water present in the wetland and the upland groundwater. End
+of winter water levels will be controlled by fall water levels and winter
+precipitation. These models will be developed using pre-treatment data from all
+of the watersheds and potentially some post-treatment data from the five control
+watersheds. As the goal of these models is prediction of wetland water levels
+given environmental drivers, model performance will be evaluated against the
+remaining post-treatment data for the control watersheds [@kuhn-2013]. Separate
+models will be fit to the post-treatment conditions in the ash cut and girdle
+watersheds holding the final year of post-treatment data in reserve for model
+validation.
+
+#### Future Climate Conditions
+Wetland models were run under simulated current (1980-2009) and future
+(2070-2099) conditions. Future conditions were evaluated under the RCP 4.5 and
+RCP 8.5 emission scenarios. Daily climate projections for all scenario-period
+combinations were taken from the localized constructed analogs downscaling
+(LOCA) for the General Fluid Dynamics Lab Coupled Model (GFDL-CM3) and National
+Center for Atmospheric Research Community Earth System Model (CCSM4) global
+climate models (GCMS) [@pierce-2014; *GFDL-CM3, CCSM4 Citations*]. LOCA
+downscaled data were retrieved from the downscaled CMIP3 and CMIP5 Climate and
+Hydrology Projections archive
+(http://gdo-dcp.ucllnl.org/downscaled_cmip_projections/).  Performance of GCMs
+in the Great Lake region varies due to the mostly unaccounted for regional
+climate impact of the Great Lakes [@notaro-2015; @rood-2018]. GCM model
+selection was guided by performance and sensitivity (magnitude of change under a
+given emissions scenario relative to other GCMs) of the models in the Great
+Lakes region [@byun-2018].Both GFDL-CM3 and CCSM4 were found to be well
+performing models for the Great Lakes region, and CCSM4 and GFDL-CM3 represent a
+less and more sensitive models, respectively. The two-model 'bookend' approach
+provides a range of potential future conditions as opposed to the multi-model
+ensemble approach which masks some of the uncertainty in potential future
+conditions [**NIACS CITATION**]
+
+
+GCMs vary in how or if they consider the Great Lakes impact on local and regional
+climate [@notaro-2015]
+were 
+
+Climate change projections vary within a given region depending upon the global
+model used and the emissions scenario selected [@avery-2018]. Additionally GCMs
+vary in how or if they consider the Great Lakes impact on local and regional
+climate, meaning selection of an appropriate regional climate model (RCM) is
+important [@notaro-2015]. The Great Lakes Integrated Sciences + Assessments
+(GLISA) curates a selection of global and regional climate models and downscaled
+data which are evaluated to ensure that they include a Great Lakes signal and is
+known as the Great Lakes Ensemble [@rood-2018]. I will be drawing my climate
+model output from this resource, and plan to consider at least two emissions
+scenarios. These climate model outputs will be used to recondition the SWG
+parameters to new climate drivers in place of the local weather stations. The
+reconditioned SWG will be used to generate synthetic weather time series and
+drive the wetland water level models _n_ times. These _n_ simulations will
+provide credibility intervals around the most probable wetland response to
+future climate conditions for forested and impacted wetlands.
+
+Lakes are important in models [@bonan-1995]
+
+RCP8.5 may not be a likely worst case scenario any more [@harvey-2020; @hausfather-2020]
+
+
+#### Stochastic Weather Generator  
+Stochastic weather generators (SWG) can be used to simulate daily weather
+conditions to generate model inputs for a given climatology [@wilks-1999]. SWGs
+have also been used as a downscaling technique for global or regional climate models
+[@verdin-2015; @verdin-2019]. I currently plan to use the Bayesian stochastic
+weather generator described in @verdin-2019. This SWG propagates the uncertainty
+of the parameters used to generate daily weather, providing additional
+variability into the final model output and performs well in generating extreme
+events. I will initially paramatize the generator using local weather stations
+and evaluate performance by comparing monthly summary statistics for the
+observed and simulated weather conditions (See @gregory-1993 for citation about 
+indication that this means synthetic and observed climates are good matches). 
+After initial
+validation using observed local climatology the present-day outputs for the
+selected climate models and emission scenarios (see below) will be used to drive
+the SWG. The output of _n_ runs will again be evaluated against the observed
+weather conditions. When the SWG is performing as desired I will use the
+generated time series to drive the wetland water level models and compare mean
+water level patterns over _n_ runs with observed water levels as a final
+validation.
+
+Good description of validating GCM outputs in @hayhoe-2010, p.11. Should be 
+applicable to RCMs as well.
+
+
+### Results
+
+#### SWG
+
+Must check length of wet and dry spells and make sure they agree with climate 
+predictions [@wilks-1999 p.333]
+
+#### Wetland Water Levels
+
+Should I look at predicted vs fitted low and high quantiles for water levels?
+
+Look at amount of time above threshold WL from morphology mods (recreate morpho
+mods to get threshold WL to use for max WL in hystersis models)
+
+
+### Discussion
+
+#### Species selection
+Use hydrograph results to reexaming list from Iverson and results from Looney &
+Bolton to see if any of the recommendations hold true, or if any new species 
+could be considered depending on the simulation results
+
+#### Rain on Snow
+Rain on snow melt can increase melt timing and result in reduced groundwater 
+recharge, which will likely impact the immediacy of wetland water level drawdown.
+Idea from Meyers H028-07 AGU 2020
+
+## Acknowledgements
+Andrew Verdin for discussion and code examples.
+
+# References
