@@ -8,7 +8,7 @@
 ##' @author Joe Shannon
 ##' @export
 calculate_hargreaves_pet <- 
-  function(data, lambda.MJ.kg) {
+  function(data, lambda.MJ.kg, return.vector = FALSE) {
     # 0.014375 = 0.0023/0.16, taken from Hargreaves & Allen 2003 (eq. 8 & Ks =
     # 0.16 from precedeing paragraph)
     # Eq 3 from Hargreaves & Allen (2003), using Rs as calculated from 
@@ -16,6 +16,14 @@ calculate_hargreaves_pet <-
     data[, pet_cm := pmin(0, -0.1 * 0.0135 * solrad_MJ_m2 / lambda.MJ.kg * (tmean_c + 17.8))][]
     
     data[tmax_c <= 0, pet_cm := 0]
+    
+    # Not the cleanest implementation, but can't have two pet_cm columns added
+    # to data since I do it by reference above
+    if(return.vector) {
+      pet <- data$pet_cm
+      data[, pet_cm := NULL]
+      return(pet)
+      }
     
     data
   }
