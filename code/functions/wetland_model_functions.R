@@ -306,7 +306,7 @@ optimize_params <-
                      
                      -sum(dnorm(resids,
                                 mean = 0,
-                                sd = sd(diff(data$wl_initial_cm), na.rm = TRUE),
+                                sd = sd(diff(data$wl_initial_cm), na.rm = TRUE) / sum(!is.na(data$wl_initial_cm)),
                                 log = TRUE))
                      
                      # hydroGOF::md(wl_hat[!is.na(data$wl_initial_cm)], data$wl_initial_cm[!is.na(data$wl_initial_cm)])
