@@ -3,6 +3,7 @@ data.table
 purrr
 furrr
 sirad
+sn
 lubridate
 geodist
 ggplot2
@@ -12,4 +13,3 @@ airGR
 stringr
 tidync
 ncmeta
-sn msn.mle dp2cp rmsn
