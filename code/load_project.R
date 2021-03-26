@@ -1,6 +1,16 @@
 # Load packages
 library(targets)
-purrr::walk(readLines("code/climate_packages.txt"), library, character.only = TRUE)
+pkgs <- purrr::map(readLines("code/climate_packages.txt"), strsplit, " ")
+pkgs <- purrr::map(pkgs, unlist)
+purrr::map_if(pkgs, 
+              ~length(.x) == 1, 
+              ~library(.x[[1]], 
+                       character.only = TRUE))
+purrr::map_if(pkgs, 
+              ~length(.x) > 1, 
+              ~library(.x[[1]], 
+                       character.only = TRUE, 
+                       include.only = .x[-c(1)]))
 
 # Load functions
 for(i in list.files("code/functions", full.names = TRUE)){
