@@ -30,19 +30,23 @@ swg_single_site <-
     lat <- 
       con.data$lat[1]
     
-    # Should calculated PET etc when donig format_swg
-    con.data <- 
-      copy(con.data) %>% 
-      calculate_mean_temp() %>% 
-      calculate_solar_radiation(coefs = solar.coefs,
-                                return.vector = FALSE) %>% 
-      calculate_hargreaves_pet(lambda.MJ.kg = 2.45)
+    if(!is.null(solar.coefs)){
     
+      # Should calculated PET etc when donig format_swg
+      con.data <- 
+        copy(con.data) %>% 
+        calculate_mean_temp() %>% 
+        calculate_solar_radiation(coefs = solar.coefs,
+                                  return.vector = FALSE) %>% 
+        calculate_hargreaves_pet(lambda.MJ.kg = 2.45)
+      
+      
+      mean_snowfall <- 
+        calculate_snowmelt(con.data, 
+                           cn.params = c(0.4, 2.9), 
+                           return.mean.snowfall = TRUE)$mean_snowfall_mm
     
-    mean_snowfall <- 
-      calculate_snowmelt(con.data, 
-                         cn.params = c(0.4, 2.9), 
-                         return.mean.snowfall = TRUE)$mean_snowfall_mm
+    }
     
     swg.coefs <-
       flatten(swg.models[1, .(occur_coefs,
