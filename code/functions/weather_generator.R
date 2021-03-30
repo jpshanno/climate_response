@@ -8,11 +8,14 @@
 ##' @author Joe Shannon
 ##' @export
 swg_single_site <-   
-  function(con.data, swg.models = NULL, simulation.dates, n.workers = 1, n.simulations, seed = 1234, solar.coefs = NULL){
-  
-  # For some reason this does not work when used with .SD inside a nested 
-  # data.table. It hangs on exit. 
-  
+  function(con.data, 
+           swg.models = NULL, 
+           simulation.dates, 
+           n.workers = 1, 
+           n.simulations, 
+           seed = 1234, 
+           solar.coefs = NULL){
+
   set.seed(seed)
   
   if(nrow(con.data) < 365){
@@ -53,8 +56,7 @@ swg_single_site <-
                            amount_coefs,
                            tmin_coefs,
                            tmax_coefs,
-                           regional_monthly_sd_tmin_c,
-                           regional_monthly_sd_tmax_c,
+                           monthly_temp_error, 
                            amount_shape)])
     
   sim_data <- 
@@ -122,6 +124,9 @@ swg_single_site <-
                                sim_tmin <- 
                                numeric(days_per_sim)
                              
+                             monthly_temp_params <- 
+                               swg.coefs$monthly_temp_error
+                             
                              min_t_difference <- 0.5
                              
                              init_conditions <- 
@@ -130,9 +135,7 @@ swg_single_site <-
                                           mean_precip_amount = mean(precip_amount, na.rm = TRUE),
                                           sd_precip_amount = sd(precip_amount, na.rm = TRUE), 
                                           mean_tmax_c = mean(tmax_c, na.rm = TRUE),
-                                          sd_tmax_c = sd(tmax_c, na.rm = TRUE), 
-                                          mean_tmin_c = mean(tmin_c, na.rm = TRUE),
-                                          sd_tmin_c = sd(tmin_c, na.rm = TRUE))]
+                                          mean_tmin_c = mean(tmin_c, na.rm = TRUE))]
                              
                              # initialize with a sample from binomial with probability equal to 
                              # the observed probability of occurrence for 31 Dec (all years)
@@ -144,13 +147,18 @@ swg_single_site <-
                              
                              while(initial_tdiff < min_t_difference){
                                
+                               sim_temp_error <- 
+                                 rmsn(1, dp = monthly_temp_params[[month(simulation.dates[1] - 1)]][[sim_occur[1] + 1]])
+                               
                                sim_tmax[1] <- sim_tmax_l1 <- 
-                                 rnorm(1, mean = init_conditions$mean_tmax_c, sd = init_conditions$sd_tmax_c)
+                                 init_conditions$mean_tmax_c + sim_temp_error[1, 2]
                                
                                sim_tmin[1] <- sim_tmin_l1 <- 
-                                 rnorm(1, mean = init_conditions$mean_tmin_c, sd = init_conditions$sd_tmin_c)
+                                 init_conditions$mean_tmin_c + sim_temp_error[1, 1]
                                
-                               initial_tdiff <- sim_tmax[1] - sim_tmin[1]
+                               initial_tdiff <- 
+                                 sim_tmax[1] - sim_tmin[1]
+                               
                              }
                              
                              # Sample a conditioning year at random each simulation
@@ -187,12 +195,6 @@ swg_single_site <-
                                                      regional_precip_cm$jja,
                                                      regional_precip_cm$son),
                                            shape = swg.coefs$amount_shape)
-                             
-                             monthly_tmin_sd <- 
-                               swg.coefs$regional_monthly_sd_tmin_c
-                             
-                             monthly_tmax_sd <- 
-                               swg.coefs$regional_monthly_sd_tmax_c
                              
                              # Reduce subsets within loop to speed things up
                              regional_precip_cm_djf <- regional_precip_cm$djf
@@ -255,6 +257,9 @@ swg_single_site <-
                                
                                while(sim_t_difference < min_t_difference){
                                  
+                                 sim_temp_errors <- 
+                                   rmsn(1, dp = monthly_temp_params[[simulation_month[i]]][[sim_occur[i] + 1]])
+                                 
                                  # max is mean function + rnorm TMAX.sd according to month
                                  # covariates for mean function are PMN, PMX, ct, st, OCC, Rt
                                  sim_tmax[i] <- 
@@ -274,8 +279,7 @@ swg_single_site <-
                                            regional_tmax_c_mam[i],
                                            regional_tmax_c_jja[i],
                                            regional_tmax_c_son[i])) + 
-                                   rnorm(n=1, mean=0, sd = monthly_tmin_sd[simulation_month[i]])
-                                 
+                                   sim_temp_errors[1, 2]
                                  
                                  # min is mean function + rnorm TMIN.sd according to month
                                  # covariates for mean function are PMN, PMX, ct, st, OCC, Rt
@@ -296,8 +300,7 @@ swg_single_site <-
                                            regional_tmax_c_mam[i],
                                            regional_tmax_c_jja[i],
                                            regional_tmax_c_son[i])) + 
-                                   rnorm(n = 1, mean = 0, sd = monthly_tmax_sd[simulation_month[i]])
-                                 
+                                   sim_temp_errors[1, 1]
                                  
                                  sim_t_difference <- 
                                    sim_tmax[i] - sim_tmin[i]
@@ -483,13 +486,27 @@ swg_build_models <-
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     
     # Temperature standard deviations
-    swg_models[,
-               regional_monthly_sd_tmin_c := map2(dat, tmin_resids,
-                                                  ~tapply(.y, .x$sample_month, sd, na.rm = TRUE))]
     
-    swg_models[,
-               regional_monthly_sd_tmax_c := map2(dat, tmax_resids,
-                                                  ~tapply(.y, .x$sample_month, sd, na.rm = TRUE))]
+    swg_models[, temp_resids := map2(tmin_resids, tmax_resids,
+                                     ~cbind(.x, .y))]
+    
+    swg_models[, monthly_temp_error := map2(dat,
+                                            temp_resids,
+                                            ~{
+                                              dat <- 
+                                                cbind(.x[, .(sample_date, precip_occur)], resid_tmin = .y[, 1], resid_tmax = .y[, 2])
+                                              
+                                              dat[, sample_month := month(sample_date)]
+                                              
+                                              dat <- 
+                                                dat[!is.na(resid_tmin) & !is.na(resid_tmax), 
+                                                    .(msn_params = list(msn.mle(y = as.matrix(.SD[, .(resid_tmin, resid_tmax)]))$dp)), 
+                                                    by = .(sample_month, precip_occur)]
+                                              
+                                              split(dat[order(sample_month, precip_occur)], by = "sample_month") %>%
+                                                map(split, by = "precip_occur") %>% 
+                                                modify_depth(2, pluck, "msn_params", 1)
+                                            })]
     
     swg_models[]
   }
