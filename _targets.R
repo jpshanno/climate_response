@@ -136,6 +136,7 @@ targets <- list(
     water_budget,
     prepare_water_levels(path = study_path("well_levels", study_data_paths)) %>% 
       subset(site != "006") %>% 
+      set(i = which(.$water_year %in% c(2016, 2020)), j = "wl_initial_cm", value = NA_real_) %>% 
       append_study_precip(precip.path = study_path("precip", study_data_paths)) %>% 
       merge_external_met(external.met = external_met)
   )
