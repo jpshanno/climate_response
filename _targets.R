@@ -19,6 +19,7 @@ targets <- list(
   
   # Set Data Paths ----------------------------------------------------------
   
+  # Paths to Study Field Data
   tar_target(
     study_data_paths,
     c("data/well_levels.csv",
@@ -26,14 +27,14 @@ targets <- list(
     format = "file"
   )
   
+  # Paths to Mesowest Meterological Stations
   , tar_target(
     mesowest_dir,
     "data/mesowest_met/",
     format = "file"
   )
   
-  # The station inventory for the HPD data is not a stable address, the date
-  # changes. Need to update the function to account for that.
+  # Paths to HPN & GHCND Stations
   , tar_target(
     ncei_files,
     fetch_ncei_data(out.path = "data/ncei_data",
@@ -45,7 +46,14 @@ targets <- list(
                     force.download = TRUE),
     format = "file"
   )
-  
+
+  # Path to Climate Normals
+  , tar_target(
+    climate_norms_file,
+    "data/bergland_climate_normals.csv",
+    format = "file")
+    
+  # Paths to LOCA Daily Projections
   , tar_target(
     loca_files,
     list.files("data/loca_ccsm4_gfdlcm3/", 
@@ -54,13 +62,9 @@ targets <- list(
     format = "file"
   )
   
-  , tar_target(
-    climate_norms_file,
-    "data/bergland_climate_normals.csv",
-    format = "file")
+  # Prepare Data ----------------------------------------------------------
   
-  # Prepare Met Data ------------------------------------------------------
-  
+  # Create Climate Normals Dataset
   , tar_target(
     climate_norms,
     prepare_climate_norms(norms.file = climate_norms_file,
@@ -69,6 +73,14 @@ targets <- list(
                           solrad.coefs = solrad_coefs[station_name == "PIEM4"]),
   )
   
+  # Units for GHCND columns to automate conversion & standardization
+  # taken from GHCND README
+  , tar_target(
+    ghcnd_units,
+    fread("resources/ghcnd_element_codes.csv")
+  )
+  
+  # Prepare GHCND data for use in SWG creation
   , tar_target(
     swg_data,
     prepare_ghcnd_swg_data(ncei.paths = ncei_files[grepl("\\.dly$", ncei_files)], 
@@ -77,6 +89,7 @@ targets <- list(
                                                    "USR0000MWAT", "USC00206220"))
   )
   
+  # Combine and format Mesowest stations
   , tar_target(
     mesowest_met,
     prepare_mesowest_data(dir = mesowest_dir, 
@@ -84,18 +97,13 @@ targets <- list(
                           end.date = as.Date("2020-10-31"))
   )
   
+  # Calculate Bristow-Campbell Solar Radiation Coefficients
   , tar_target(
     solrad_coefs,
     calculate_solrad_coefs(data = mesowest_met)
   )
-  
-  , tar_target(
-    # Elements units
-    # Taken from GHCND readme
-    ghcnd_units,
-    fread("resources/ghcnd_element_codes.csv")
-  )
-  
+
+  # Create Combined External Met Data for Wetland Model Creation
   # The removed stations may be okay looking at the raw GHCND data, but they 
   # showed very strange trends in water availability, likely the result of an 
   # instrumentation change or a the backfilling process
@@ -121,6 +129,7 @@ targets <- list(
       calculate_water_availability()
   )
   
+  # Extract LOCA daily projections at various meteorological stations
   , tar_target(
     loca_simulations,
     extract_loca_simulations(nc.files = loca_files,
@@ -130,8 +139,7 @@ targets <- list(
     .[, swg_format_data(.SD), by = .(gcm, scenario)]
   )
   
-  
-  # Prepare Water Budget Data ---------------------------------------------
+  # Combine Study Data and External Met Data
   , tar_target(
     water_budget,
     prepare_water_levels(path = study_path("well_levels", study_data_paths)) %>% 
@@ -145,29 +153,25 @@ targets <- list(
   # Training data for the control period for each site comes from the first 
   # availabile year of data. For most sites this is 2012 (which is ideal because
   # it has the largest drawdown period, which means it provides the best data
-  # for ESy models). For treatment data just choosing the first post-treatment
-  # year
+  # for ESy models). The same process is used for the treatment period
   
   , tar_target(
     training_data,
     list(control = select_training_data(water_budget),
          treated = selected_treatment_training_data(water_budget)),
-         # treated = water_budget[water_budget[!is.na(wl_initial_cm) & site_status == "Treated", 
-         #                        .(training_year = min(water_year)),
-         #                        by = .(site)],
-         #                        on = c("site", water_year = "training_year")]),
     format = "rds"
   )
   
-
   # Train Wetland Models ----------------------------------------------------
 
+  # Create Esy models for each wetland
   , tar_target(
     esy_functions,
     build_esy_functions(training_data[["control"]]),
     format = "rds"
   )
   
+  # Optimize Control Models
   , tar_target(
     control_optimization,
     fit_models(training_data[["control"]],
@@ -182,6 +186,7 @@ targets <- list(
     format = "rds"
   )
   
+  # Reoptimize models for the control period
   , tar_target(
     treated_optimization,
     refit_model(training_data[["treated"]],
@@ -192,6 +197,7 @@ targets <- list(
     format = "rds"
   )
   
+  # Combine Control & Treated Model Parameters
   , tar_target(
     model_params,
     setkey(rbind(control_optimization[, .(site, site_status = "Control", params)],
@@ -199,7 +205,6 @@ targets <- list(
            site, site_status)[],
     format = "rds"
   )
- 
 
   # Evaluate Models ---------------------------------------------------------
   # This should probably be done breaking the water years up rather than doing 
@@ -207,8 +212,9 @@ targets <- list(
   # water years within a given site.
   
 
-  # Create Weather Series ---------------------------------------------------
-  
+  # Simulate Weather Series -------------------------------------------------
+
+  # Create & Run SWG for Observed Data  
   , tar_target(
     swg_simulations_observed,
     swg_single_site(con.data = swg_data[station_name == "bergland_dam"],
@@ -218,7 +224,7 @@ targets <- list(
                     simulation.dates = seq(as.Date("2008-11-01"), as.Date("2009-10-31"), by = "days")),
   )
 
-  # Perform one extra simulation because one is dropped when calculating CN snow
+  # Create & Run SWG for LOCA Data
   , tar_target(
     swg_simulations_loca,
     loca_simulations[station_name == "bergland_dam",
