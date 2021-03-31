@@ -159,9 +159,35 @@ build_esy_functions <-
 ##' @export
 ##' 
 wetland_model <- 
-  function(data, params){
+  function(data, params, future.forest.change = NA){
+
+    # Percentage of Basal Area As Ash
+    # 1 009   0.752355 - 2012 Veg Surveys
+    #   053   0.756437 - 2014 Veg Surveys
+    # 2 077   0.440609 - 2012 Veg Surveys
+    #   111   0.48
+    #   113   0.663741 - 2015 Veg Surveys
+    # 3 119   0.838836 - 2012 Veg Surveys
+    # 4 135   0.261113 - 2012 Veg Surveys
+    #   139   0.38
+    # 5 140   0.703470 - 2012 Veg Surveys
+    # 6 151   0.535355 - 2012 Veg Surveys
+    # 7 152   0.663909 - 2012 Veg Surveys
+    # 8 156   0.850605 - 2012 Veg Surveys
+    # 9 157   0.821684 - 2012 Veg Surveys
+    
     MPET <-
       params[["MPET"]]
+    
+    if(is.na(future.forest.change)){
+      pet_fun <- 
+        function(wl, max.wl, future.forest.change){ 1 }
+    } else {
+      pet_fun <- 
+        function(wl, max.wl, future.forest.change){
+          (1 - future.forest.change) + future.forest.change * pmin(1, abs(1/(1.45077 - 0.05869 * (wl - max.wl))))
+        }
+    }
     
     MP <- 
       params[["MP"]]
@@ -232,7 +258,7 @@ wetland_model <-
         # less than interception (not necessarily true, but works as a 
         # simplifying assumption)
         pet_hat[t] <- 
-          (MPET * PET[t]) * gradient[t]
+          pet_fun(wl_hat[t-1], maxWL, future.forest.change) * (MPET * PET[t]) * gradient[t]
         
         wl_hat[t] <-
           wl_hat[t-1] + pet_hat[t]

@@ -200,9 +200,8 @@ targets <- list(
   # Combine Control & Treated Model Parameters
   , tar_target(
     model_params,
-    setkey(rbind(control_optimization[, .(site, site_status = "Control", params)],
-                 treated_optimization[, .(site, site_status = "Treated", params)]),
-           site, site_status)[],
+    concatenate_model_params(Control = control_optimization, 
+                             Treated = treated_optimization),
     format = "rds"
   )
 
