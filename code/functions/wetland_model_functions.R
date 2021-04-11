@@ -328,14 +328,32 @@ optimize_params <-
                        wetland_model(data = data, params)$wl_hat
                      
                      resids <- 
-                       (wl_hat - data$wl_initial_cm)[!is.na(data$wl_initial_cm)]
+                       (wl_hat - data$wl_initial_cm)
                      
-                     -sum(dnorm(resids,
-                                mean = 0,
-                                sd = sd(diff(data$wl_initial_cm), na.rm = TRUE) / sum(!is.na(data$wl_initial_cm)),
-                                log = TRUE))
+                     # obs_weights <- 
+                     #   as.data.table(density(data[, wl_initial_cm], 
+                     #                         na.rm = TRUE)[c("x", "y")]
+                     #                 )[, .(x, weight = -log(y))]
+                     # 
+                     # weights_index <- 
+                     #   map_int(wl_hat, 
+                     #           ~if(is.na(.x)){
+                     #             return(NA_integer_)
+                     #           } else {
+                     #             which.min(abs(.x - obs_weights$x))
+                     #           })
+                     # 
+                     # resid_weights <- 
+                     #   obs_weights[weights_index, weight]
                      
-                     # hydroGOF::md(wl_hat[!is.na(data$wl_initial_cm)], data$wl_initial_cm[!is.na(data$wl_initial_cm)])
+                     # -sum(
+                     #   # resid_weights[!is.na(data$wl_initial_cm)] * 
+                     #     dnorm(resids[!is.na(data$wl_initial_cm)],
+                     #           mean = 0,
+                     #           sd = sd(diff(data$wl_initial_cm), na.rm = TRUE) / sum(!is.na(data$wl_initial_cm)),
+                     #           log = TRUE))
+                     
+                     hydroGOF::rsr(wl_hat[!is.na(data$wl_initial_cm)], data$wl_initial_cm[!is.na(data$wl_initial_cm)])
                    })
     
     opt$par <- c(opt$par, unlist(fixed))
