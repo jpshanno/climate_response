@@ -162,6 +162,12 @@ targets <- list(
     format = "rds"
   )
   
+  , tar_target(
+    testing_data,
+    water_budget[!training_data[["control"]]][!training_data[["treated"]]]
+  )
+  
+  
   # Train Wetland Models ----------------------------------------------------
 
   # Create Esy models for each wetland
@@ -210,6 +216,22 @@ targets <- list(
   # them sequentially. Need to also consider adjusting max.wl for different 
   # water years within a given site.
   
+  , tar_target(
+    test_data_fits,
+    predict_test_period(data = testing_data, 
+                        model.params = model_params)
+  )
+  
+  , tar_target(
+    model_evaluation_summary,
+    evaluate_wetland_models(data = test_data_fits))
+  
+  , tar_target(
+    model_evaluation_plots,
+    create_model_evaulation_plots(data = test_data_fits,
+                                  out.dir = "output/figures/wetland_model_evalution"),
+    format = "file"
+  )
 
   # Simulate Weather Series -------------------------------------------------
 
