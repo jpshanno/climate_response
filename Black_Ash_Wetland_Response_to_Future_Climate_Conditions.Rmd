@@ -563,9 +563,6 @@ increased variability relative to LOCA values, but follows the same general
 distribution.
 
 <!--
-Must check length of wet and dry spells and make sure they agree with climate
-predictions [@wilks-1999 p.333]
-
 evaluate performance by comparing monthly summary statistics for the
 observed and simulated weather conditions (See @gregory-1993 for citation about
 indication that this means synthetic and observed climates are good matches).
@@ -629,55 +626,14 @@ probability of drawdown than was observed under the current ash forest.
 Probability of drawdown was greater in the more sensitive scenario relative to
 the less sensitive scenario and also more variable. Under the non-forest cover
 and more sensitive scenario probability of drawdown was greater than observed
-and greater than the less sensitive scenario. The less sensitve scenario had
+and greater than the less sensitive scenario. The less sensitive scenario had
 a higher probability of drawdown conditions than observations, but 
-showed overlap with interannual variation. 
+showed overlap with interannual variation. Drawdown events were very unlikely
+under replacement forested conditions.
 
 
-<!-- in code/results_connectivity.R -->
-'significant over lap between interannual variability' 'difference in the 
+<!-- 'significant over lap between interannual variability' 'difference in the  -->
 
-
-Late spring and summer simulations showed decreased probability of surface
-water connectivity under all climate scenario and vegetation condition
-combinations. Simulations under GFDL-CM3 (8.5) showed the earliest decrease in
-probability of connectivity and followed by CCSM4 (4.5) and last current
-conditions. Simulations under CCSM4 (4.5) consistently showed the lowest
-probability of connectivity during the summer season (forested:, non-forested:
-). Simulations under GFDL-CM3 (8.5) showed similar (non-forested) or increased (
-forested) probability of connectivity relative to current conditions during the
-summer season. Under replacement forest conditions CCSM4 (4.5) connectivity
-closely matched current connectivity in the fall, while GFDL-CM3 (8.5)
-connectivity was less than current conditions. Non-forested conditions showed
-more variability in the probability of connectivity (wider 50% quantile
-intervals) relative to the replacement forest conditions.
-
-<!-- in code/results_inundation.R -->
-Under both vegetation conditions the probability of surface inundation is least
-under the CCSM4 (4.5) and greatest under current climate with GFDL-CM3 falling
-between the other two scenarios. For replacement forests CCSM4 (4.5) the median
-daily simulated probability of water levels within 10cm of the soil surface
-drops to as low as 0.57 during the peak of the growing season. Minimum median
-daily simulated probability of water levels within 10cm of the soil surface was
-0.75 under GFDL-CM3 (8.5) and 0.84 under historical climate conditions. Under
-replacement forests and all climate scenarios water was more likely to be
-present close to the surface relative to current ash forest conditions. Early
-season drawdown may result in less surface water under the more senstive climate
-scenario. For non-forested conditions the climate scenarios fell in the same
-order with more separation between scenarios. The minimum median simulated
-probability of water levels within 10cm of the soil surface was 0.70, 0.57, 0.38
-for current climate, GFDL-CM3 (8.5), and CCSM4 (4.5) respectively. Here we see
-similar probability of near-surface water under CCSM4 (4.5) relative to current
-ash forest conditions. Early season drawdown may lead to lower early growing
-season water levels under GFDL-CM3 (8.5). Surface water was found to be less
-likely in the fall under GFDL-CM3 (8.5) and CCSM4 (4.5).
-
-
-<!-- in code/results_drawdown.R -->
-          scenario Ash Forest Replacement Forest Non-Forested
-1: Current Climate     0.1364             0.0048      0.07200
-2:  Less Sensitive     0.4429             0.0545      0.29460
-3:  More Sensitive     0.2937             0.0163      0.17745
 
 ### Discussion
 
