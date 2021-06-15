@@ -154,6 +154,10 @@ build_esy_functions <-
 
 ##' @title Wetland model
 
+##' PET adjustment has pmin(1, ...) because the adjustment regression
+##' could show an increase in PET for extermely high water levels, but
+##' I don't think that's realistic
+
 ##' @return
 ##' @author Joe Shannon
 ##' @export
@@ -353,7 +357,15 @@ optimize_params <-
                      #           sd = sd(diff(data$wl_initial_cm), na.rm = TRUE) / sum(!is.na(data$wl_initial_cm)),
                      #           log = TRUE))
                      
-                     hydroGOF::rsr(wl_hat[!is.na(data$wl_initial_cm)], data$wl_initial_cm[!is.na(data$wl_initial_cm)])
+                     # hydroGOF::rsr(wl_hat[!is.na(data$wl_initial_cm)], data$wl_initial_cm[!is.na(data$wl_initial_cm)])
+                     
+                     wghts <- ifelse(params$maxWL >= data$wl_initial_cm,
+                                     pmax(0.1, params$maxWL - data$wl_initial_cm),
+                                     0.1)
+                     
+                     sqrt(weighted.mean(resids^2, w = wghts^2, na.rm = TRUE))
+                     
+                     
                    })
     
     opt$par <- c(opt$par, unlist(fixed))
