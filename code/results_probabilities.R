@@ -415,29 +415,61 @@ connectivity_panel <-
 
 
 # Summary Panel -----------------------------------------------------------
-
 library(forcats)
+ci_width <- 0.67
+ci_function <- function(...) {ggdist::hdci(...)}
+point_function <- function(...) {median(...)}
+
+
+tar_load(c(training_data, testing_data, control_optimization))
+
+obs_cols <- c(
+  "site", "sample_date", "sample_year", "wl_initial_cm", "treatment",
+  "site_status")
+
+observations <- rbindlist(list(
+  testing_data[site_status == "Control" & month(sample_date) %in% 5:10, ..obs_cols],
+  training_data$control[month(sample_date) %in% 5:10, ..obs_cols]
+  ))
+
+observations[, simulation_month := month(sample_date, label = TRUE, abbr = TRUE)]
+
+observations[control_optimization[, .(site, max_wl = map_dbl(params, "maxWL"))],
+             on = c("site"),
+             max_wl := i.max_wl]
+
+obs_probs <- 
+  observations[!is.na(wl_initial_cm),
+             .(Connectivity = sum(wl_initial_cm >= (max_wl - 5), na.rm = TRUE) / .N,
+               Inundation = sum(wl_initial_cm >= -10, na.rm = TRUE) / .N,
+               Drawdown = sum(wl_initial_cm <= -50, na.rm = TRUE) / .N),
+             by = .(site, simulation_month)] %>%
+  melt(id.vars = c("site", "simulation_month"), value.name = "Probability") %>%
+  {rbind(.[, c(.SD, site_status = "Future Forested")],
+        .[, c(.SD, site_status = "Treated")])}
+
 
 summary_baseline <- 
   proportions[site_status == "Control" & scenario == "historical" & month(simulation_date) %in% 5:10, 
-              .(Connectivity = median(prop_within_5cm_max_wl),
-                Drawdown = median((1-prop_above_neg_50)),
-                Inundation = median(prop_above_neg_10)),
+              .(Connectivity = point_function(prop_within_5cm_max_wl),
+                Drawdown = point_function((1-prop_above_neg_50)),
+                Inundation = point_function(prop_above_neg_10)),
               by = .(simulation_month = month(simulation_date, label = TRUE, abbr = TRUE))] %>% 
   melt(id.vars = "simulation_month",
        value.name = "Probability")
 
+# Using qi() not HDCI because of how skewed the probabilities are
 summary_dat <- 
-  proportions[site_status != "Control" & month(simulation_date) %in% 5:10, 
-              .(connectivity = median(prop_within_5cm_max_wl),
-                connectivity_min = ggdist::qi(prop_within_5cm_max_wl, .width = 0.5)[[1]],
-                connectivity_max = ggdist::qi(prop_within_5cm_max_wl, .width = 0.5)[[2]],
-                drawdown = median((1-prop_above_neg_50)),
-                drawdown_min = ggdist::qi((1-prop_above_neg_50), .width = 0.5)[[1]],
-                drawdown_max = ggdist::qi((1-prop_above_neg_50), .width = 0.5)[[2]],
-                inundation = median(prop_above_neg_10),
-                inundation_min = ggdist::qi(prop_above_neg_10, .width = 0.5)[[1]],
-                inundation_max = ggdist::qi(prop_above_neg_10, .width = 0.5)[[2]]),
+  proportions[site_status != "Control" & month(simulation_date) %in% 5:10,
+              .(connectivity = point_function(prop_within_5cm_max_wl),
+                connectivity_min = ci_function(prop_within_5cm_max_wl, .width = ci_width)[[1]],
+                connectivity_max = ci_function(prop_within_5cm_max_wl, .width = ci_width)[[2]],
+                drawdown = point_function((1-prop_above_neg_50)),
+                drawdown_min = ci_function((1-prop_above_neg_50), .width = ci_width)[[1]],
+                drawdown_max = ci_function((1-prop_above_neg_50), .width = ci_width)[[2]],
+                inundation = point_function(prop_above_neg_10),
+                inundation_min = ci_function(prop_above_neg_10, .width = ci_width)[[1]],
+                inundation_max = ci_function(prop_above_neg_10, .width = ci_width)[[2]]),
               by = .(site_status, 
                      scenario = fcase(scenario == "historical", "Current Climate", 
                                       scenario == "rcp45", "Less Sensitive", 
@@ -484,9 +516,9 @@ test <-
 ggplot(summary_dat) + 
   stat_gradientinterval(data = test,
                         color = NA,
-                                aes(x = simulation_month,
-                                    y = Probability,
-                                    slab_alpha = stat(-pmin(0.5, pmax(abs(1-2*cdf),0.1))))) +
+                        aes(x = simulation_month,
+                            y = Probability,
+                            slab_alpha = stat(-pmin(ci_width, pmax(abs(1-2*cdf), 0))))) + # Shading covers 67% of data, starts to fade at 10%
   geom_boxplot(data = summary_baseline,
                aes(x = simulation_month,
                    y = Probability),
@@ -497,13 +529,6 @@ ggplot(summary_dat) +
                       ymax = ymax,
                       color = scenario),
                   position = position_dodge(width = 0.6)) +
-  # stat_gradientinterval(data = test_dat,
-  #                       aes(x = simulation_month,
-  #                           y = Probability,
-  #                           color = scenario,
-  #                           fill = scenario,
-  #                           slab_alpha = stat(-pmin(0.5, pmax(abs(1-2*cdf),0.1)))),
-  #                       position = position_dodge(width = 0.6)) +
   scale_fill_manual(values = c(`Current Climate` = green,
                                `Less Sensitive` = darkblue,
                                `More Sensitive` = orange,
@@ -514,9 +539,18 @@ ggplot(summary_dat) +
                                 control = 'black')) +
   facet_grid(variable ~ site_status,
              scales = "free") +
+  labs(caption = "All ranges represent 67% of the simulations as HDCI. Points represent median. Gray shaded area represents model simulations for control conditions under the historical climate.") +
   guides(color = guide_legend(title = NULL)) +
   theme_minimal(base_size = 18) +
   theme(legend.position = c(0.01, 0.3),
         legend.justification = c(0, 1),
         panel.grid.minor.y = element_blank(),
         panel.border = element_rect(fill = NA))
+
+ggplot(rbindlist(list(simulation = test, obs = obs_probs), idcol = "type", fill = TRUE)) + 
+  geom_boxplot(aes(x = simulation_month,
+                   y = Probability,
+                   fill = type)) +
+  facet_grid(~ variable,
+             scales = "free") 
+  
