@@ -11,7 +11,7 @@ purrr::map_if(pkgs,
               ~library(.x[[1]], 
                        character.only = TRUE, 
                        include.only = .x[-c(1)]))
-
+rm(pkgs)
 # Load functions
 for(i in list.files("code/functions", full.names = TRUE)){
   source(i, verbose = FALSE)
