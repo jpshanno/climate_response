@@ -62,6 +62,13 @@ targets <- list(
     format = "file"
   )
   
+  # Path to raw wetland simulations
+# , tar_target(
+#   wetland_simulations_path,
+#   "/run/media/jpshanno/Joe_Shannon/wetland_simulations.csv.gz",
+#   format = "file"
+# )
+  
   # Prepare Data ----------------------------------------------------------
   
   # Create Climate Normals Dataset
@@ -246,19 +253,44 @@ targets <- list(
   )
 
   # Create & Run SWG for LOCA Data
+  # Stopped using water year start and end because that really works better with
+  # continuous data than with the simulation data. Had lots of days
+  # (specifically) historical gfdl-cm3 in early water year (Nov-Dec) that had
+  # low water levels. It may have to do with the seasonal conditioning of the
+  # swg with Sept & Oct bringing November values up
   , tar_target(
     swg_simulations_loca,
     loca_simulations[station_name == "bergland_dam",
                      swg_single_site(.SD, 
-                                     simulation.dates = seq(as.Date("2008-11-01"),
-                                                            as.Date("2009-10-31"),
+                                     simulation.dates = seq(as.Date("2009-01-01"),
+                                                            as.Date("2009-12-31"),
                                                             by = "days"),
                                      n.simulations = 10000,
                                      n.workers = 4,
                                      solar.coefs = solrad_coefs[station_name == "PIEM4"]),
                      by = .(gcm, scenario)]
   )
+
+
+  # Evaluate SWG Performance ------------------------------------------------
+
   
+
+  # Run Wetland Models on Synthetic Weather ---------------------------------
+  
+  , tar_target(
+    wetland_simulation_summaries,
+    simulate_wetlands(data = swg_simulations_loca, 
+                      model.params = model_params,
+                      out.path = "/run/media/jpshanno/Joe_Shannon/wetland_simulations.csv.gz"),
+    format = "rds"
+  )
+  
+  # , tar_target(
+  #   water_level_probabilities,
+  #   calculate_daily_probabilities(in.path = wetland_simulations_path)
+  # )
+    
 )
 
 # End with a call to tar_pipeline() to wrangle the targets together.
