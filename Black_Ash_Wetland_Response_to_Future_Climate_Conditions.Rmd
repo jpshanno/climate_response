@@ -320,8 +320,12 @@ flextable(tab) %>%
 Training data for wetland water level models was selected for each wetland as
 the year with the greatest water level drawdown within the control period. The
 remaining control-period years were used for wetland model evaluation. Wetland
-parameters were estimated using minimize the ratio of the root mean square error to the standard
-deviation of measured data (RSR) [@moriasi-2007]. To model impacted
+parameters were estimated using minimize the weighted root-mean square error of
+the predictions. Weights were applied asymmetrically where days with
+observed water levels greater than or equal to *WL<sub>max</sub>* were assign an
+weight equivalent to equal weight. As observed water levels decreased below
+*WL<sub>max</sub>* weights increased as the square of the difference between
+observed water level and *WL<sub>max</sub>*. To model impacted
 wetlands that have not recovered to a fully forested state the observed
 treatment data are used to reparameterize the model. Treatment-period training
 data were also selected to maximize water level drawdown in the training set.
