@@ -359,10 +359,13 @@ optimize_params <-
                      
                      # hydroGOF::rsr(wl_hat[!is.na(data$wl_initial_cm)], data$wl_initial_cm[!is.na(data$wl_initial_cm)])
                      
-                     wghts <- ifelse(params$maxWL >= data$wl_initial_cm,
-                                     pmax(0.1, params$maxWL - data$wl_initial_cm),
-                                     0.1)
+                     # Initial weights are equal
+                     init_weight <- 1 / sum(is.na(data$wl_initial_cm))
                      
+                     # Weights increase asymmetrically as water levels drop
+                     wghts <- pmax(init_weight, init_weight * (params$maxWL - data$wl_initial_cm))
+                     
+                     # Weights are squared
                      sqrt(weighted.mean(resids^2, w = wghts^2, na.rm = TRUE))
                      
                      
