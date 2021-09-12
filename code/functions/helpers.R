@@ -425,3 +425,10 @@ diff_na <-
     
     out
   }
+
+
+pretty_round <- function(data, n_digits) {
+  
+  format(round(data, n_digits), nsmall = n_digits)
+  
+}
