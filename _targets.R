@@ -224,6 +224,13 @@ targets <- list(
   # water years within a given site.
   
   , tar_target(
+    train_data_fits,
+    predict_train_period(data = training_data,
+                         model.params = model_params),
+    format = "rds"
+  )
+
+  , tar_target(
     test_data_fits,
     predict_test_period(data = testing_data, 
                         model.params = model_params)
