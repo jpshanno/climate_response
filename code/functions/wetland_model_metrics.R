@@ -10,6 +10,34 @@ wetland_model_metrics <- function(data) {
 }
   
 
+create_wetland_model_metrics_plot <- function(metrics, outlier.sites, output.file, ...) {
+  
+  metrics <- copy(metrics)
+  
+  metrics[, site_class := fifelse(site %in% outlier.sites, "Outlier Sites", "Analysis Sites")]
+  metrics[, metric := str_replace_all(metric, c("r2" = "R<sup>2</sup>", "med_err" = "Median Error (cm)", "rmse" = "RMSE"))]
+  
+  fig <- metrics %>%
+    split(f = interaction(.$site_class, .$metric)) %>%
+    map(~{
+      ggplot(.x) +
+        aes(x = site, y = value) +
+        geom_boxplot() +
+        labs(y = .x[["metric"]][1]) +
+        facet_grid(~ site_class, scales = "free", space = "free")
+      }) %>%
+    reduce(`+`)  +
+    plot_layout(design = "AAAAB\nCCCCD\nEEEEF", guides = "collect") &
+    theme_minimal(base_size = 12) +
+    theme(axis.title.x = element_blank(),
+          axis.title.y = ggtext::element_markdown(),
+          legend.title = element_blank())
+  
+  ggsave(plot = fig, filename = output.file, ...)
+  
+  output.file
+  
+}
 
 calculate_predicted_probabilities <- function(data, max_wl_data) {
   
@@ -95,12 +123,18 @@ create_wetland_model_probability_table <- function(tests) {
   
   simp <- tests[,
     .(variable, site_status, type,
-      estimate = glue::glue_data(tests, "{pretty_round(estimate, 2)} ({pretty_round(conf.low, 2)}, {pretty_round(conf.high, 2)})"))] %>%
-  dcast(variable + site_status ~ type, value.var = "estimate")
+      estimate = glue::glue_data(tests, "{pretty_round(estimate, 2)} ({pretty_round(conf.low, 2)}, {pretty_round(conf.high, 2)})"),
+      within_variable_group = letters[as.integer(.group)])] %>%
+  dcast(variable + site_status + within_variable_group ~ type, value.var = "estimate") %>%
+  .[, .(variable, site_status, Observed, Predicted, within_variable_group)]
+  
+  simp[, variable := factor(variable, levels = c("Connectivity", "Inundation", "Drawdown"), labels = c("Connectivity", "Inundation", "Drawdown"), ordered = TRUE)]
+  simp[order(variable)]
   
   flextable::flextable(simp) %>%
-    flextable::merge_v() %>%
-    flextable::valign(j = 1:2, valign = "top")
+    flextable::merge_v(j = 1:2) %>%
+    flextable::valign(j = 1:2, valign = "top") %>%
+    flextable::autofit()
   
 }
 
