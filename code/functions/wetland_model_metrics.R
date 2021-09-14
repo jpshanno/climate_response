@@ -1,14 +1,16 @@
-wetland_model_metrics <- function(data) {
+calculate_wetland_model_metrics <- function(data, max_wl_data) {
+  
+  data[max_wl_data, max_wl := max_wl, on = "site"]
   
   data[!is.na(wl_initial_cm + wl_hat),
         .(r2 = hydroGOF::rPearson(wl_hat, wl_initial_cm),
-          mae = hydroGOF::mae(wl_hat, wl_initial_cm)),
+          med_err = median(wl_initial_cm - wl_hat, na.rm = TRUE),
+          rmse = hydroGOF::rmse(wl_hat, wl_initial_cm)),
         by = .(site, water_year, site_status)] %>% 
     melt(id.vars = c("site", "water_year", "site_status"),
          variable.name = "metric")
   
 }
-  
 
 create_wetland_model_metrics_plot <- function(metrics, outlier.sites, output.file, ...) {
   
