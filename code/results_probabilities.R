@@ -539,7 +539,7 @@ ggplot(summary_dat) +
                                 control = 'black')) +
   facet_grid(variable ~ site_status,
              scales = "free") +
-  labs(caption = "All ranges represent 67% of the simulations as HDCI. Points represent median. Gray shaded area represents model simulations for control conditions under the historical climate.") +
+  labs(caption = str_wrap("All ranges represent 67% of the simulations as HDCI. Points represent median. Gray shaded area represents model simulations for control conditions under the current climate.", width = 100)) +
   guides(color = guide_legend(title = NULL)) +
   theme_minimal(base_size = 18) +
   theme(legend.position = c(0.01, 0.3),
