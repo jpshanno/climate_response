@@ -515,7 +515,7 @@ wetland water levels. Using these ECDFs we estimated the number of days water
 levels were expected to be at certain critical levels. We chose to look at the
 number of days water levels were within 10cm of the wetland surface, within 5 cm
 of the control-condition wetland maximum water levels, and and more than
-_**50cm**_ below the wetland surface. These levels represent wetland inundation,
+50 cm below the wetland surface. These levels represent wetland inundation,
 important for vegetative cover, connectivity to the larger hydrologic surface
 water network via streamflow and subsurface flow, and 'dry' conditions, 
 representing periods where non-facultative wetland species could become 
@@ -544,19 +544,50 @@ for this variable.
 
 #### Wetland Water Level Model Performance
 Wetland water level model performance was evaluated using the retained
-independent testing datasets. probability of inundation, connectivity, and 
-drawdown and comparing them to observed probabilities of the same conditions,
-median absolute error, and *R^2^*.
+independent testing datasets. We calculated *R^2^* as a metric for the
+relationship between modeled and modeled values, but it cannot be used to
+evaluate the accuracy of predictions [@krause-2005]. We use the median
+prediction error to determine model predictive accuracy. In addition to the
+overall accuracy of the models we want the models to represent the hydrologic
+dynamics of interest (inundation, connectivity, and drawdown). We tested the
+predicted probabilities of inundation, connectivity, and drawdown to the
+observed probabilities of the same conditions.
 
-Median error and *R^2^* results ... Based on these results wetland models and
-simulation data from sites 113 and 119 have been excluded from further
-analysis due to consistently poor performance in the test data. Based on
-knowledge of these sites the authors believe these sites would require a
-different hydrologic process model. Site 119 is a closed
-basin with no surface outlet and was shown to have different source
-water characteristics than other sites [@vangrinsven-2017]. Site 113 has
-multiple defined seeps which provide defined surface water inputs to
-the site.
+Two sites, 113 and 119, had more than 50% of the withheld training years with
+*R^2^* below 0.6, which was chosen as a threshold for unsatisfactory model
+results by @moriasi-2015 (Figure EEE). Site 135 had much higher errors than all
+other sites excluding 113. Results from wetland model performance
+and simulation data from these sites have been excluded from further analysis
+due to consistently the poor performance in the test data. Based on knowledge of
+these sites the authors believe these sites would require different hydrologic
+process models. Site 119 is a closed basin with no surface outlet and was shown
+to have different Site 113 has multiple defined seeps which provide defined
+surface water inputs to the site. source water characteristics than other sites 
+[@vangrinsven-2017]. Site 135 is the driest of all study sites and unlike other
+sites has only infrequent and localized surface water.
+
+```{r model-metrics, fig.cap="Wetland model performance metrics. The threes `Outlier Sites` were found to perform much worse than the remaining 10 sites and were excluded from further analysis. Site characteristics suggest that the outlier sites would require new hydrologic models."}
+
+knitr::include_graphics("output/figures/boxplot_wetland_model_boxplot.tiff")
+
+```
+
+
+```{r predicted-probabilities}
+
+tar_read(wetland_model_predicted_probs_table) %>%
+  flextable::set_caption(
+    caption = "Tests comparing probability of occurance for hydroecologically significant water levels. Connectivity, Inundation, and Drawdown respectively represent wetland water levels equal to or greater than modeled maximum water level, water levels within 10 cm of the wetland surface, and water levels more than 50 cm below the wetland surface.",
+    autonum = officer::run_autonum(seq_id = "tab", bkm = "pred-probs"))
+
+```
+
+```{r predicted-probs, fig.cap=}
+
+knitr::include_graphics("output/figures/jitterpoint_and_pointrange_wetland_model_predicted_probability.tiff")
+
+```
+
 
 #### SWG Performance
 
@@ -572,7 +603,7 @@ data because of quantity of observations. The LOCA data represents 30 years of
 data compared to the 10,000 years of synthetic weather series. To compare the
 distributions of the observed values we randomly sampled 30 sets of 30 years
 from the observed 10,000 synthetic series. The distribution of these samples
-were compared to the distribution of LOCA values. **Fig BBB** shows good
+were compared to the distribution of LOCA values. **Fig BBB A** shows good
 agreement for all seasons for daily minimum and maximum temperature. Monthly
 precipitation totals are shown in **Fig BBB B**. Synthetic weather series show a
 increased variability relative to LOCA values, but follows the same general
@@ -649,6 +680,8 @@ under replacement forested conditions.
 
 
 <!-- 'significant over lap between interannual variability' 'difference in the  -->
+
+#### Make Driver Contributions Figures for Hydrologic Changes
 
 
 ### Discussion
