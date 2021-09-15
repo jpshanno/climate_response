@@ -237,15 +237,70 @@ targets <- list(
   )
   
   , tar_target(
-    model_evaluation_summary,
-    evaluate_wetland_models(data = test_data_fits))
+    wetland_model_metrics,
+    calculate_wetland_model_metrics(data = test_data_fits, max_wl_data = esy_functions))
+
+  , tar_target(
+    wetland_model_metrics_plot,
+    create_wetland_model_metrics_plot(
+      data = wetland_model_metrics,
+      outlier.sites = c("113", "119", "135"),
+      metrics = c("r2", "med_err", "rmse", "rmse_range"),
+      output.file = "output/figures/boxplot_wetland_model_metrics.tiff",
+      type = "cairo",
+      compression = "lzw",
+      dpi = 600,
+      width = 8,
+      height = 6
+      ),
+    format = "file")
+
+  , tar_target(
+    wetland_model_predicted_probabilities,
+    calculate_predicted_probabilities(test_data_fits[!(site %in% c("113", "119"))], max_wl_data = esy_functions)
+  )
+
+  , tar_target(
+    wetland_model_predicted_probs_tests,
+    test_predicted_probabilities(wetland_model_predicted_probabilities)
+  )
+
+  , tar_target(
+    wetland_model_predicted_probs_table,
+    create_wetland_model_probability_table(wetland_model_predicted_probs_tests),
+    format = "rds"
+  )
   
   , tar_target(
-    model_evaluation_plots,
-    create_model_evaulation_plots(data = test_data_fits,
-                                  out.dir = "output/figures/wetland_model_evalution"),
+    wetland_model_predicted_probs_plot,
+    create_wetland_model_probability_plot(
+      data = wetland_model_predicted_probabilities,
+      tests = wetland_model_predicted_probs_tests,
+      output.file = "output/figures/jitterpoint_and_pointrange_wetland_model_predicted_probability.tiff",
+      type = "cairo",
+      compression = "lzw",
+      dpi = 600,
+      width = 7.5,
+      height = 3.5),
     format = "file"
   )
+
+
+  # Check GCM & SWG ---------------------------------------------------------
+  , tar_target(
+    gcm_check_plot,
+    create_gcm_check_plot(
+      observed.data = tar_read(swg_data)[station_name == "bergland_dam"],
+      gcm.data = tar_read(loca_simulations)[station_name == "bergland_dam" & scenario == "historical"],
+      output.file = "output/figures/density_ridges_gcm_and_observed_climatology.tiff",
+      type = "cairo",
+      compression = "lzw",
+      dpi = 600,
+      width = 10,
+      height = 7.5),
+    format = "file"
+  )
+
 
   # Simulate Weather Series -------------------------------------------------
 

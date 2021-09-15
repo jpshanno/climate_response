@@ -4,22 +4,23 @@ calculate_wetland_model_metrics <- function(data, max_wl_data) {
   
   data[!is.na(wl_initial_cm + wl_hat),
         .(r2 = hydroGOF::rPearson(wl_hat, wl_initial_cm),
-          med_err = median(wl_initial_cm - wl_hat, na.rm = TRUE),
-          rmse = hydroGOF::rmse(wl_hat, wl_initial_cm)),
+          med_err = median(wl_hat - wl_initial_cm, na.rm = TRUE),
+          rmse = hydroGOF::rmse(wl_hat, wl_initial_cm),
+          rmse_range = hydroGOF::rmse(wl_hat, wl_initial_cm) / diff(range(wl_initial_cm, na.rm = TRUE))),
         by = .(site, water_year, site_status)] %>% 
     melt(id.vars = c("site", "water_year", "site_status"),
          variable.name = "metric")
   
 }
 
-create_wetland_model_metrics_plot <- function(metrics, outlier.sites, output.file, ...) {
+create_wetland_model_metrics_plot <- function(data, outlier.sites, output.file, metrics, ...) {
   
-  metrics <- copy(metrics)
+  data <- copy(data[metric %in% metrics])
   
-  metrics[, site_class := fifelse(site %in% outlier.sites, "Outlier Sites", "Analysis Sites")]
-  metrics[, metric := str_replace_all(metric, c("r2" = "R<sup>2</sup>", "med_err" = "Median Error (cm)", "rmse" = "RMSE"))]
+  data[, site_class := fifelse(site %in% outlier.sites, "Outlier Sites", "Analysis Sites")]
+  data[, metric := str_replace_all(metric, c("r2" = "R<sup>2</sup>", "med_err" = "Median Error (cm)", "^rmse$" = "RMSE", "rmse_range" = "RMSE / Range(WL)"))]
   
-  fig <- metrics %>%
+  fig <- data %>%
     split(f = interaction(.$site_class, .$metric)) %>%
     map(~{
       ggplot(.x) +
@@ -29,7 +30,7 @@ create_wetland_model_metrics_plot <- function(metrics, outlier.sites, output.fil
         facet_grid(~ site_class, scales = "free", space = "free")
       }) %>%
     reduce(`+`)  +
-    plot_layout(design = "AAAAB\nCCCCD\nEEEEF", guides = "collect") &
+    plot_layout(design = "AAAAB\nCCCCD\nEEEEF\nGGGGH", guides = "collect") &
     theme_minimal(base_size = 12) +
     theme(axis.title.x = element_blank(),
           axis.title.y = ggtext::element_markdown(),
@@ -142,15 +143,21 @@ create_wetland_model_probability_table <- function(tests) {
 
 create_wetland_model_probability_plot <- function(data, tests, output.file, ...) {
   
+  data <- copy(data)
+  tests <- copy(tests)
+  
+  data[, variable := factor(variable, levels = c("Connectivity", "Inundation", "Drawdown"), labels = c("Connectivity", "Inundation", "Drawdown"), ordered = TRUE)]
+  tests[, variable := factor(variable, levels = c("Connectivity", "Inundation", "Drawdown"), labels = c("Connectivity", "Inundation", "Drawdown"), ordered = TRUE)]
+  
   fig <-
     ggplot(data) +
     aes(x = site_status, y = Probability) +
-    geom_point(aes(color = type), position = position_jitterdodge()) +
+    geom_point(aes(color = type, shape = type), position = position_jitterdodge()) +
     geom_pointrange(data = tests,
                     aes(y = estimate, ymin = conf.low, ymax = conf.high, group = type),
                     position = position_dodge(width = 0.75)) +
     facet_wrap(. ~ variable, scales = "free") +
-    theme_minimal(base_size = 16) +
+    theme_minimal(base_size = 13) +
     theme(legend.position = "bottom",
           axis.title.x = element_blank(),
           legend.title = element_blank())
