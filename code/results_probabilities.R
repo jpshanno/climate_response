@@ -513,6 +513,7 @@ test <-
        value.name = "Probability")
 
 
+# Drop 'Current Climate
 ggplot(summary_dat) + 
   stat_gradientinterval(data = test,
                         color = NA,
