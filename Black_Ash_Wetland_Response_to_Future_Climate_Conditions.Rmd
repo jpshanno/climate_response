@@ -582,7 +582,7 @@ tar_read(wetland_model_predicted_probs_table) %>%
 
 ```
 
-```{r predicted-probs, fig.cap=}
+```{r predicted-probs, fig.cap="Observed and wetland model predicted probability of hydroecologically-relevation water levels."}
 
 knitr::include_graphics("output/figures/jitterpoint_and_pointrange_wetland_model_predicted_probability.tiff")
 
@@ -598,16 +598,34 @@ distribution of observed values should closely match the shape of the underlying
 data [@gregory-1993]. When comparing all of the simulated SWG data (10000 years)
 the mean values and interquartile ranges of daily minimum and maximum
 temperature and precipitation align well with the LOCA-generated daily values
-**FIG AAA**. There are more outliers observed in these data than in the LOCA
-data because of quantity of observations. The LOCA data represents 30 years of
-data compared to the 10,000 years of synthetic weather series. To compare the
+**FIG AAA**. The LOCA data represents 30 years of
+data compared to the 10,000 years of synthetic weather series. We may expect more outliers in the SWG data than in
+the LOCA data because the quantity of observations will increased samples in the
+tails of distributions. To compare the
 distributions of the observed values we randomly sampled 30 sets of 30 years
 from the observed 10,000 synthetic series. The distribution of these samples
 were compared to the distribution of LOCA values. **Fig BBB A** shows good
-agreement for all seasons for daily minimum and maximum temperature. Monthly
-precipitation totals are shown in **Fig BBB B**. Synthetic weather series show a
-increased variability relative to LOCA values, but follows the same general
-distribution.
+agreement for all seasons for daily minimum and maximum temperature. The 
+distribution of simulated monthly
+precipitation totals are shown in **Fig BBB B**. The 30 sets of 30-year
+synthetic weather series show variability relative to LOCA values, but cluster 
+around the LOCA value as a mean.
+
+```{r, swg-check-table}
+
+targets::tar_read(swg_check_table) %>%
+  flextable::set_caption(
+    caption = "Comparison of 30 years of LOCA-generated climate values and 10,000 simulated weather series (SWG). Value are presented as mean (± 1.96*SD). Percentage of outliers is the number of each value type that falls outside of the interval defined by ± 1.96*SD for the LOCA-generated values.",
+    autonum = officer::run_autonum(seq_id = "tab", bkm = "swg-check-table")
+  )
+
+```
+
+```{r swg-check-plot, fig.cap="Density plots of 30 years of LOCA generated data, and 30 random samples of 30-year periods from the full 10,000 years of SWG synthetic weather series."}
+
+knitr::include_graphics("output/figures/density_lines_loca_and_swg_climatology.tiff")
+
+```
 
 <!--
 evaluate performance by comparing monthly summary statistics for the
