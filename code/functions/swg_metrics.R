@@ -39,3 +39,186 @@ create_gcm_check_plot <- function(observed.data, gcm.data, output.file, ...) {
 
   output.file
 }
+
+create_swg_table <- function(loca.data, swg.data) {
+  # swg.data <- tar_read(swg_simulations_loca)[scenario == "historical"]
+  # loca.data <- tar_read(loca_simulations)[station_name == "bergland_dam" & scenario == "historical"]
+  
+  dat <- 
+    rbind(swg.data[, .(type = "SWG", gcm = toupper(gcm), doy = yday(simulation_date), sample_year = simulation_id, sample_month = simulation_month, season = simulation_season, tmin_c, tmax_c, precip_cm)],
+          loca.data[, .(type = "LOCA", gcm = toupper(gcm), doy = yday(sample_date), sample_year, sample_month, season = as.climate_season(sample_month, TRUE), tmin_c, tmax_c, precip_cm)])
+  
+  # Tables for 
+  tabs <- 
+    melt(dat, measure.vars = c("tmin_c", "tmax_c", "precip_cm"))[
+      j = threshold := qnorm(0.975) * sd(value[.SD[["type"]] == "LOCA"]),
+      by = .(gcm, season, variable)
+    ][
+      by = .(type, gcm, season, variable),
+      j = .(val_summary = glue::glue_data(.SD,
+                                          "{pretty_round(mean(value), 2)} ({pretty_round(mean(value) - qnorm(0.975) * sd(value), 2)}, {pretty_round(mean(value) + qnorm(0.975) * sd(value), 2)}); {pretty_round(100 * sum(abs(value - mean(value)) > threshold) / .N, 2)}% outliers")
+      )] %>%
+    split(f = .$variable) %>%
+    map_dfr(~dcast(.x, gcm + season ~ type,
+                   value.var = "val_summary"),
+            .id = "Variable")
+  
+  
+  tabs %>% 
+    transform(Variable = 
+                str_replace_all(
+                  Variable,
+                  pattern = c(
+                    "tmin_c" = "Minimum Temperature",
+                    "tmax_c" = "Maximum Temperature",
+                    "precip_cm" = "Precipitation"
+                  ))) %>%
+    transform(season = toupper(season)) %>%
+    setnames(old = c("gcm", "season"), new = c("GCM", "Season")) %>%
+    flextable::flextable() %>%
+    flextable::merge_v(j = 1:2) %>%
+    flextable::valign(j = 1:2, valign = "top") %>%
+    flextable::autofit()
+}
+
+create_swg_plot <- function(loca.data, swg.data, output.file, ...) {
+  # swg.data <- tar_read(swg_simulations_loca)[scenario == "historical"]
+  # loca.data <- tar_read(loca_simulations)[station_name == "bergland_dam" & scenario == "historical"]
+  
+  dat <- 
+    rbind(swg.data[, .(type = "SWG", gcm = toupper(gcm), doy = yday(simulation_date), sample_year = simulation_id, sample_month = simulation_month, season = simulation_season, tmin_c, tmax_c, precip_cm)],
+          loca.data[, .(type = "LOCA", gcm = toupper(gcm), doy = yday(sample_date), sample_year, sample_month, season = as.climate_season(sample_month, TRUE), tmin_c, tmax_c, precip_cm)])
+
+  dat[, season := toupper(season)]
+  
+  green <- as.character(palette.colors()[4])
+  blue <- as.character(palette.colors()[6])
+  orange <- as.character(palette.colors()[7])
+  
+  
+  simulation_samples <- 
+    replicate(n = 30,
+              expr = sample(1:10000, size = 30, replace = FALSE),
+              simplify = FALSE)
+  
+  base_plot <- 
+    ggplot() +
+    aes(y = ..scaled..) +
+    facet_grid(.~season)
+  
+  
+  for(i in seq_len(30)){
+    if(i == 1){
+      tmin_plot <- 
+        base_plot + aes(x = tmin_c)
+    }
+    
+    tmin_plot <- 
+      tmin_plot +
+      geom_density(data = dat[type == "SWG" & sample_year %in% simulation_samples[[i]]],
+                   alpha = 0.9,
+                   size = 0.05,
+                   color = 'gray30')
+    
+    if(i == 30){
+      tmin_plot <- 
+        tmin_plot +
+        geom_density(data = dat[type == "LOCA"],
+                     color = green)
+    }
+  }
+  
+  
+  for(i in seq_len(30)){
+    
+    if(i == 1){
+      tmax_plot <- 
+        base_plot + aes(x = tmax_c)
+    }
+    
+    tmax_plot <- 
+      tmax_plot +
+      geom_density(data = dat[type == "SWG" & sample_year %in% simulation_samples[[i]]],
+                   alpha = 0.9,
+                   size = 0.05,
+                   color = 'gray30')
+    
+    if(i == 30){
+      tmax_plot <- 
+        tmax_plot +
+        geom_density(data = dat[type == "LOCA"],
+                     color = green)
+    }
+  }
+  
+  for(i in seq_len(30)){
+    
+    if(i == 1){
+      t_plot <- 
+        base_plot
+    }
+    
+    t_plot <- 
+      t_plot +
+      geom_density(data = dat[type == "SWG" & sample_year %in% simulation_samples[[i]]],
+                   aes(x = tmin_c),
+                   alpha = 0.9,
+                   size = 0.05,
+                   color = blue) +
+      geom_density(data = dat[type == "SWG" & sample_year %in% simulation_samples[[i]]],
+                   aes(x = tmax_c),
+                   alpha = 0.9,
+                   size = 0.05,
+                   color = orange)
+    
+    if(i == 30){
+      t_plot <- 
+        t_plot +
+        geom_density(data = dat[type == "LOCA"],
+                     aes(x = tmin_c),
+                     color = blue)+
+        geom_density(data = dat[type == "LOCA"],
+                     aes(x = tmax_c),
+                     color = orange)
+    }
+  }
+  
+  for(i in seq_len(30)){
+    
+    if(i == 1){
+      precip_plot <-
+        base_plot + aes(x = precip_cm)
+    }
+    
+    precip_plot <- 
+      precip_plot +
+      geom_density(data = dat[type == "SWG" & sample_year %in% simulation_samples[[i]], 
+                              .(precip_cm = sum(precip_cm)),
+                              by = .(sample_year, season)],
+                   alpha = 0.9,
+                   size = 0.05,
+                   color = 'gray30')
+    
+    if(i == 30){
+      precip_plot <- 
+        precip_plot +
+        geom_density(data = dat[type == "LOCA", 
+                                .(precip_cm = sum(precip_cm)),
+                                by = .(sample_year, season)],
+                     color = green)
+    }
+  }
+  
+  
+  fig <- {t_plot + 
+      labs(y = NULL,
+           x = "Daily Minimum and Maximum Temperature (C)")} / 
+    {precip_plot +  
+        labs(y = NULL, 
+             x = "Monthly Precipitation (cm)")} & 
+    theme_minimal(base_size = 13)
+ 
+  ggsave(plot = fig, filename = output.file, ...)
+  
+  output.file
+}
