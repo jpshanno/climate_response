@@ -301,6 +301,30 @@ targets <- list(
     format = "file"
   )
 
+  , tar_target(
+    swg_check_table,
+    create_swg_table(
+      swg.data = swg_simulations_loca[scenario == "historical"],
+      loca.data = loca_simulations[station_name == "bergland_dam" & scenario == "historical"]
+    ),
+    format = "rds"
+  )
+
+  , tar_target(
+    swg_check_plot,
+    create_swg_plot(
+      swg.data = swg_simulations_loca[scenario == "historical"],
+      loca.data = loca_simulations[station_name == "bergland_dam" & scenario == "historical"],
+      output.file = "output/figures/density_lines_loca_and_swg_climatology.tiff",
+      type = "cairo",
+      compression = "lzw",
+      dpi = 600,
+      width = 10,
+      height = 6
+    ),
+    format = "rds"
+  )
+
 
   # Simulate Weather Series -------------------------------------------------
 
@@ -357,4 +381,5 @@ targets <- list(
 
 # End with a call to tar_pipeline() to wrangle the targets together.
 # This target script must return a pipeline object.
-tar_pipeline(targets)
+# tar_pipeline(targets)
+targets
