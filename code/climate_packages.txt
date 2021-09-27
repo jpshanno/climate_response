@@ -3,15 +3,14 @@ data.table
 purrr
 furrr
 sirad
-sn
 lubridate
 geodist
 ggplot2
 patchwork
 brms
-airGR
 stringr
 ncmeta
 tidync
+ggdist
 ggridges
 forcats

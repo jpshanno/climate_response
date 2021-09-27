@@ -1,6 +1,6 @@
 create_probabilities_plot <- function(proportions, output.file, ...){
   
-  # proportions <- tar_read(wetland_simulation_summaries)[["proportions"]]
+  # proportions <- tar_read(wetland_simulation_summaries)[["proportions"]][!(site %in% c("113", "119", "135"))]
   green <- "#2b730b"
   brown <- "#756953" 
   blue <- "#3096bd"
@@ -11,7 +11,7 @@ create_probabilities_plot <- function(proportions, output.file, ...){
   red <- "#dc2b2bff"
   
   ci_width <- 0.67
-  ci_function <- function(...) {ggdist::hdci(...)}
+  ci_function <- function(...) {hdci(...)}
   point_function <- function(...) {median(...)}
 
   summary_dat <- 
@@ -48,7 +48,7 @@ create_probabilities_plot <- function(proportions, output.file, ...){
          value.name = "Probability")
   
   fig <- ggplot(summary_dat) + 
-    ggdist::stat_gradientinterval(data = baseline,
+    stat_gradientinterval(data = baseline,
                           color = NA,
                           aes(x = simulation_month,
                               y = Probability,
