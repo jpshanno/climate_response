@@ -257,7 +257,7 @@ targets <- list(
 
   , tar_target(
     wetland_model_predicted_probabilities,
-    calculate_predicted_probabilities(test_data_fits[!(site %in% c("113", "119"))], max_wl_data = esy_functions)
+    calculate_predicted_probabilities(test_data_fits[!(site %in% c("113", "119", "135"))], max_wl_data = esy_functions)
   )
 
   , tar_target(
@@ -322,9 +322,8 @@ targets <- list(
       width = 10,
       height = 6
     ),
-    format = "rds"
+    format = "file"
   )
-
 
   # Simulate Weather Series -------------------------------------------------
 
@@ -372,10 +371,19 @@ targets <- list(
     format = "rds"
   )
   
-  # , tar_target(
-  #   water_level_probabilities,
-  #   calculate_daily_probabilities(in.path = wetland_simulations_path)
-  # )
+  , tar_target(
+    probabilities_plot,
+    create_probabilities_plot(
+      proportions = wetland_simulation_summaries[["proportions"]][!(site %in% c("113", "119", "135"))],
+      output.file = "output/figures/slabinterval_and_pointrange_ecohydrological_level_probabilities.tiff",
+      type = "cairo",
+      compression = "lzw",
+      dpi = 600,
+      width = 7,
+      height = 8
+    ),
+    format = "file"
+  )
     
 )
 
