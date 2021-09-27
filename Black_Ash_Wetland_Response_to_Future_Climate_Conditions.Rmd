@@ -107,8 +107,8 @@ distribution of possible responses. Stochastic weather generators (SWGs) provide
 a tool for generating synthetic time series of weather that simulate conditions
 under an observed or projected climatology [@wilks-1999]. SWGs have also been
 used as a downscaling technique for global or regional climate models
-[@wilks-2012a; @wilks-2012b; @verdin-2015; @verdin-2019]. One class of SWG known
-as Richardson [@wilks-2012b] are built from parametric representations fit to
+[@wilks-2012; @verdin-2015; @verdin-2019]. One class of SWG known
+as Richardson [@wilks-2012] are built from parametric representations fit to
 climate conditions using multiple generalized linear models and varied
 statistical distributions. This approach can be implemented using any observed
 (or simulated) weather series that define particular climatic conditions. This
@@ -118,7 +118,7 @@ without the overhead cost of executing complete GCM runs.
 We have performed simulation experiments combining observed wetland hydrology
 and synthetic weather sequences to quantify the interactions of EAB and future
 climate scenarios. We developed wetland hydrology models for current canopy
-conditions (ash-dominated forested wetlands), unforested conditions (herbaceous
+conditions (ash-dominated forested wetlands), non-forested conditions (herbaceous
 and shrub/scrub wetlands), and potential future canopy conditions (forested
 wetlands under current co-dominant species). We evaluated each class of model
 under two potential future climate scenarios for the end of the 21st century
@@ -392,36 +392,17 @@ found to be well performing models for the Great Lakes region, and CCSM4 and
 GFDL-CM3 represent a less and more sensitive models, respectively. Inspection of
 LOCA daily simulations of GFDL-CM3 and CCSM4 for the 1980-2009 period show
 excellent alignment with observed conditions during the same period (Figure
-\@ref(fig:gcm-evaluation)). Based on agreement between the LOCA and observed
-datasets no bias-correction was performed. <!-- The combination of emission
-scenarios and time periods results in six simulation periods (Table TABAAA),
-each with 30 years of daily projections. -->
+\@ref(fig:gcm-evaluation)). Monthly and seasonal precipitation totals showed 
+good agreement between the LOCA and observed datasets and no bias-correction was 
+performed. 
 
 ```{r gcm-evaluation, fig.cap = "Comparison of LOCA daily projections and observed values for the climate normal period (1980-2009) from the GFDL-CM3 (A-C) and CCSM4 (D-F) global climate models. Points show median value, bold and thin bar show 1 and 2 standard devations respectively, and filled polygons show distribution of values."}
 
-knitr::include_graphics("output/figures/panel_slab_intervals_gcm_evaluations.png")
+knitr::include_graphics("output/figures/density_ridges_gcm_and_observed_climatology.tiff")
 
 ```
 
-<!--
-abbreviation, GCM, Scenario, Time Period
-, GFDL-CM3, Historical, 1980-2009
-, GFDL-CM3, RCP 4.5, 2070-2099
-, GFDL-CM3, RCP 8.5, 2070-2099
-, CCSM4, Historical, 1980-2009
-, CCSM4, RCP 4.5, 2070-2099
-, CCSM4, RCP 8.5, 2070-2099
--->
-
-
-<!-- Lakes are important in models [@bonan-1995] -->
-
 #### Stochastic Weather Generator  
-
-**NEED TO LOOK AT APPLY A CUPOLA TO THE MULTIVARIATE RANDOM NUMBER GENERATION.**
-**I AM SEEING MORE EXTREME VALUES THAN WOULD BE EXPECTED. ALSO THESE ERRORS**
-**ARE ON THE MONTHLY SCALE, WHICH I FOUND INTRODUCES MORE VARIANCE I CAN **
-**PROBABLY GO BACK TO SEASONAL EVAL AND BE OKAY.**
 
 The objective of projecting wetland conditions under future climate scenarios is
 to understand the expected response, and the range of possible responses. The
@@ -542,40 +523,84 @@ for this variable.
 
 ### Results
 
+#### SWG Performance
+
+Synthetic weather generator performance can be evaluated by comparing generated
+weather sequences with the underlying observed/simulated climate data. The
+summary statistics of the sequences should align well with underlying data and
+the distribution of observed values should closely match the shape of the
+underlying data [@gregory-1993]. When comparing all of the simulated SWG data
+(10000 years) the mean values and interquartile ranges of daily minimum and
+maximum temperature and precipitation align well with the LOCA-generated daily
+values (Table \@ref(tab:swg-check-table)). Fewer monthly precipitation total
+outliers were observed for the SWG synthetic series than the LOCA climatology.
+Minimum and maximum temperatures showed an increase in outliers in the synthetic
+weather series for JJA and SON seasons, and a decrease in outliers for the DJF
+and MAM seasons. The difference in outliers was small and may be partially
+explained by the scale of the two datasets. The LOCA data represents 30 years of
+data compared to the 10,000 years of synthetic weather series. To compare the
+SWG and LOCA values as climatologies, we randomly sampled 30 sets of 30 years
+from the observed 10,000 synthetic series. The distribution of these samples
+were compared to the distribution of LOCA values in Figure
+\@ref(fig:swg-check-plot). Figure \@ref(fig:swg-check-plot)A shows good
+agreement for all seasons for daily minimum and maximum temperature. The
+distribution of simulated monthly precipitation totals are shown in Figure
+\@ref(fig:swg-check-plot)B. Relative to minimum and maximum temperature, monthly
+precipitation totals show greater variability among the 30 sets of 30-year
+synthetic weather series. All three variables show that the synthetic weather
+climatologies cluster around the LOCA value as a mean.
+
+```{r, swg-check-table}
+
+targets::tar_read(swg_check_table) %>%
+  flextable::set_caption(
+    caption = "Comparison of 30 years of LOCA-generated climate values and 10,000 simulated weather series (SWG). Value are presented as mean (± 1.96*SD). Percentage of outliers is the number of each value type that falls outside of the interval defined by ± 1.96*SD for the LOCA-generated values.",
+    autonum = officer::run_autonum(seq_id = "tab", bkm = "swg-check-table")
+  )
+
+```
+
+```{r swg-check-plot, fig.cap="Density plots of 30 years of LOCA generated data, and 30 random samples of 30-year periods from the full 10,000 years of SWG synthetic weather series. Bold lines represent LOCA climatology, and gray or fine red and blue plots show individual 30-year samples of SWG data."}
+
+knitr::include_graphics("output/figures/density_lines_loca_and_swg_climatology.tiff")
+
+```
+
 #### Wetland Water Level Model Performance
 Wetland water level model performance was evaluated using the retained
 independent testing datasets. We calculated *R^2^* as a metric for the
-relationship between modeled and modeled values, but it cannot be used to
-evaluate the accuracy of predictions [@krause-2005]. We use the median
+relationship between observed and modeled values. *R^2^* cannot be used to
+evaluate the accuracy of the models because consistent over or under predictions
+would still result in high *R^2^* values [@krause-2005]. We use the median
 prediction error to determine model predictive accuracy. In addition to the
-overall accuracy of the models we want the models to represent the hydrologic
-dynamics of interest (inundation, connectivity, and drawdown). We tested the
-predicted probabilities of inundation, connectivity, and drawdown to the
-observed probabilities of the same conditions.
+overall accuracy of the models we want the models to accurately capture the
+hydrologic dynamics of interest (inundation, connectivity, and drawdown). We
+tested the predicted probabilities of inundation, connectivity, and drawdown to
+the observed probabilities of the same conditions.
 
 Two sites, 113 and 119, had more than 50% of the withheld training years with
 *R^2^* below 0.6, which was chosen as a threshold for unsatisfactory model
-results by @moriasi-2015 (Figure EEE). Site 135 had much higher errors than all
-other sites excluding 113. Results from wetland model performance
-and simulation data from these sites have been excluded from further analysis
-due to consistently the poor performance in the test data. Based on knowledge of
-these sites the authors believe these sites would require different hydrologic
-process models. Site 119 is a closed basin with no surface outlet and was shown
-to have different Site 113 has multiple defined seeps which provide defined
-surface water inputs to the site. source water characteristics than other sites 
-[@vangrinsven-2017]. Site 135 is the driest of all study sites and unlike other
-sites has only infrequent and localized surface water.
+results by @moriasi-2015 (Figure \@ref(fig:model-metrics)). Site 135 had much
+higher errors than all other sites excluding 113. Results from wetland model
+performance and simulation data from these sites have been excluded from further
+analysis due to consistently the poor performance in the test data. Based on
+knowledge of these sites the authors believe these sites would require different
+hydrologic process models. Site 119 is a closed basin with no surface outlet and
+was shown to have different source water characteristics than other sites
+[@vangrinsven-2017]. Site 113 has multiple defined seeps which provide direct
+surface water inputs to the site. Site 135 is the driest of all study sites and
+unlike other sites has only infrequent and localized surface water.
 
 ```{r model-metrics, fig.cap="Wetland model performance metrics. The threes `Outlier Sites` were found to perform much worse than the remaining 10 sites and were excluded from further analysis. Site characteristics suggest that the outlier sites would require new hydrologic models."}
 
-knitr::include_graphics("output/figures/boxplot_wetland_model_boxplot.tiff")
+knitr::include_graphics("output/figures/boxplot_wetland_model_metrics.tiff")
 
 ```
 
 
 ```{r predicted-probabilities}
 
-tar_read(wetland_model_predicted_probs_table) %>%
+targets::tar_read(wetland_model_predicted_probs_table) %>%
   flextable::set_caption(
     caption = "Tests comparing probability of occurance for hydroecologically significant water levels. Connectivity, Inundation, and Drawdown respectively represent wetland water levels equal to or greater than modeled maximum water level, water levels within 10 cm of the wetland surface, and water levels more than 50 cm below the wetland surface.",
     autonum = officer::run_autonum(seq_id = "tab", bkm = "pred-probs"))
@@ -588,139 +613,158 @@ knitr::include_graphics("output/figures/jitterpoint_and_pointrange_wetland_model
 
 ```
 
-
-#### SWG Performance
-
-Synthetic weather generator performance can be by comparing generated weather
-sequences with the underlying observed/simulated climate data. The summary
-statistics of the sequences should align well with underlying data and the
-distribution of observed values should closely match the shape of the underlying
-data [@gregory-1993]. When comparing all of the simulated SWG data (10000 years)
-the mean values and interquartile ranges of daily minimum and maximum
-temperature and precipitation align well with the LOCA-generated daily values
-**FIG AAA**. The LOCA data represents 30 years of
-data compared to the 10,000 years of synthetic weather series. We may expect more outliers in the SWG data than in
-the LOCA data because the quantity of observations will increased samples in the
-tails of distributions. To compare the
-distributions of the observed values we randomly sampled 30 sets of 30 years
-from the observed 10,000 synthetic series. The distribution of these samples
-were compared to the distribution of LOCA values. **Fig BBB A** shows good
-agreement for all seasons for daily minimum and maximum temperature. The 
-distribution of simulated monthly
-precipitation totals are shown in **Fig BBB B**. The 30 sets of 30-year
-synthetic weather series show variability relative to LOCA values, but cluster 
-around the LOCA value as a mean.
-
-```{r, swg-check-table}
-
-targets::tar_read(swg_check_table) %>%
-  flextable::set_caption(
-    caption = "Comparison of 30 years of LOCA-generated climate values and 10,000 simulated weather series (SWG). Value are presented as mean (± 1.96*SD). Percentage of outliers is the number of each value type that falls outside of the interval defined by ± 1.96*SD for the LOCA-generated values.",
-    autonum = officer::run_autonum(seq_id = "tab", bkm = "swg-check-table")
-  )
-
-```
-
-```{r swg-check-plot, fig.cap="Density plots of 30 years of LOCA generated data, and 30 random samples of 30-year periods from the full 10,000 years of SWG synthetic weather series."}
-
-knitr::include_graphics("output/figures/density_lines_loca_and_swg_climatology.tiff")
-
-```
-
-<!--
-evaluate performance by comparing monthly summary statistics for the
-observed and simulated weather conditions (See @gregory-1993 for citation about
-indication that this means synthetic and observed climates are good matches).
-
-Good description of validating GCM outputs in @hayhoe-2010, p.11. Should be
-applicable to RCMs as well.
--->
-
 #### Wetland Water Levels
 
 Wetland water levels under future climate conditions were highly variable under
-both scenarios and both vegetation types. Surface water occurred frequently
-under all simulated conditions and scenarios  (FIG WATER LEVELS). Maximum
-drawdown differed between future climate scenarios and vegetation conditions.
-The less sensitive GCM under RCP 4.5 showed greater drawdown levels than the
-more-sensitive GCM under RCP 8.5. Under both vegetation types, GFDL-CM3 (8.5)
-conditions resulted in less variability than current ash forested conditions,
-but more variability than the respective vegetation types under current climate
-conditions (**FIG WATER LEVELS**). This increased variability was also observed
-when analyzing the probability of critical water level thresholds.
+both scenarios and both vegetation types (Figure \@ref(fig:probabilities)).
+Figure \@ref(fig:probabilities) shows the probability that wetland water levels
+will be above or below the ecohydrologically relevant thresholds defined above.
+The reported probability is the proportion of observations where daily water
+level surpasses each threshold out of all modeled daily water levels in a month
+(~30,000). The median probability and a range representing 67% of all
+observations (highest density continuous intervals, HDCI) are shown as point and
+line estimates for the less and more sensitive future climate scenarios. Modeled
+control conditions are also reported as the median and 67% HDCI, represented as
+a crossbar and shaded area.
 
-###### Connecitivty
+For non-forested conditions both future climate scenarios showed a decrease in
+probability of connectivity relative to current site conditions (Figure
+\@ref(fig:probabilities)A). The more sensitive climate scenario consistently
+showed a lower median probability of connectivity and was more likely to have
+simulated conditions outside of the HDCI of current conditions. The
+less-sensitive climate scenario showed greatest agreement with current conditions
+in July and August. Future forested conditions were more likely to show
+connectivity in July and August under both climate scenarios, to a greater
+degree under the less sensitive climate scenario (Figure \@ref(fig:probabilities)B).
+Connectivity to the larger hydrologic network was much less likely to occur
+under the more sensitive climate scenario and both vegetation conditions in May
+(Figure \@ref(fig:probabilities)A & B). Under both vegetation conditions the
+more-sensitive climate scenario resulted in a lower probability of connectivity
+relative to the less-sensitive climate scenario. While both vegetation conditions
+showed significant overlap between the less-sensitive climate conditions and
+control conditions, the non-forested conditions tended to skew towards current
+drier years (lower probability of connectivity) and future forested conditions
+skewed twoards current wetter years (high probability of connectivity).
 
-For replacement forested conditions the probability of connectivity to surface
-water networks showed significant overlap with observed interannual variation
-(FIG PROBABILITIES). For growing season months GFDL-CM3 (8.5) showed lower
-median probability than observed conditions. These differences were greatest in
-May and June. CCSM4 (4.5) simulations showed an earlier decline in water table
-connectivity in June, with significant overlap with observed conditions.
-Significant overlap occurs between the observed conditions and CCSM4 (4.5) for
-the remainder of the growing season but the median response shows greater
-connectivity between wetlands and surface water. For non-forested conditions
-both less and more sensitive climate scenarios show reduced probability of
-connectivity relative to current climate and forest conditions. The more
-sensitive scenario shows little to no overlap with observed conditions while the
-less sensitive scenario has lower median values, but significant overlap with
-observed interannual variability.
+Inundation results in Figure \@ref(fig:probabilities)C & D closely resemble the
+patterns observed in the connectivity results. This is inline with fit model
+parameters that showed maximum sustained water levels were above the surface for
+almost every wetland and treatment combination (**TABLE S1**). Generally,
+inundated conditions would be less prevalent under future non-forested
+conditions than the future-forested conditions. For non-forested conditions
+there was less overlap between observed conditions and the more-sensitive
+climate scenario results (Figure \@ref(fig:probabilities)D). This was contrary
+to non-forested conditions where the less-sensitive climate scenario results
+showed more overlap with current conditions. Under both future climate scenarios
+(Figure \@ref(fig:probabilities)C). Future-forested conditions showed increased
+probability for inundation in July, August, and September (Figure
+\@ref(fig:probabilities)D).
 
-##### Inundation
+The probability that water levels will drop to less than 50 cm below the wetland
+soil surface agree with the connectivity and inundation results (Figure
+\@ref(fig:probabilities)E & F). Under both climate scenarios the future forest
+conditions showed a lower probability of drawdown than was observed under the
+current black ash forest, with almost no overlap with current conditions in
+July, August, and September (Figure \@ref(fig:probabilities)F). Drawdown events
+were very unlikely under replacement forested conditions under both climate
+scenarios. Probability of drawdown was greater in the more sensitive scenario
+relative to the less sensitive scenario and also more variable. Under the
+non-forest cover the probability of drawdown was more likely under both future
+climate scenarios. Differences from current conditions were greatest in August,
+but drawdown conditions were much more likely than current conditions from July
+through October (Figure \@ref(fig:probabilities)E).
 
-Inundation results closely resemble connectivity results however for all climate
-scenarios and vegetation cover times probability of inundation was higher than
-probability of connectivity. This is inline with fit model parameters that 
-showed maximum sustained water levels were above the surface for almost every
-wetland and treatment combination (**TABLE S1**). Under future forested 
-conditions the more sensitive climate scenario shows similar probability of
-inundation as observed variation with the exception of June when the probability
-of inundation declined. Under the less sensitive climate scenario the 
-probability of inundation increased in August and September while the other 
-months showed median values with the range of observed variability. Under 
-non-forested conditions the more sensitive climate scenario showed a lower 
-probability of inundation starting in July and extending through October. The
-less sensitive climate scenario showed that the probability of inundation was 
-only slightly less than observed conditions for all growing season months with
-the smallest difference in August.
+```{r probabilities, fig.cap="Probability of observing water levels above (connectivity, inundation) or below (drawdown) ecohydrologically significant thresholds. Points represent median the median observed probability within a month and ranges represent 67% of the simulations as highest-density continuous interval (HDCI). Gray shaded area represents model simulations for control black (ash forest) conditions under the current climate and the black bar represents the control monthly median probability."}
 
-##### Drawdown
+knitr::include_graphics("output/figures/slabinterval_and_pointrange_ecohydrological_level_probabilities.tiff")
 
-Under both climate scenarios the future forest conditions showed a lower
-probability of drawdown than was observed under the current ash forest.
-Probability of drawdown was greater in the more sensitive scenario relative to
-the less sensitive scenario and also more variable. Under the non-forest cover
-and more sensitive scenario probability of drawdown was greater than observed
-and greater than the less sensitive scenario. The less sensitive scenario had
-a higher probability of drawdown conditions than observations, but 
-showed overlap with interannual variation. Drawdown events were very unlikely
-under replacement forested conditions.
-
-
-<!-- 'significant over lap between interannual variability' 'difference in the  -->
-
-#### Make Driver Contributions Figures for Hydrologic Changes
-
+```
 
 ### Discussion
 
-For non-forested sites water level rebound and recharge would be reliant on 
-dormant season precipitation.
+#### SWG
 
-Earlier decrease in early growing season is from earlier snowmelt (check but
-I think CN did not do a great job adjusting to a smaller snowmelt)
+We chose to use a SWG approach that relied on only a single 
+
+Only using a single year of simulation, missing long terms droughts and wet 
+spells. Do not have the training data to compare, and assuming wetland recharge
+will happen each time since we aren't predicted for winter droughts. Perhaps it
+would be worth looking at 30 year chunks of simulations for multiyear drought
+presence
+
+Each wetland is being considered individually so it is not necessary to use a
+GLM that accounts for spatial correlation between observed conditions. To expand
+this work to an assessment of the impact of EAB on regional hydrology would
+require the GLM treat the region as a single system and capture spatial trends
+in weather conditions.
+
+#### Wetland Water Level Models
+
+The Connectivity, Inundation, and Drawdown probabilities all agree, suggesting
+that there are not wild swings within months or between simulation years (Figure 
+\@ref(fig:probabilities)).
+
+Discussion on models [@marechaux-2021]:
+Q4 Which forest systems and which of their properties are most sensitive to changes in community composition across scales and why?
+Q5 Which factors control the resilience of forest ecosystems to various disturbances?
+Q6 What makes forests susceptible to rapid system shifts and how can we project tipping points?
+Q7 How do disturbance regimes and global change affect sustainable forest management strategies?
+
+Consistency between the observation period used to train wetland water level
+models and future climate predictions is critical to draw meaningful
+conclusions. This is why we chose to use external meterologic data to develop
+our wetland models. And also why we use a modeled control baseline rather than 
+observed.
+
+#### Future Hydrology
+
+Relate future simulations to 'normal' years now. For instance non-forested less
+sensitive scenario: A 'wet' year under those conditions and scenario will be 
+similar to a somehwat 'dry' year now.
+
+The high interannual variability of these systems does not show much
+differentiation between climate scenarios and vegetation conditions. Examining
+the probability of occurrence of certain threshold water levels does show
+differentiation between climate scenarios and vegetation conditions. Similar to 
+how interannual differences and hydrologic drivers masked treatment effects in 
+raw water level signal.
+
+Wetland water levels under observed conditions were highly variable
+[@vangrinsven-2017] similar to simulations.
+
+The drier/hotter more-sensitive scenario showed good aligned between future
+forested conditions and current conditions for connectivity and inundation, but
+also showed lower chances of dry conditions (drawdown) within the sites. Under
+the non-forested conditions the wetter/cooler (**is this comparison true? May
+need to make a less-sensitive vs more senstive figure**) less-senstive scenario
+was more similar to current conditions. So the future of black ash wetlands
+depends on both the management strategy implemented and the path of future
+climate change.
+
+Discuss skew of distributions. Some months (check panel C in probs figure) exhibit more positive or negative 
+skew in the observed probabilities.
+
+Observed water levels are highly variable so it's not surprising that future 
+conditions are also highly variable.
+
+Future water level rebound and recharge would be reliant on dormant season
+precipitation, especially under drier, non-forest conditions.
+
+Future-forested may be suffering from reduced solar radiation/undestory T 
+relative to non-forested. And suffering from reduced canopy T relative to ash 
+forest. Non-linear response in wetland plant communties affecting model results [@short-2016]
 
 Under all vegetation/indicator combinations more and less sensitive scenarios
 showed the same trend, drier conditions under more sensitive.
 
-Increased variability in GFDL-CM3 (8.5) relative to observed conditions w/r/t
-future forested inundation could be explained simply by number of observations.
-Control model under future climates would help by showing if variability is high
-for ash forests under future climate conditions
+Connectivity of landscape wetlands [@creed-2014]
 
-Relate future simulations to 'normal' years now. For instance non-forested less
-sensitve scenario: A 'wet' year under those conditions and scenario will be 
-similar to a somehwat 'dry' year now.
+#### Drivers of Future Wetland Hydrology
+
+##### Make Driver Contributions Figures for Hydrologic Changes
+
+Decadal oscillations from @watras-2014 illustrate more potential sources of 
+variation
 
 Use current climate simulations under both veg types to evlauate role of climate
 conditions vs role of veg cover. If ash-forest conditions and historical climate
@@ -733,65 +777,34 @@ control
 
 There are similar pattern,s, but some distinctions between connectivity and 
 inundation probabilities that may be important enough to note. Less uncertainty
-regarding connectivity relative to inundation. More separation between climate
-scenarios for connectivity
+regarding connectivity relative to inundation for more sensitive.
 
-Compare with CCSM-4 RCP8.5 and GFDL-CM3 RCP4.5
+Did not compare with CCSM-4 RCP8.5 and GFDL-CM3 RCP4.5
 
-Wetland water levels under observed conditions were highly variable
-[@vangrinsven-2017] similar to simulations.
+Earlier decrease in early growing season is from earlier snowmelt (check but
+I think CN did not do a great job adjusting to a smaller snowmelt). 
 
-[@mitsch-2013]
-
-Non-linear response in wetland plant communties affecting model results [@short-2016]
-
-Discussion on models [@marechaux-2021]
-
-Connectivity of landscape wetlands [@creed-2016]
-
-Discuss bigger picture questions with @moomaw-2018, 
-
-Consistency between the observation period used to train wetland water level
-models and future climate predictions is critical to draw meaningful
-conclusions. This is why we chose to use external meterologic data to develop
-our wetland models.
-
-The high interannual variability of these systems does not show much
-differentiation between climate scenarios and vegetation conditions. Examining
-the probability of occurrence of certain threshold water levels does show
-differentiation between climate scenarios and vegetation conditions.
-
-It is critical to capture full range of water levels in E~Sy~ calculations. Testing
-at 152 shows that we get poorer performance of ET vs PET when doing diurnal 
-signal separation with 2018 data vs the 2012 E~Sy~
-
-Decadal oscillations from @watras-2014 illustrate more potential sources of 
-variation
-
-Only using a single year of simulation, missing long terms droughts and wet 
-spells. Do not have the training data to compare, and assuming wetland recharge
-will happen each time since we aren't predicted for winter droughts. Perhaps it
-would be worth looking at 30 year chunks of simulations for multiyear drought
-presence
-
-Get at drivers of different responses. Is it increase/decrease in P, increase in
-PET or decrease in AET that's driving these results?
-
-#### Species selection
-Use hydrograph results to reexaming list from Iverson and results from Looney &
-Bolton to see if any of the recommendations hold true, or if any new species
-could be considered depending on the simulation results
-
-#### Rain on Snow
 Rain on snow melt can increase melt timing and result in reduced groundwater
 recharge, which will likely impact the immediacy of wetland water level drawdown.
 Idea from Meyers H028-07 AGU 2020
 
-Each wetland is being considered individually so it is not necessary to use a GLM that accounts for spatial correlation between observed conditions. To expand this work to an assessment of the impact of EAB on regional hydrology would require the GLM treat the region as a single system and capture spatial trends in weather conditions.
+#### Management Implications
+
+Use hydrograph results to reexamine list from Iverson and results from Looney &
+Bolton to see if any of the recommendations hold true, or if any new species
+could be considered depending on the simulation results
+
+#### Conclusions and Future Research
+
+Each wetland is being considered individually so it is not necessary to use a
+GLM that accounts for spatial correlation between observed conditions. To expand
+this work to an assessment of the impact of EAB on regional hydrology would
+require the GLM treat the region as a single system and capture spatial trends
+in weather conditions.
 
 RCP8.5 may not be a likely worst case scenario any more [@harvey-2020; @hausfather-2020]
 
-
+Discuss bigger picture questions with @moomaw-2018,
 
 ## Acknowledgements
 Andrew Verdin for discussion and code examples.
