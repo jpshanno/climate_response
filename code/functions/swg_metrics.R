@@ -1,6 +1,6 @@
 create_gcm_check_plot <- function(observed.data, gcm.data, output.file, ...) {
-  # obs <- tar_read(swg_data)[station_name == "bergland_dam"]
-  # loca <- tar_read(loca_simulations)[station_name == "bergland_dam" & scenario == "historical"]
+  # observed.data <- tar_read(swg_data)[station_name == "bergland_dam"]
+  # gcm.data <- tar_read(loca_simulations)[station_name == "bergland_dam" & scenario == "historical"]
   
   green <- as.character(palette.colors()[4])
   blue <- as.character(palette.colors()[6])
@@ -13,22 +13,28 @@ create_gcm_check_plot <- function(observed.data, gcm.data, output.file, ...) {
   
   dat[, sample_season := as.climate_season(sample_date, TRUE)]
   
-  base_plot <- 
-    ggplot(dat) +
+  base_plot <- function(data){
+    ggplot(data) +
     aes(y = sample_season,
-        fill = gcm) +
+        fill = type) +
     scale_y_discrete(labels = toupper) +
-    facet_wrap(~gcm.wrap, ncol = 1) +
-    theme_minimal() +
-    theme(strip.text = element_blank())
-  
+    scale_fill_manual(values = c("LOCA" = green, "Observed" = "gray70")) +
+    # facet_wrap(~gcm.wrap, ncol = 1) +
+    theme_minimal()} #+
+    # theme(strip.text = element_blank())
   
   fig <- 
     {
-    {base_plot + geom_density_ridges(aes(x = tmin_c), color = "gray60", alpha = 0.5, scale = 1)} +
-    {base_plot + geom_density_ridges(aes(x = tmax_c), color = "gray60", alpha = 0.5, scale = 1)} +
-    {base_plot + geom_density_ridges(aes(x = precip_cm), color = "gray60", alpha = 0.5, scale = 1) + scale_x_sqrt()}
-  } +
+      {
+      {base_plot(dat[gcm.wrap == "CCSM4"]) + geom_density_ridges(aes(x = tmin_c), color = "gray60", alpha = 0.5, scale = 1) + labs(title = "A. CCSM4", x = "", y = "Season")} +
+      {base_plot(dat[gcm.wrap == "CCSM4"]) + geom_density_ridges(aes(x = tmax_c), color = "gray60", alpha = 0.5, scale = 1) + labs(x = "", y = "")} +
+      {base_plot(dat[gcm.wrap == "CCSM4"]) + geom_density_ridges(aes(x = precip_cm), color = "gray60", alpha = 0.5, scale = 1) + scale_x_sqrt() + labs(x = "", y = "")}
+      } / {
+      {base_plot(dat[gcm.wrap == "GFDL-CM3"]) + geom_density_ridges(aes(x = tmin_c), color = "gray60", alpha = 0.5, scale = 1) + labs(title = "B. GFDL-CM3", x = "Minimum Temperature (C)", y = "Season")} +
+      {base_plot(dat[gcm.wrap == "GFDL-CM3"]) + geom_density_ridges(aes(x = tmax_c), color = "gray60", alpha = 0.5, scale = 1) + labs(x = "Maximum Temperature (C)", y = "")} +
+      {base_plot(dat[gcm.wrap == "GFDL-CM3"]) + geom_density_ridges(aes(x = precip_cm), color = "gray60", alpha = 0.5, scale = 1) + scale_x_sqrt() + labs(x = "Daily Precipitatation (cm)", y = "")}
+      }
+    } +
     plot_layout(guides = "collect") &
     theme(legend.position = "bottom",
           legend.title = element_blank())
@@ -95,6 +101,7 @@ create_swg_plot <- function(loca.data, swg.data, output.file, ...) {
   blue <- as.character(palette.colors()[6])
   orange <- as.character(palette.colors()[7])
   
+  set.seed(1234)
   
   simulation_samples <- 
     replicate(n = 30,
@@ -215,7 +222,8 @@ create_swg_plot <- function(loca.data, swg.data, output.file, ...) {
            x = "Daily Minimum and Maximum Temperature (C)")} / 
     {precip_plot +  
         labs(y = NULL, 
-             x = "Monthly Precipitation (cm)")} & 
+             x = "Monthly Precipitation (cm)")} &
+    plot_annotation(tag_levels = "A") & 
     theme_minimal(base_size = 13)
  
   ggsave(plot = fig, filename = output.file, ...)
