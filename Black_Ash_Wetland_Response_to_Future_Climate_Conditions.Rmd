@@ -644,7 +644,7 @@ relative to the less-sensitive climate scenario. While both vegetation condition
 showed significant overlap between the less-sensitive climate conditions and
 control conditions, the non-forested conditions tended to skew towards current
 drier years (lower probability of connectivity) and future forested conditions
-skewed twoards current wetter years (high probability of connectivity).
+skewed towards current wetter years (high probability of connectivity).
 
 Inundation results in Figure \@ref(fig:probabilities)C & D closely resemble the
 patterns observed in the connectivity results. This is inline with fit model
@@ -684,19 +684,146 @@ knitr::include_graphics("output/figures/slabinterval_and_pointrange_ecohydrologi
 
 #### SWG
 
-We chose to use a SWG approach that relied on only a single 
+Our SWG performed well at simulating weather series that conformed to LOCA-
+downscaled future climate scenarios (Table \@ref(tab:swg-check-table)}, Figure 
+\@ref(fig:swg-check-plot)). The synthetic weather series were well aligned with 
+the LOCA series, with precipitation showing more inter-simulation variability 
+than minimum or maximum temperature. This result is understandable when we 
+consider that in the study region precipitation is only weakly seasonal, while 
+minimum and maximum temperature have strong seasonal signals. For the downscaled 
+LOCA values the CV of the seasonal-mean precipitation was 0.24 cm and was 
+3.45 and 0.75 &deg;C for the seasonal-mean minimum and maximum temperatures, 
+respectively. There may be a slight trend in under estimating the range of 
+observed future climate conditions (Table \@ref(tab:swg-check-table)). This is 
+likely a result of reversion to the seasonal mean due to a lack of available 
+external weather drivers. Under future climate scenarios extreme events are 
+expected to be more common place (**CITATION**), and these results suggest that 
+could be better parameterized by increasing the probability of extreme events 
+through selection of distribution choices (@verdin-2019). This shortcoming of 
+the SWGs should not affect our findings because our objective is not to 
+model response to extreme events, but overall probability of certain threshold 
+water levels. These water levels will be affected by extreme precipitation 
+events but the systems do not have infinite storage and more extreme events 
+can be expected to pulse through the system more quickly (**CITATION**). The 
+quicker the pulse passes through the system the smaller the impact on overall 
+probability of wetland water levels maintaining above a certain level.
 
-Only using a single year of simulation, missing long terms droughts and wet 
-spells. Do not have the training data to compare, and assuming wetland recharge
-will happen each time since we aren't predicted for winter droughts. Perhaps it
-would be worth looking at 30 year chunks of simulations for multiyear drought
-presence
+<!-- 
+# Get the CVs
+loca_simulations[
+  i = station_name == "bergland_dam",
+  by = .(gcm, scenario, climate_season = as.climate_season(sample_date, TRUE)),
+  j = lapply(.SD, function(x) {mean(x)}),
+  .SDcols = c("precip_cm", "tmax_c", "tmin_c")
+  ][
+  (gcm == "ccsm4" & scenario == "rcp45") |
+    (gcm == "gfdl-cm3" & scenario == "rcp85"),
+  j = lapply(.SD, function(x) {sd(x) / mean(x)}),
+  .SDcols = c("precip_cm", "tmax_c", "tmin_c")
+]
+-->
 
-Each wetland is being considered individually so it is not necessary to use a
-GLM that accounts for spatial correlation between observed conditions. To expand
-this work to an assessment of the impact of EAB on regional hydrology would
-require the GLM treat the region as a single system and capture spatial trends
-in weather conditions.
+We chose to use an SWG approach that relied on only a single estimate of climate 
+within the study area. Alternatively, regional variation in climate and 
+weather patterns could be incorporated by using additional meteorological 
+stations in the development of the SWG. A spatially-explicit SWG approach 
+takes into account the covariance of regional meteorological stations and has 
+been shown to faithfully capture larger regional trends in climate and weather 
+(@verdin-2015). Within our study region there are no clear weather or climate 
+gradients and so we assumed that each study wetland was within a single 
+climatic unit. This results in a much simpler SWG-construction process, but the 
+resulting SWG cannot be used outside of the study region without reconstruction 
+from a different meteorological station(s). To simulate black ash wetland 
+response on a regional basis would require addressing known temperature and 
+precipitation gradients through the range of black ash. 
+
+In addition to using only a single spatial representation of future climate, we
+chose to use individual years of simulation. The direct impact of this is to
+missing long-term droughts and wet spells. These events are expected to increase
+in frequency under future climate scenarios (**CITATION**). We deliberately
+chose to use single-year simulations because of the length of available training
+data. During our study the region was in the process of transitioning from a
+relatively dry period to a relatively wetter period (\@ref{fig:water-balacne}).
+Our training data are primarily drawn from the drier portion of the study
+period. Without longer-periods of training data we do not feel that we can
+capture both the intra- and inter-annual dynamics of wetland hydrology. If we
+assumed all 10000 years of synthetic weather series were contiguous weather
+records, the longest period of drought years (annual precipitation less than
+annual PET) was 7 and 9 years for the less and more sensitive climate scenarios,
+respectively. By using single-year simulations we are implicitly assuming that
+fall and winter (SON and DJF) precipitation is high enough to recharge the local
+hydrology driving these wetlands, restarting the cycle at or near maximum
+wetland water levels. When we consider only fall and winter precipitation we
+found 0%, 8.7%, and 10.1% of synthetic weather series had totals below the tenth
+percentile of observed data, less-sensitive and more-sensitive climate
+scenarios, respectively. Unsurprisingly close to 10% of the synthetic weather
+winters were drier than the tenth percentile of the LOCA downscaled values.
+Synthetic (and LOCA) winters were wetter than observed winters, supporting the
+assumption that dormant-season precipitation would be enough to recharge wetland
+water levels.
+
+<!--
+# Drought Years
+swg_simulations_loca[
+  (gcm == "ccsm4" & scenario == "rcp45") |
+    (gcm == "gfdl-cm3" & scenario == "rcp85"),
+  .(drought = sum(precip_cm) < sum(abs(pet_cm))),
+  by = .(gcm, scenario, simulation_id)
+][,
+  .(max_drought = {
+    rles <- rle(.SD[["drought"]])
+    max(rles$lengths[rles$values])
+    }),
+  by = .(gcm, scenario)]
+
+
+# Percentage of dry winters simulated compared to loca simulation and observed
+
+obs_dry <- external_met[, .(precip_cm = sum(precip_cm)),
+             by = .(sample_year, station_name, climate_season = as.climate_season(sample_date, TRUE))
+             ][, .(obs_dry_precip_cm = quantile(precip_cm, probs = 0.1)),
+               by = .(climate_season)]
+
+loca_dry <- 
+  loca_simulations[
+    ((gcm == "ccsm4" & scenario == "rcp45") |
+      (gcm == "gfdl-cm3" & scenario == "rcp85")) & 
+      station_name == "bergland_dam",
+    .(precip_cm = sum(precip_cm)),
+    by = .(gcm, scenario, sample_year, climate_season = as.climate_season(sample_month, TRUE))
+  ][, .(obs_dry_precip_cm = quantile(precip_cm, probs = 0.1)),
+    by = .(gcm, scenario, climate_season)]
+
+swg_simulations_loca[
+  (gcm == "ccsm4" & scenario == "rcp45") |
+    (gcm == "gfdl-cm3" & scenario == "rcp85"),
+  .(precip_cm = sum(precip_cm)),
+  by = .(gcm, scenario, simulation_id, climate_season = simulation_season)
+  ][
+    loca_dry,
+    on = c("gcm", "scenario", "climate_season")
+  ][climate_season %in% c("son", "djf"),
+    .(precip_cm = mean(obs_dry_precip_cm > precip_cm)),
+    by = .(gcm, scenario)]
+
+swg_simulations_loca[
+  (gcm == "ccsm4" & scenario == "rcp45") |
+    (gcm == "gfdl-cm3" & scenario == "rcp85"),
+  .(precip_cm = sum(precip_cm)),
+  by = .(gcm, scenario, simulation_id, climate_season = simulation_season)
+][
+  obs_dry,
+  on = c("climate_season")
+][climate_season %in% c("son", "djf"),
+  .(precip_cm = mean(obs_dry_precip_cm > precip_cm))]
+-->
+
+```{r water-balance, fig.width=6, fig.height = 3, fig.cap = "Regional cumulative water availability for the period from November 1, 2005 through October 21, 2020. Water availability was calculated as the difference between rainfall plus melt and potential evapotranspiration."}
+
+knitr::include_graphics("output/figures/line_plot_study_period_water_availability.tiff")
+
+```
+
 
 #### Wetland Water Level Models
 
@@ -716,11 +843,23 @@ conclusions. This is why we chose to use external meterologic data to develop
 our wetland models. And also why we use a modeled control baseline rather than 
 observed.
 
+The next step for these models is to fit them using a hierarchical Bayesian 
+approach. This should improve model fit by incorporating information from all 
+sites into a single model while still allowing model parameters to vary between 
+sites. If model performance does not significantly improve with that approach 
+more, or potentially all years of data can be used to parameterize the wetland 
+models. Using most or all of the data for model parameterization precludes the 
+options of evaluating model performance on truly independent data. Kozak and 
+Kozak (-@kozak-2003) provide an alternative view that replaces cross-validation 
+with lack-of-fit metrics, which evaluate model predictions for assumptions of 
+model assumptions. Their main conclusion was that cross-validation increase the 
+variance of model estimates potentially resulting in poor model choice.
+
 #### Future Hydrology
 
 Relate future simulations to 'normal' years now. For instance non-forested less
 sensitive scenario: A 'wet' year under those conditions and scenario will be 
-similar to a somehwat 'dry' year now.
+similar to a somewhat 'dry' year now.
 
 The high interannual variability of these systems does not show much
 differentiation between climate scenarios and vegetation conditions. Examining
