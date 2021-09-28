@@ -384,6 +384,23 @@ targets <- list(
     ),
     format = "file"
   )
+
+
+  # Discussion Figures ------------------------------------------------------
+
+  , tar_target(
+    water_balance_plot,
+    create_water_balance_plot(
+      data = external_met,
+      output.file = "output/figures/line_plot_study_period_water_availability.tiff",
+      type = "cairo",
+      compression = "lzw",
+      dpi = 600,
+      width = 6,
+      height = 3
+    ),
+    format = "file"
+  )
     
 )
 
