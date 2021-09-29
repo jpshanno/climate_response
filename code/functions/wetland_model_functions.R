@@ -373,12 +373,6 @@ optimize_params <-
     
     opt$par <- c(opt$par, unlist(fixed))
     
-    wl_hat <- 
-      wetland_model(data = data, opt$par)$wl_hat
-    
-    opt$value <- 
-      hydroGOF::md(wl_hat[!is.na(data$wl_initial_cm)], data$wl_initial_cm[!is.na(data$wl_initial_cm)])
-    
     opt
   }
 
