@@ -1,12 +1,12 @@
 calculate_wetland_model_metrics <- function(data, max_wl_data) {
   
   data[max_wl_data, max_wl := max_wl, on = "site"]
-  data[, wl_range := median_na(.SD[!is.na(wl_initial_cm + wl_hat), .(wl_range = diff(range(wl_initial_cm, na.rm = TRUE))), by = .(water_year)][["wl_range"]]), by = .(site)]
+  # data[, wl_range := median_na(.SD[!is.na(wl_initial_cm + wl_hat), .(wl_range = diff(range(wl_initial_cm, na.rm = TRUE))), by = .(water_year)][["wl_range"]]), by = .(site)]
   data[!is.na(wl_initial_cm + wl_hat),
         .(r2 = cor(wl_hat, wl_initial_cm, use = "pairwise.complete.obs"),
           med_err = median(wl_hat - wl_initial_cm, na.rm = TRUE),
           rmedse = rmedse(wl_hat, wl_initial_cm),
-          rmedse_range = rmedse(wl_hat, wl_initial_cm) /  wl_range),
+          rmedse_range = rmedse(wl_hat, wl_initial_cm) /  diff(range(wl_initial_cm, na.rm = TRUE))),
         by = .(site, water_year, site_status)] %>% 
     melt(id.vars = c("site", "water_year", "site_status"),
          variable.name = "metric")
