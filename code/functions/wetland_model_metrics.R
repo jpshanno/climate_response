@@ -3,14 +3,18 @@ calculate_wetland_model_metrics <- function(data, max_wl_data) {
   data[max_wl_data, max_wl := max_wl, on = "site"]
   
   data[!is.na(wl_initial_cm + wl_hat),
-        .(r2 = hydroGOF::rPearson(wl_hat, wl_initial_cm),
+        .(r2 = cor(wl_hat, wl_initial_cm, use = "pairwise.complete.obs"),
           med_err = median(wl_hat - wl_initial_cm, na.rm = TRUE),
-          rmse = hydroGOF::rmse(wl_hat, wl_initial_cm),
-          rmse_range = hydroGOF::rmse(wl_hat, wl_initial_cm) / diff(range(wl_initial_cm, na.rm = TRUE))),
+          rmedse = rmedse(wl_hat, wl_initial_cm),
+          rmedse_range = rmedse(wl_hat, wl_initial_cm) / diff(range(wl_initial_cm, na.rm = TRUE))),
         by = .(site, water_year, site_status)] %>% 
     melt(id.vars = c("site", "water_year", "site_status"),
          variable.name = "metric")
   
+}
+
+rmedse <- function(sim, obs){
+  sqrt(median((sim - obs)^2, na.rm = TRUE))
 }
 
 create_wetland_model_metrics_plot <- function(data, outlier.sites, output.file, metrics, ...) {
@@ -18,7 +22,7 @@ create_wetland_model_metrics_plot <- function(data, outlier.sites, output.file, 
   data <- copy(data[metric %in% metrics])
   
   data[, site_class := fifelse(site %in% outlier.sites, "Outlier Sites", "Analysis Sites")]
-  data[, metric := str_replace_all(metric, c("r2" = "R<sup>2</sup>", "med_err" = "Median Error (cm)", "^rmse$" = "RMSE", "rmse_range" = "RMSE / Range(WL)"))]
+  data[, metric := str_replace_all(metric, c("r2" = "R<sup>2</sup>", "med_err" = "Median Error (cm)", "^rmedse$" = "RMedSE", "rmedse_range" = "RMedSE / Range(WL)"))]
   
   fig <- data %>%
     split(f = interaction(.$site_class, .$metric)) %>%

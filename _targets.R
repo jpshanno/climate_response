@@ -245,7 +245,7 @@ targets <- list(
     create_wetland_model_metrics_plot(
       data = wetland_model_metrics,
       outlier.sites = c("113", "119", "135"),
-      metrics = c("r2", "med_err", "rmse", "rmse_range"),
+      metrics = c("r2", "med_err", "rmedse", "rmedse_range"),
       output.file = "output/figures/boxplot_wetland_model_metrics.tiff",
       type = "cairo",
       compression = "lzw",
