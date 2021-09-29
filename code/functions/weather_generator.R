@@ -337,7 +337,9 @@ swg_single_site <-
                            })
                })
   
-  RPushbullet::pbPost("note", "Simulations Complete")
+  if("RPushbullet" %in% .packages(TRUE) && suppressWarnings(suppressMessages(RPushbullet::pbValidateConf()))){
+    RPushbullet::pbPost("note", "Simulations Complete")
+  }
   # simulations <- copy(simulations)
   
   simulations <- rbindlist(flatten(simulations))
