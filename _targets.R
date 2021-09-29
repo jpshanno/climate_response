@@ -367,7 +367,7 @@ targets <- list(
     wetland_simulation_summaries,
     simulate_wetlands(data = swg_simulations_loca, 
                       model.params = model_params,
-                      out.path = "/run/media/jpshanno/Joe_Shannon/wetland_simulations.csv.gz"),
+                      out.path = "/Volumes/Joe_Shannon/wetland_simulations.csv.gz"),
     format = "rds"
   )
   
