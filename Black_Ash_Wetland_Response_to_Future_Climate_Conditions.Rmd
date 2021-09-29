@@ -322,8 +322,8 @@ the year with the greatest water level drawdown within the control period. The
 remaining control-period years were used for wetland model evaluation. Wetland
 parameters were estimated using minimize the weighted root-mean square error of
 the predictions. Weights were applied asymmetrically where days with
-observed water levels greater than or equal to *WL<sub>max</sub>* were assign an
-weight equivalent to equal weight. As observed water levels decreased below
+observed water levels greater than or equal to *WL<sub>max</sub>* were assigned 
+the original equal weight (1/n). As observed water levels decreased below
 *WL<sub>max</sub>* weights increased as the square of the difference between
 observed water level and *WL<sub>max</sub>*. To model impacted
 wetlands that have not recovered to a fully forested state the observed
@@ -572,7 +572,8 @@ independent testing datasets. We calculated *R^2^* as a metric for the
 relationship between observed and modeled values. *R^2^* cannot be used to
 evaluate the accuracy of the models because consistent over or under predictions
 would still result in high *R^2^* values [@krause-2005]. We use the median
-prediction error to determine model predictive accuracy. In addition to the
+prediction error to measure model bias and the root median squared error 
+(RMedSE) to assess overall predictive accuracy. In addition to the
 overall accuracy of the models we want the models to accurately capture the
 hydrologic dynamics of interest (inundation, connectivity, and drawdown). We
 tested the predicted probabilities of inundation, connectivity, and drawdown to
@@ -591,12 +592,31 @@ was shown to have different source water characteristics than other sites
 surface water inputs to the site. Site 135 is the driest of all study sites and
 unlike other sites has only infrequent and localized surface water.
 
-```{r model-metrics, fig.cap="Wetland model performance metrics. The threes `Outlier Sites` were found to perform much worse than the remaining 10 sites and were excluded from further analysis. Site characteristics suggest that the outlier sites would require new hydrologic models."}
+For the remaining sites 79.59% of site-year combinations had *R^2* values above
+0.75 (Figure \@ref(fig:model-metrics)). Wetland models tended to predict drier
+than observed conditions, with median errors ranging from -15.56--6.38 cm (median ), with
+77.56% of site-year combinations have a negative median error 
+(Figure \@ref(fig:model-metrics)). The RMedSE ranged from 1.77--18.51 cm with a 
+median of 4.62 cm. When RMedSE is normalized by the annual range of water level 
+fluctuation within a wetland (rRMedSE) errors range from 3.67--78.68% of annual 
+water level range with a median value of 13.64%.
+
+```{r model-metrics, fig.cap="Wetland model performance metrics. Metrics were calculated for each site-year combination and are presented within sites. RMedSE and rRMedSE are root median squared error and root median squared error relative to wetland water level range within that year. The threes `Outlier Sites` were found to perform much worse than the remaining 10 sites and were excluded from further analysis. Site characteristics suggest that the outlier sites would require new hydrologic models."}
 
 knitr::include_graphics("output/figures/boxplot_wetland_model_metrics.tiff")
 
 ```
 
+Modeled wetland water levels showed no significant difference in probability of
+ecohydrologically significant water levels (Table \@ref(tab:pred_probs)). The
+range of site-level probability of each level of interest were similar between
+modeled and observed data (Figure \@ref(fig:predicted-probabilities)). Though
+non-significant these results show a systematic bias towards drier conditions in
+the modeled wetland water levels. All comparisons of current conditions to
+combinations of future vegetation conditions and climate scenarios will use
+modeled current conditions. This comparison ensures that the described
+non-significant model bias does not impact results or conclusions. It also sets
+equal sample sizes between the control and future conditions.
 
 ```{r predicted-probabilities}
 
@@ -827,6 +847,17 @@ knitr::include_graphics("output/figures/line_plot_study_period_water_availabilit
 
 #### Wetland Water Level Models
 
+##### Model Performance
+Wetland model performance was adequate for the objective of this study, which
+was to observe changes in the gross hydrology of black ash wetlands. Overall the
+retained models showed good correlation between observed and modeled water
+levels. Model performance varied by site but median rRMedSE was 13.64% of annual
+water level range and median model error was -2.62 cm. In this case daily
+percent bias estimates (PBIAS) would be helpful to consider error relative to
+observed daily water level. However, wetland water levels cross 0 so that the
+relative error approaches infinity as water levels rise or fall towards the
+surface.
+
 The Connectivity, Inundation, and Drawdown probabilities all agree, suggesting
 that there are not wild swings within months or between simulation years (Figure 
 \@ref(fig:probabilities)).
@@ -839,10 +870,21 @@ Q7 How do disturbance regimes and global change affect sustainable forest manage
 
 Consistency between the observation period used to train wetland water level
 models and future climate predictions is critical to draw meaningful
-conclusions. This is why we chose to use external meterologic data to develop
+conclusions. This is why we chose to use external meteorologic data to develop
 our wetland models. And also why we use a modeled control baseline rather than 
 observed.
 
+RMedSE and relative RMedSE had similar patterns among sites 
+(Figure \@ref(fig:model-metrics)). This suggests that the wetland models were 
+less suited to wetlands with more stable water levels. More stable water levels 
+in these wetlands generally indicated consistently wet conditions. While the 
+patterns are consistent, the magnitude of difference among wetlands is greater 
+for relative RMedSE than for RMedSE.
+
+##### Ecosystem Specific Yield
+Discuss *E~Sy~*
+
+##### Future Improvements
 The next step for these models is to fit them using a hierarchical Bayesian 
 approach. This should improve model fit by incorporating information from all 
 sites into a single model while still allowing model parameters to vary between 
