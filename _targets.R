@@ -256,6 +256,12 @@ targets <- list(
     format = "file")
 
   , tar_target(
+    wetland_model_metrics_table,
+    create_wetland_model_metrics_table(wetland_model_metrics[!(site %in% c("113", "119", "135"))]),
+    format = "rds"
+  )
+
+  , tar_target(
     wetland_model_predicted_probabilities,
     calculate_predicted_probabilities(test_data_fits[!(site %in% c("113", "119", "135"))], max_wl_data = esy_functions)
   )

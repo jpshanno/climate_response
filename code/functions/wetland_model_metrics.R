@@ -144,8 +144,7 @@ create_wetland_model_probability_table <- function(tests) {
   
   flextable::flextable(simp) %>%
     flextable::merge_v(j = 1:2) %>%
-    flextable::valign(j = 1:2, valign = "top") %>%
-    flextable::autofit()
+    flextable::valign(j = 1:2, valign = "top")
   
 }
 
@@ -173,5 +172,27 @@ create_wetland_model_probability_plot <- function(data, tests, output.file, ...)
   ggsave(filename = output.file, plot = fig, ...)
   
   output.file
+  
+}
+
+
+create_wetland_model_metrics_table <- function(data) {
+  
+  tab <- data[,
+    .(`Minimum\nObserved` = pretty_round(min(value), 2),
+      `Maximum\nObserved` = pretty_round(max(value), 2),
+      `Median` = pretty_round(median(value), 2)),
+    by = .(`Model\nMetric` = metric, `Site\nCondition` = site_status)]
+  
+  tab[, 
+      `Model\nMetric` := str_replace_all(`Model\nMetric`, c("r2" = "R<sup>2</sup>", "med_err" = "Median Error (cm)", "^rmedse$" = "RMedSE", "rmedse_range" = "rRMedSE"))]
+  
+  flextable::flextable(tab) %>%
+    flextable::merge_v(j = 1:2) %>%
+    flextable::valign(j = 1, valign = "top") %>%
+    flextable::align(align = "right") %>%
+    flextable::align(j = 1, align = "left") %>%
+    flextable::align(j = 2, align = "center") %>%
+    flextable::align(part = "header", align = "center")
   
 }
