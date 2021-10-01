@@ -502,6 +502,9 @@ water network via streamflow and subsurface flow, and 'dry' conditions,
 representing periods where non-facultative wetland species could become 
 established.
 
+##### Water Level Categories??
+Explain connectivity, inundataion, drawdown better
+
 <!--
 ##### SWG Evaluation
 Accuracy of the SWGs in representing the climatology of the model-scenario
@@ -550,6 +553,8 @@ precipitation totals show greater variability among the 30 sets of 30-year
 synthetic weather series. All three variables show that the synthetic weather
 climatologies cluster around the LOCA value as a mean.
 
+**MAKE NOTE THAT THIS IS 95% CI, DON'T JUST RELY ON THE FORMULA**
+
 ```{r, swg-check-table}
 
 targets::tar_read(swg_check_table) %>%
@@ -559,6 +564,8 @@ targets::tar_read(swg_check_table) %>%
   )
 
 ```
+
+**MAKE GRAY LINES PALE GREEN**
 
 ```{r swg-check-plot, fig.cap="Density plots of 30 years of LOCA generated data, and 30 random samples of 30-year periods from the full 10,000 years of SWG synthetic weather series. Bold lines represent LOCA climatology, and gray or fine red and blue plots show individual 30-year samples of SWG data."}
 
@@ -573,7 +580,9 @@ relationship between observed and modeled values. *R^2^* cannot be used to
 evaluate the accuracy of the models because consistent over or under predictions
 would still result in high *R^2^* values [@krause-2005]. We use the median
 prediction error to measure model bias and the root median squared error 
-(RMedSE) to assess overall predictive accuracy. In addition to the
+(RMedSE) to assess overall predictive accuracy. RMedSE was used in place of RMSE 
+becuase we expect some outlier errors where regionally-informed rainfall records 
+do not match observed wetland rainfall. In addition to the
 overall accuracy of the models we want the models to accurately capture the
 hydrologic dynamics of interest (inundation, connectivity, and drawdown). We
 tested the predicted probabilities of inundation, connectivity, and drawdown to
@@ -592,18 +601,32 @@ was shown to have different source water characteristics than other sites
 surface water inputs to the site. Site 135 is the driest of all study sites and
 unlike other sites has only infrequent and localized surface water.
 
-For the remaining sites 79.59% of site-year combinations had *R^2* values above
-0.75 (Figure \@ref(fig:model-metrics)). Wetland models tended to predict drier
-than observed conditions, with median errors ranging from -15.56--6.38 cm (median ), with
-77.56% of site-year combinations have a negative median error 
-(Figure \@ref(fig:model-metrics)). The RMedSE ranged from 1.77--18.51 cm with a 
-median of 4.62 cm. When RMedSE is normalized by the annual range of water level 
-fluctuation within a wetland (rRMedSE) errors range from 3.67--78.68% of annual 
-water level range with a median value of 13.64%.
+**Add panel labels**
 
 ```{r model-metrics, fig.cap="Wetland model performance metrics. Metrics were calculated for each site-year combination and are presented within sites. RMedSE and rRMedSE are root median squared error and root median squared error relative to wetland water level range within that year. The threes `Outlier Sites` were found to perform much worse than the remaining 10 sites and were excluded from further analysis. Site characteristics suggest that the outlier sites would require new hydrologic models."}
 
 knitr::include_graphics("output/figures/boxplot_wetland_model_metrics.tiff")
+
+```
+
+Table \@ref(tab:model-metrics) summarizes the wetland model metrics by site
+status after the above outlier sites were removed, presenting the minimum,
+maximum, and median values observed across all site-year combinations. Median
+model performance was the same between site statuses for *R^2* and rRMedSE
+(\@ref(tab:model-metrics)). The treated models showed lower median values for
+median error and RMedSE (\@ref(tab:model-metrics)). For the remaining sites
+*R^2* values ranged from -0.10 to 0.98. The one observed negative *R^2* value
+occurred at an extremely wet site (157) which generally shows very little
+drawdown, resulting in magnified relative errors (Figure
+\@ref(fig:model-metrics)A & D).
+
+```{r model-metrics-table}
+
+targets::tar_read(wetland_model_metrics_table) %>%
+  flextable::set_caption(
+    caption = "Minimum, maximum, and median values of wetland water level model metrics, comparing observed and modeled wetland water levels. Metrics were evaluated on withheld test data for each combination of site and year of data. Prior to calculating these metrics three sites with incompatible hydrology for the model structure were removed from the analysis.",
+    autonum = officer::run_autonum(seq_id = "tab", bkm = "model-metrics"))
+
 
 ```
 
@@ -618,6 +641,7 @@ modeled current conditions. This comparison ensures that the described
 non-significant model bias does not impact results or conclusions. It also sets
 equal sample sizes between the control and future conditions.
 
+**Try vertical text for variable label then can horizontally expand LOCA and SWG values**
 ```{r predicted-probabilities}
 
 targets::tar_read(wetland_model_predicted_probs_table) %>%
@@ -627,7 +651,10 @@ targets::tar_read(wetland_model_predicted_probs_table) %>%
 
 ```
 
-```{r predicted-probs, fig.cap="Observed and wetland model predicted probability of hydroecologically-relevation water levels."}
+**Explain that this is only predicted values for the test data set**
+**Update axis label to probability of occurrence**
+**Check that probability of treated data is only calculated from days with observed water level.**
+```{r predicted-probs, fig.cap="Observed and wetland model predicted probability of hydroecologically-relevation water levels. Probability is derived from number of observed days at each water level."}
 
 knitr::include_graphics("output/figures/jitterpoint_and_pointrange_wetland_model_predicted_probability.tiff")
 
@@ -848,15 +875,25 @@ knitr::include_graphics("output/figures/line_plot_study_period_water_availabilit
 #### Wetland Water Level Models
 
 ##### Model Performance
+
+<!-- 
+wetland_model_metrics[
+  metric == "r2" & !(site %in% c("113", "119", "135")),
+  mean(value > 0.75),
+  by = .(site_status)]
+-->
+
 Wetland model performance was adequate for the objective of this study, which
 was to observe changes in the gross hydrology of black ash wetlands. Overall the
 retained models showed good correlation between observed and modeled water
-levels. Model performance varied by site but median rRMedSE was 13.64% of annual
-water level range and median model error was -2.62 cm. In this case daily
-percent bias estimates (PBIAS) would be helpful to consider error relative to
-observed daily water level. However, wetland water levels cross 0 so that the
-relative error approaches infinity as water levels rise or fall towards the
-surface.
+levels (Figure \@ref(fig:model-metrics)A, Table \@ref(tab:model_metrics)). We
+found that 77.27% and 81.48% of site-year combinations had *R^2* values above
+0.75 for the control and treated condition models, respectively. Model
+performance varied by site with a median rRMedSE of 11.97% of annual water level
+range and median model error was 6.086 cm. In this case daily percent bias
+estimates (PBIAS) would be helpful to consider error relative to observed daily
+water level. However, wetland water levels cross 0 so that the relative error
+approaches infinity as water levels rise or fall towards the surface.
 
 The Connectivity, Inundation, and Drawdown probabilities all agree, suggesting
 that there are not wild swings within months or between simulation years (Figure 
@@ -933,7 +970,7 @@ precipitation, especially under drier, non-forest conditions.
 
 Future-forested may be suffering from reduced solar radiation/undestory T 
 relative to non-forested. And suffering from reduced canopy T relative to ash 
-forest. Non-linear response in wetland plant communties affecting model results [@short-2016]
+forest. Non-linear response in wetland plant communities affecting model results [@short-2016]
 
 Under all vegetation/indicator combinations more and less sensitive scenarios
 showed the same trend, drier conditions under more sensitive.
@@ -941,6 +978,13 @@ showed the same trend, drier conditions under more sensitive.
 Connectivity of landscape wetlands [@creed-2014]
 
 #### Drivers of Future Wetland Hydrology
+
+- Is any of this generalizeable to the region
+
+- If we consider a fixed climate scenario what are the differences between the 
+vegetation types? 'We know that climate changing differently across range of 
+black ash, if we look within a climate scenario what does the role of vegetation
+mean?'
 
 ##### Make Driver Contributions Figures for Hydrologic Changes
 
