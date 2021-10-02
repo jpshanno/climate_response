@@ -63,7 +63,7 @@ create_esy_impact_plot <- function(data, esy_data, parameters, output.file, ...)
     aes(x = `Observed Daily Change in Water Level (cm)`, y = `Predicted Daily Change in Water Level (cm)`) +
     annotate(x = min(aug_adj[["Observed Daily Change in Water Level (cm)"]]),
              y = max(aug_adj[["Predicted Daily Change in Water Level (cm)"]]),
-             label = paste0("R<sup>2</sup> = ", r2_raw),
+             label = paste0("R<sup>2</sup> = ", r2_adj),
              geom = ggtext::GeomRichText,
              hjust = 0,
              vjust = 1) + 
