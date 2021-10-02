@@ -156,6 +156,12 @@ targets <- list(
       merge_external_met(external.met = external_met)
   )
   
+  , tar_target(
+    treatment_sites,
+    water_budget[site_status == "Treated", unique(site)],
+    format = "rds"
+  )
+
   # Split Data --------------------------------------------------------------
   # Training data for the control period for each site comes from the first 
   # availabile year of data. For most sites this is 2012 (which is ideal because
@@ -232,7 +238,7 @@ targets <- list(
 
   , tar_target(
     test_data_fits,
-    predict_test_period(data = testing_data, 
+    predict_test_period(data = testing_data[site %in% treatment_sites], 
                         model.params = model_params)
   )
   
@@ -244,26 +250,25 @@ targets <- list(
     wetland_model_metrics_plot,
     create_wetland_model_metrics_plot(
       data = wetland_model_metrics,
-      outlier.sites = c("113", "119", "135"),
       metrics = c("r2", "med_err", "rmedse", "rmedse_range"),
       output.file = "output/figures/boxplot_wetland_model_metrics.tiff",
       type = "cairo",
       compression = "lzw",
       dpi = 600,
-      width = 8,
+      width = 4,
       height = 6
       ),
     format = "file")
 
   , tar_target(
     wetland_model_metrics_table,
-    create_wetland_model_metrics_table(wetland_model_metrics[!(site %in% c("113", "119", "135"))]),
+    create_wetland_model_metrics_table(wetland_model_metrics),
     format = "rds"
   )
 
   , tar_target(
     wetland_model_predicted_probabilities,
-    calculate_predicted_probabilities(test_data_fits[!(site %in% c("113", "119", "135"))], max_wl_data = esy_functions)
+    calculate_predicted_probabilities(test_data_fits, max_wl_data = esy_functions)
   )
 
   , tar_target(
@@ -380,7 +385,7 @@ targets <- list(
   , tar_target(
     probabilities_plot,
     create_probabilities_plot(
-      proportions = wetland_simulation_summaries[["proportions"]][!(site %in% c("113", "119", "135"))],
+      proportions = wetland_simulation_summaries[["proportions"]][site %in% treatment_sites],
       output.file = "output/figures/slabinterval_and_pointrange_ecohydrological_level_probabilities.tiff",
       type = "cairo",
       compression = "lzw",
@@ -411,7 +416,7 @@ targets <- list(
   , tar_target(
     esy_impact_plot,
     create_esy_impact_plot(
-      data = training_data[["control"]][!(site %in% c("113", "119", "135"))],
+      data = training_data[["control"]],
       esy_data = esy_functions,
       parameters = control_optimization,
       output.file = "output/figures/scatterplot_and_zoom_delta_water_level_esy_predictions.tiff",

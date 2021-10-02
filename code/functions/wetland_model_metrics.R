@@ -21,24 +21,25 @@ rrmedse <- function(sim, obs){
   rmedse(sim, obs) / diff(range(obs, na.rm = TRUE))
 }
 
-create_wetland_model_metrics_plot <- function(data, outlier.sites, output.file, metrics, ...) {
+create_wetland_model_metrics_plot <- function(data, output.file, metrics, ...) {
   
   data <- copy(data[metric %in% metrics])
   
-  data[, site_class := fifelse(site %in% outlier.sites, "Outlier Sites", "Analysis Sites")]
   data[, metric := str_replace_all(metric, c("r2" = "R<sup>2</sup>", "med_err" = "Median Error (cm)", "^rmedse$" = "RMedSE", "rmedse_range" = "rRMedSE"))]
   
+  # Keeping split + combine to label y-axis with metric. Could melt the data and
+  # then facet by variable. But this was set up from when there were outlier 
+  # sites removed
   fig <- data %>%
-    split(f = interaction(.$site_class, .$metric)) %>%
+    split(f = .$metric) %>%
     map(~{
       ggplot(.x) +
         aes(x = site, y = value) +
         geom_boxplot() +
-        labs(y = .x[["metric"]][1]) +
-        facet_grid(~ site_class, scales = "free", space = "free")
+        labs(y = .x[["metric"]][1])
       }) %>%
     reduce(`+`)  +
-    plot_layout(design = "AAAAB\nCCCCD\nEEEEF\nGGGGH", guides = "collect") &
+    plot_layout(ncol = 1, guides = "collect") &
     theme_minimal(base_size = 12) +
     theme(axis.title.x = element_blank(),
           axis.title.y = ggtext::element_markdown(),
