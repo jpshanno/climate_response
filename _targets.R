@@ -381,11 +381,16 @@ targets <- list(
                       out.path = "output/tabular/wetland_simulations.csv.gz"),
     format = "rds"
   )
+
+  , tar_target(
+    analysis_simulations,
+    simplify_scenarios(wetland_simulation_summaries[["proportions"]][site %in% treatment_sites])
+  )
   
   , tar_target(
     probabilities_plot,
     create_probabilities_plot(
-      proportions = wetland_simulation_summaries[["proportions"]][site %in% treatment_sites],
+      proportions = analysis_simulations,
       output.file = "output/figures/slabinterval_and_pointrange_ecohydrological_level_probabilities.tiff",
       type = "cairo",
       compression = "lzw",

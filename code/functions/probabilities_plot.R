@@ -1,6 +1,6 @@
 create_probabilities_plot <- function(proportions, output.file, ...){
   
-  # proportions <- tar_read(wetland_simulation_summaries)[["proportions"]][!(site %in% c("113", "119", "135"))]
+  # proportions <- tar_read(analysis_simulations)
   green <- "#2b730b"
   brown <- "#756953" 
   blue <- "#3096bd"
@@ -58,7 +58,7 @@ create_probabilities_plot <- function(proportions, output.file, ...){
                   fun = median,
                  aes(x = simulation_month,
                      y = Probability,
-                     color = "Modeled Control")
+                     color = "Modeled Black Ash, Current Climate")
                  ) +
     geom_pointrange(aes(x = simulation_month,
                         y = Probability,
