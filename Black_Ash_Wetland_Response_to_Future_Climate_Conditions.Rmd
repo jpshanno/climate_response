@@ -940,8 +940,14 @@ Chapter #### demonstrates that *ET* estimates derived using this approach
 perform comparably to other implementations for calculating *E~Sy~* 
 (above). Figure \@ref(fig:esy-impact) shows the results of a simple quantile 
 regression explaining daily change in wetland water level as a function of *PET*
-*P* and *M* (not used elsewhere in this study). We found that *R<sup>2</sup> of 
-the model improved
+*P* and *M* (not used elsewhere in this study). We found that *R<sup>2</sup>* of 
+the model improved from 0.69 to 0.78. While 0.69 is considered an acceptable 
+*R^2^* as set out in Moriasi (-@moriasi-2015), we can see that water level 
+drawdown is extremely underestimated by the unadjusted model 
+(Figure \@ref(fig:esy-impact)A). This supports the genearl conclusion that the 
+impact of E~Sy~ increases as water levels drawdown, so that mid-season periods 
+with the highest *PET* are not correctly modeled as having high rates of water 
+level decline.
 
 ```{r esy-impact, fig.width=6, fig.height=8, fig.cap=""}
 

@@ -54,7 +54,7 @@ create_esy_impact_plot <- function(data, esy_data, parameters, output.file, ...)
     ggforce::facet_zoom(xlim = c(-5, 5), ylim = c(-5, 5), zoom.size = 1) +
     theme_minimal(base_size = 12) +
     theme(
-      strip.background = element_rect(fill = "gray90", color = NA),
+      strip.background = element_rect(fill = "gray85", color = NA),
       plot.title = ggtext::element_markdown())
   
   esy_plot <- 
@@ -72,7 +72,7 @@ create_esy_impact_plot <- function(data, esy_data, parameters, output.file, ...)
     ggforce::facet_zoom(xlim = c(-5, 5), ylim = c(-5, 5), zoom.size = 1) +
     theme_minimal(base_size = 12) +
     theme(
-      strip.background = element_rect(fill = "gray90", color = NA),
+      strip.background = element_rect(fill = "gray85", color = NA),
       plot.title = ggtext::element_markdown())
   
   fig <- {wrap_elements(raw_plot)} / {wrap_elements(esy_plot)}
