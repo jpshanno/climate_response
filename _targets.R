@@ -373,7 +373,7 @@ targets <- list(
     wetland_simulation_summaries,
     simulate_wetlands(data = swg_simulations_loca, 
                       model.params = model_params,
-                      out.path = "/Volumes/Joe_Shannon/wetland_simulations.csv.gz"),
+                      out.path = "output/tabular/wetland_simulations.csv.gz"),
     format = "rds"
   )
   
@@ -404,6 +404,22 @@ targets <- list(
       dpi = 600,
       width = 6,
       height = 3
+    ),
+    format = "file"
+  )
+
+  , tar_target(
+    esy_impact_plot,
+    create_esy_impact_plot(
+      data = training_data[["control"]][!(site %in% c("113", "119", "135"))],
+      esy_data = esy_functions,
+      parameters = control_optimization,
+      output.file = "output/figures/scatterplot_and_zoom_delta_water_level_esy_predictions.tiff",
+      type = "cairo",
+      compression = "lzw",
+      dpi = 600,
+      width = 6,
+      height = 8
     ),
     format = "file"
   )
