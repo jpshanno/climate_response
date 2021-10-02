@@ -9,7 +9,7 @@ create_gcm_check_plot <- function(observed.data, gcm.data, output.file, ...) {
   dat <- 
     rbind(observed.data[, .(type = 'Observed', gcm = "Observed", gcm.wrap = "GFDL-CM3", sample_date, sample_month, sample_year, tmin_c, tmax_c, precip_cm)],
           observed.data[, .(type = 'Observed', gcm = "Observed", gcm.wrap = "CCSM4", sample_date, sample_month, sample_year, tmin_c, tmax_c, precip_cm)],
-          gcm.data[, .(type = 'LOCA', gcm = toupper(gcm), gcm.wrap = toupper(gcm), sample_date, sample_month, sample_year, tmin_c, tmax_c, precip_cm)])
+          gcm.data[, .(type = 'LOCA, Current Climate', gcm = toupper(gcm), gcm.wrap = toupper(gcm), sample_date, sample_month, sample_year, tmin_c, tmax_c, precip_cm)])
   
   dat[, sample_season := as.climate_season(sample_date, TRUE)]
   
@@ -18,7 +18,7 @@ create_gcm_check_plot <- function(observed.data, gcm.data, output.file, ...) {
     aes(y = sample_season,
         fill = type) +
     scale_y_discrete(labels = toupper) +
-    scale_fill_manual(values = c("LOCA" = green, "Observed" = "gray70")) +
+    scale_fill_manual(values = c("LOCA, Current Climate" = green, "Observed" = "gray70")) +
     # facet_wrap(~gcm.wrap, ncol = 1) +
     theme_minimal()} #+
     # theme(strip.text = element_blank())
