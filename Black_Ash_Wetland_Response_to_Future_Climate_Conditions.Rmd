@@ -219,17 +219,18 @@ The link between hydrology drivers (rainfall, snowmelt, PET) and daily water
 level response has been shown to be non-linear and varying with stage
 [@loheideii-2008; @white-1932]. In wetland systems the relationship between the
 driver magnitude and response magnitude has been termed the ecosystem specific
-yield (E~Sy~) [@mclaughlin-2014]. E~Sy~ has been empirically derived as the ratio
-between precipitation inputs and water level rise ($\frac{P}{\Delta\;WL}$). The
-relationship between empirical E~Sy~ and water level is modeled to provide a
-continuous estimate of E~Sy~. Models fit to the E~Sy~\~Water Level relationship
-include exponential [@mclaughlin-2014; @watras-2017], quadratic
-[@mclaughlin-2014], and step-wise regression [@mclaughlin-2014]. This approach 
-can be unworkable in the presence of confounding hydrologic variation such as
-surface water connectivity and low-frequency seasonal changes in water 
-availability [@watras-2017; @zhu-2011]. Similar to these studies our sites did
-not show clear a relationship to E~Sy~ as defined above, requiring an 
-alternative approach.
+yield (E~Sy~) [@mclaughlin-2014] (see **Section #### in Chapter #### on Pressure
+Transducer Uncertainty for more information about the development of E~Sy~ over
+time**). E~Sy~ has been empirically derived as the ratio between precipitation
+inputs and water level rise ($\frac{P}{\Delta\;WL}$). The relationship between
+empirical E~Sy~ and water level is modeled to provide a continuous estimate of
+E~Sy~. Models fit to the E~Sy~\~Water Level relationship include exponential
+[@mclaughlin-2014; @watras-2017], quadratic [@mclaughlin-2014], and step-wise
+regression [@mclaughlin-2014]. This approach can be unworkable in the presence
+of confounding hydrologic variation such as surface water connectivity and
+low-frequency seasonal changes in water availability [@watras-2017; @zhu-2011].
+Similar to these studies our sites did not show clear a relationship to E~Sy~ as
+defined above, requiring an alternative approach.
 
 As an alternative we fit an inverse analog to $\frac{P}{\Delta\;WL}$. We began
 by fitting a quadratic curve to the relationship between
@@ -874,8 +875,6 @@ knitr::include_graphics("output/figures/line_plot_study_period_water_availabilit
 
 #### Wetland Water Level Models
 
-##### Model Performance
-
 <!-- 
 wetland_model_metrics[
   metric == "r2" & !(site %in% c("113", "119", "135")),
@@ -890,14 +889,25 @@ levels (Figure \@ref(fig:model-metrics)A, Table \@ref(tab:model_metrics)). We
 found that 77.27% and 81.48% of site-year combinations had *R^2* values above
 0.75 for the control and treated condition models, respectively. Model
 performance varied by site with a median rRMedSE of 11.97% of annual water level
-range and median model error was 6.086 cm. In this case daily percent bias
-estimates (PBIAS) would be helpful to consider error relative to observed daily
+range and median model error was 6.086 cm. Daily percent bias
+estimates (PBIAS) would be helpful to evaluate error relative to observed daily
 water level. However, wetland water levels cross 0 so that the relative error
 approaches infinity as water levels rise or fall towards the surface.
 
-The Connectivity, Inundation, and Drawdown probabilities all agree, suggesting
-that there are not wild swings within months or between simulation years (Figure 
-\@ref(fig:probabilities)).
+<!--
+test_data_fits[, .(error_delta = (delta_wl_hat_cm - delta_wl_cm)), by = .(site)] %>%
+ggplot() + aes(x = site, y = error_delta) + geom_boxplot() + ylim(-10, 10)
+-->
+
+Table \@ref(tab:predicted-probs) and Figure \@ref(fig:predicted-probabilities)
+show that observed and modeled probability of occurrence of connectivity,
+inundation, and drawdown were not different in the test data. They also showed 
+that the modeled wetland conditions were slightly drier than the observed 
+conditions. Importantly the pattern of those errors is consistent. Wetlands were 
+less likely to have wet conditions (connectivity, inundation) simulated and more 
+likely to have dry conditions (drawdown) simulated. The consistency in error 
+suggests that the errors from an overall negative model bias rather than from 
+an underestimate of the dynamic range of wetland water levels.
 
 Discussion on models [@marechaux-2021]:
 Q4 Which forest systems and which of their properties are most sensitive to changes in community composition across scales and why?
@@ -905,21 +915,40 @@ Q5 Which factors control the resilience of forest ecosystems to various disturba
 Q6 What makes forests susceptible to rapid system shifts and how can we project tipping points?
 Q7 How do disturbance regimes and global change affect sustainable forest management strategies?
 
+RMedSE and relative RMedSE had similar patterns among sites 
+(Figure \@ref(fig:model-metrics)). This suggests that the wetland models were 
+less suited to wetlands with more stable water levels. More stable water levels 
+in these wetlands generally indicated consistently wet conditions. While the 
+patterns are consistent, the magnitude of difference among wetlands is greater 
+for relative RMedSE than for RMedSE. This suggests that from both absolute and 
+relative view the wetland models as developed capture dynamic wetland water 
+levels more accurately than static wetland water levels.
+
 Consistency between the observation period used to train wetland water level
 models and future climate predictions is critical to draw meaningful
 conclusions. This is why we chose to use external meteorologic data to develop
 our wetland models. And also why we use a modeled control baseline rather than 
 observed.
 
-RMedSE and relative RMedSE had similar patterns among sites 
-(Figure \@ref(fig:model-metrics)). This suggests that the wetland models were 
-less suited to wetlands with more stable water levels. More stable water levels 
-in these wetlands generally indicated consistently wet conditions. While the 
-patterns are consistent, the magnitude of difference among wetlands is greater 
-for relative RMedSE than for RMedSE.
+The approach used to calculate *E~Sy~* for use in relating the magnitude of
+water level change to the drivers of that change was an alternative to those
+presented in previous research. We developed this alternative based on
+unsuccessful attempts to implement *E~Sy~* calculates through the rainfall/rise
+method described in McLaughlin, et al (-@mclaughlin-2014). Directly proving the 
+accuracy of this approach is outside the scope of this study. Section #### in 
+Chapter #### demonstrates that *ET* estimates derived using this approach 
+perform comparably to other implementations for calculating *E~Sy~* 
+(above). Figure \@ref(fig:esy-impact) shows the results of a simple quantile 
+regression explaining daily change in wetland water level as a function of *PET*
+*P* and *M* (not used elsewhere in this study). We found that *R<sup>2</sup> of 
+the model improved
 
-##### Ecosystem Specific Yield
-Discuss *E~Sy~*
+```{r esy-impact, fig.width=6, fig.height=8, fig.cap=""}
+
+knitr::include_graphics("output/figures/scatterplot_and_zoom_delta_water_level_esy_predictions.tiff")
+
+```
+
 
 ##### Future Improvements
 The next step for these models is to fit them using a hierarchical Bayesian 
