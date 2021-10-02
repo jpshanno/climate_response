@@ -296,46 +296,6 @@ targets <- list(
     format = "file"
   )
 
-
-  # Check GCM & SWG ---------------------------------------------------------
-  , tar_target(
-    gcm_check_plot,
-    create_gcm_check_plot(
-      observed.data = tar_read(swg_data)[station_name == "bergland_dam"],
-      gcm.data = tar_read(loca_simulations)[station_name == "bergland_dam" & scenario == "historical"],
-      output.file = "output/figures/density_ridges_gcm_and_observed_climatology.tiff",
-      type = "cairo",
-      compression = "lzw",
-      dpi = 600,
-      width = 10,
-      height = 7.5),
-    format = "file"
-  )
-
-  , tar_target(
-    swg_check_table,
-    create_swg_table(
-      swg.data = swg_simulations_loca[scenario == "historical"],
-      loca.data = loca_simulations[station_name == "bergland_dam" & scenario == "historical"]
-    ),
-    format = "rds"
-  )
-
-  , tar_target(
-    swg_check_plot,
-    create_swg_plot(
-      swg.data = swg_simulations_loca[scenario == "historical"],
-      loca.data = loca_simulations[station_name == "bergland_dam" & scenario == "historical"],
-      output.file = "output/figures/density_lines_loca_and_swg_climatology.tiff",
-      type = "cairo",
-      compression = "lzw",
-      dpi = 600,
-      width = 10,
-      height = 6
-    ),
-    format = "file"
-  )
-
   # Simulate Weather Series -------------------------------------------------
 
   # Create & Run SWG for Observed Data  
@@ -367,10 +327,44 @@ targets <- list(
                      by = .(gcm, scenario)]
   )
 
-
-  # Evaluate SWG Performance ------------------------------------------------
-
+  # Evalute GCM & SWG ---------------------------------------------------------
+  , tar_target(
+    gcm_check_plot,
+    create_gcm_check_plot(
+      observed.data = tar_read(swg_data)[station_name == "bergland_dam"],
+      gcm.data = tar_read(loca_simulations)[station_name == "bergland_dam" & scenario == "historical"],
+      output.file = "output/figures/density_ridges_gcm_and_observed_climatology.tiff",
+      type = "cairo",
+      compression = "lzw",
+      dpi = 600,
+      width = 10,
+      height = 7.5),
+    format = "file"
+  )
   
+  , tar_target(
+    swg_check_table,
+    create_swg_table(
+      swg.data = swg_simulations_loca[scenario == "historical"],
+      loca.data = loca_simulations[station_name == "bergland_dam" & scenario == "historical"]
+    ),
+    format = "rds"
+  )
+  
+  , tar_target(
+    swg_check_plot,
+    create_swg_plot(
+      swg.data = swg_simulations_loca[scenario == "historical"],
+      loca.data = loca_simulations[station_name == "bergland_dam" & scenario == "historical"],
+      output.file = "output/figures/density_lines_loca_and_swg_climatology.tiff",
+      type = "cairo",
+      compression = "lzw",
+      dpi = 600,
+      width = 10,
+      height = 6
+    ),
+    format = "file"
+  )
 
   # Run Wetland Models on Synthetic Weather ---------------------------------
   
@@ -387,11 +381,14 @@ targets <- list(
     simplify_scenarios(wetland_simulation_summaries[["proportions"]][site %in% treatment_sites])
   )
   
+
+  # Evaluate EAB and CC Impacts ---------------------------------------------
+
   , tar_target(
-    probabilities_plot,
-    create_probabilities_plot(
+    total_impact_plot,
+    create_total_impact_plot(
       proportions = analysis_simulations,
-      output.file = "output/figures/slabinterval_and_pointrange_ecohydrological_level_probabilities.tiff",
+      output.file = "output/figures/pointrange_and_slabinterval_ecohydrological_level_total_impact.tiff",
       type = "cairo",
       compression = "lzw",
       dpi = 600,
@@ -401,6 +398,39 @@ targets <- list(
     format = "file"
   )
 
+  , tar_target(
+    eab_impact_plot,
+    create_eab_impact_plot(
+      proportions = analysis_simulations,
+      output.file = "output/figures/pointrange_ecohydrological_level_eab_impact.tiff",
+      type = "cairo",
+      compression = "lzw",
+      dpi = 600,
+      width = 10,
+      height = 5
+    ),
+    format = "file"
+  )
+
+  , tar_target(
+    climate_impact_plot,
+    create_climate_impact_plot(
+      proportions = analysis_simulations,
+      output.file = "output/figures/pointrange_ecohydrological_level_climate_impact.tiff",
+      type = "cairo",
+      compression = "lzw",
+      dpi = 600,
+      width = 10,
+      height = 5
+    ),
+    format = "file"
+  )
+
+  , tar_target(
+    impact_attribution_table,
+    create_impact_attribution_table(analysis_simulations),
+    format = "rds"
+  )
 
   # Discussion Figures ------------------------------------------------------
 
