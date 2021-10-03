@@ -329,10 +329,10 @@ create_impact_attribution_table <- function(proportions) {
        ] %>%
       .[!is.na(future)] %>% 
       .[
-        j = `Climate Impact (Less Sens.)` := future - historical
+        j = `Climate Impact (Less Sensitive)` := future - historical
       ] %>%
       .[
-        j = .(`Climate Impact\n(Less Sens.)` = pretty_hdci(100 * `Climate Impact (Less Sens.)`)),
+        j = .(`Climate Impact\n(Less Sensitive)` = pretty_hdci(100 * `Climate Impact (Less Sensitive)`)),
         by = .(variable, site_status),
       ] %>% 
       .[]
@@ -359,10 +359,10 @@ create_impact_attribution_table <- function(proportions) {
     ] %>%
     .[!is.na(future)] %>% 
     .[
-      j = `Climate Impact (More Sens.)` := future - historical
+      j = `Climate Impact (More Sensitive)` := future - historical
     ] %>%
     .[
-      j = .(`Climate Impact\n(More Sens.)` = pretty_hdci(100 * `Climate Impact (More Sens.)`)),
+      j = .(`Climate Impact\n(More Sensitive)` = pretty_hdci(100 * `Climate Impact (More Sensitive)`)),
       by = .(variable, site_status),
     ] %>% 
     .[]
