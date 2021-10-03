@@ -464,6 +464,20 @@ targets <- list(
     format = "file"
   )
     
+  , tar_target(
+    future_climate_plot,
+    create_future_climate_plot(
+      observed.data = external_met,
+      gcm.data = simplify_scenarios(loca_simulations[station_name == "bergland_dam"]),
+      output.file = "output/figures/density_ridges_future_and_observed_climatology.tiff",
+      type = "cairo",
+      compression = "lzw",
+      dpi = 600,
+      width = 10,
+      height = 7.5),
+    format = "file"
+  )
+
 )
 
 # End with a call to tar_pipeline() to wrangle the targets together.
