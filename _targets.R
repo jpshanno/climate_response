@@ -312,7 +312,7 @@ targets <- list(
                     n.simulations = 10000,
                     n.workers = 4,
                     solar.coefs = solrad_coefs[station_name == "PIEM4"],
-                    simulation.dates = seq(as.Date("2008-11-01"), as.Date("2009-10-31"), by = "days")),
+                    simulation.dates = seq(as.Date("2009-01-01"), as.Date("2009-12-31"), by = "days")),
   )
 
   # Create & Run SWG for LOCA Data
