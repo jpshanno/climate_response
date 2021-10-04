@@ -58,7 +58,7 @@ create_total_impact_plot <- function(proportions, output.file, ...){
                   fun = median,
                  aes(x = simulation_month,
                      y = Probability,
-                     color = "Modeled Black Ash, Current Climate")
+                     color = "Baseline: Modeled Black Ash, Current Climate")
                  ) +
     geom_pointrange(aes(x = simulation_month,
                         y = Probability,
@@ -72,10 +72,10 @@ create_total_impact_plot <- function(proportions, output.file, ...){
       size = 5,
       vjust = 0
     ) +
-    scale_color_manual(values = c(`Modeled Black Ash, Current Climate` = "gray30",
+    scale_color_manual(values = c(`Baseline: Modeled Black Ash, Current Climate` = "gray30",
                                   `Less Sensitive` = darkblue,
                                   `More Sensitive` = orange),
-                       breaks = c("Less Sensitive", "More Sensitive", "Modeled Black Ash, Current Climate")) +
+                       breaks = c("Less Sensitive", "More Sensitive", "Baseline: Modeled Black Ash, Current Climate")) +
     facet_grid(variable ~ site_status,
                scales = "free") +
     # labs(caption = str_wrap("All ranges represent 67% of the simulations as HDCI. Points represent median. Gray shaded area represents model simulations for control conditions under the current climate.", width = 100)) +
@@ -115,7 +115,7 @@ create_eab_impact_plot <- function(proportions, output.file, ...){
   point_function <- function(...) {median(...)}
   
   summary_dat <- 
-    proportions[month(simulation_date) %in% 5:10,
+    proportions[month(simulation_date) %in% 5:10 & site_status != "Control",
                 .(connectivity = point_function(prop_within_5cm_max_wl),
                   connectivity_min = ci_function(prop_within_5cm_max_wl, .width = ci_width)[[1]],
                   connectivity_max = ci_function(prop_within_5cm_max_wl, .width = ci_width)[[2]],
@@ -137,21 +137,50 @@ create_eab_impact_plot <- function(proportions, output.file, ...){
                              ymax = c("connectivity_max", "inundation_max", "drawdown_max"))) %>% 
     transform(variable = fct_relabel(variable, ~fcase(.x=="1", "Connectivity", .x=="2", "Inundation", .x=="3", "Drawdown"))) %>%
     transform(site_status = factor(site_status,
-                                   levels = c("Control", "Treated", "Future Forested"),
-                                   labels = c("Black Ash", "Non-Forested", "Future Forested"),
+                                   levels = c("Treated", "Future Forested"),
+                                   labels = c("Non-Forested", "Future Forested"),
                                    ordered = TRUE))
 
+  
+  # Create baseline of black ash forest under reach climate condition
+  baseline <- proportions[
+    i = month(simulation_date) %in% 5:10 & site_status == "Control",
+    j = .(
+      simulation_month = month(simulation_date, label = TRUE, abbr = TRUE),
+      scenario = fcase(scenario == "historical", "Current Climate",
+                       scenario == "rcp45", "Less Sensitive", 
+                       scenario == "rcp85", "More Sensitive"),
+      Connectivity = prop_within_5cm_max_wl,
+      Drawdown = 1-prop_above_neg_50,
+      Inundation = prop_above_neg_10
+    )
+  ] %>% 
+    melt(id.vars = c("scenario", "simulation_month"),
+         value.name = "Probability")
+  
   fig <- ggplot(summary_dat) + 
+    stat_gradientinterval(data = baseline,
+                          color = NA,
+                          aes(x = simulation_month,
+                              y = Probability,
+                              slab_alpha = stat(-pmin(ci_width, pmax(abs(1-2*cdf), 0))))) + # Shading covers 67% of data, starts to fade at 10%
+    geom_crossbar(data = baseline,
+                  stat = "summary",
+                  fun = median,
+                  aes(x = simulation_month,
+                      y = Probability,
+                      color = "Baseline: Modeled Black Ash")
+    ) +
     geom_pointrange(aes(x = simulation_month,
                         y = Probability,
                         ymin = ymin,
                         ymax = ymax,
                         color = site_status),
                     position = position_dodge(width = 0.6)) +
-    scale_color_manual(values = c(`Black Ash` = green,
+    scale_color_manual(values = c(`Baseline: Modeled Black Ash` = "gray30",
                                   `Non-Forested` = gold,
-                                  `Future Forested` = brown),
-                       breaks = c("Black Ash", "Non-Forested", "Future Forested")) +
+                                  `Future Forested` = green),
+                       breaks = c("Non-Forested", "Future Forested", "Baseline: Modeled Black Ash")) +
     facet_grid(variable ~ scenario,
                scales = "free") +
     guides(
@@ -189,7 +218,7 @@ create_climate_impact_plot <- function(proportions, output.file, ...){
   point_function <- function(...) {median(...)}
   
   summary_dat <- 
-    proportions[month(simulation_date) %in% 5:10,
+    proportions[month(simulation_date) %in% 5:10 & scenario != "historical",
                 .(connectivity = point_function(prop_within_5cm_max_wl),
                   connectivity_min = ci_function(prop_within_5cm_max_wl, .width = ci_width)[[1]],
                   connectivity_max = ci_function(prop_within_5cm_max_wl, .width = ci_width)[[2]],
@@ -200,11 +229,10 @@ create_climate_impact_plot <- function(proportions, output.file, ...){
                   inundation_min = ci_function(prop_above_neg_10, .width = ci_width)[[1]],
                   inundation_max = ci_function(prop_above_neg_10, .width = ci_width)[[2]]),
                 by = .(site_status, 
-                       scenario = fcase(scenario == "historical", "Current Climate",
-                                        scenario == "rcp45", "Less Sensitive", 
+                       scenario = fcase(scenario == "rcp45", "Less Sensitive", 
                                         scenario == "rcp85", "More Sensitive"),
                        simulation_month = month(simulation_date, label = TRUE, abbr = TRUE))] %>% 
-    transform(scenario = factor(scenario, levels = c("Current Climate", "Less Sensitive", "More Sensitive"), ordered = TRUE)) %>% 
+    transform(scenario = factor(scenario, levels = c("Less Sensitive", "More Sensitive"), ordered = TRUE)) %>% 
     melt(id.vars = c("site_status", "scenario", "simulation_month"),
          measure.vars = list(Probability = c("connectivity", "inundation", "drawdown"),
                              ymin = c("connectivity_min", "inundation_min", "drawdown_min"),
@@ -215,17 +243,45 @@ create_climate_impact_plot <- function(proportions, output.file, ...){
                                    labels = c("Black Ash", "Non-Forested", "Future Forested"),
                                    ordered = TRUE))
   
+  # Create baseline of each alternative vegetative condition under current climate conditions 
+  baseline <- proportions[
+    i = month(simulation_date) %in% 5:10 & scenario == "historical",
+    j = .(
+      simulation_month = month(simulation_date, label = TRUE, abbr = TRUE),
+      site_status = fcase(site_status == "Control", "Black Ash",
+                          site_status == "Treated", "Non-Forested",
+                          site_status == "Future Forested", "Future Forested"),
+      Connectivity = prop_within_5cm_max_wl,
+      Drawdown = 1-prop_above_neg_50,
+      Inundation = prop_above_neg_10
+    )
+  ] %>% 
+    melt(id.vars = c("site_status", "simulation_month"),
+         value.name = "Probability")
+  
   fig <- ggplot(summary_dat) + 
+    stat_gradientinterval(data = baseline,
+                          color = NA,
+                          aes(x = simulation_month,
+                              y = Probability,
+                              slab_alpha = stat(-pmin(ci_width, pmax(abs(1-2*cdf), 0))))) + # Shading covers 67% of data, starts to fade at 10%
+    geom_crossbar(data = baseline,
+                  stat = "summary",
+                  fun = median,
+                  aes(x = simulation_month,
+                      y = Probability,
+                      color = "Baseline: Current Climate")
+    ) +
     geom_pointrange(aes(x = simulation_month,
                         y = Probability,
                         ymin = ymin,
                         ymax = ymax,
                         color = scenario),
                     position = position_dodge(width = 0.6)) +
-    scale_color_manual(values = c(`Current Climate` = "gray30",
+    scale_color_manual(values = c(`Baseline: Current Climate` = "gray30",
                                   `Less Sensitive` = darkblue,
                                   `More Sensitive` = orange),
-                       breaks = c("Current Climate", "Less Sensitive", "More Sensitive")) +
+                       breaks = c("Less Sensitive", "More Sensitive", "Baseline: Current Climate")) +
     facet_grid(variable ~ site_status,
                scales = "free") +
     guides(
