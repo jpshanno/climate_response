@@ -432,3 +432,39 @@ pretty_round <- function(data, n_digits) {
   format(round(data, n_digits), nsmall = n_digits)
   
 }
+
+filled_rolling_sum <- function(x, na.rm = TRUE) {
+  
+  # Mirror first and last 15 rows to get rid of NA values from rolling mean
+  x <- c(
+    head(x, 15),
+    x,
+    tail(x, 15)
+  )
+  
+  # Get 30 day rolling mean of precip variables
+  x <- data.table::frollsum(x = x, n = 30, align = "center", na.rm = na.rm)
+  
+  # Drop mirrored values
+  x <- head(x, -15)
+  x <- tail(x, -15)
+  
+}
+
+filled_rolling_mean <- function(x, na.rm = TRUE) {
+  
+  # Mirror first and last 15 rows to get rid of NA values from rolling mean
+  x <- c(
+    head(x, 15),
+    x,
+    tail(x, 15)
+  )
+  
+  # Get 30 day rolling mean of precip variables
+  x <- data.table::frollmean(x = x, n = 30, align = "center", na.rm = na.rm)
+  
+  # Drop mirrored values
+  x <- head(x, -15)
+  x <- tail(x, -15)
+  
+}
