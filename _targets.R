@@ -501,7 +501,7 @@ targets <- list(
   , tar_target(
     pet_impact_plot,
     create_pet_impact_plot(
-      data = hydrological_components,
+      data = analysis_simulations[["intervals_pet"]],
       output.file = "output/figures/lines_pet_demand_by_cover_and_climate.tiff",
       type = "cairo",
       compression = "lzw",
