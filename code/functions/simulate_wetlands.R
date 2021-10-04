@@ -9,26 +9,43 @@
 ##' @author Joe Shannon
 ##' @export
 simulate_wetlands <- 
-  function(data, model.params, out.path) {
+  function(data, model.params, out.dir) {
     
     start_time <- Sys.time()
     
-    if(fs::file_exists(out.path)){
+    treatments <- unique(model.params$site_status)
+    treatment_paths <- 
+      purrr::set_names(treatments, treatments)
+    
+    for(TREATMENT in treatments) {
       
-      fs::file_delete(out.path)
+      treatment_paths[[TREATMENT]] <- fs::path(out.dir, glue::glue("wetland_simulations_{gsub(' ', '_', TREATMENT)}"), ext = "csv.gz")
       
-      # writeLines doesn't automatically create connection to gz file, so using
-      # fwrite (or any other function that does recognize and create gz connection)
-      fwrite(list("simulation_id","site","site_status","gcm","scenario","simulation_date","wl_hat","q_hat","m_hat","p_hat","pet_hat","gradient"),
-                 out.path)
-
+      if(fs::file_exists(treatment_paths[[TREATMENT]])){
+        
+        fs::file_delete(treatment_paths[[TREATMENT]])
+        
+        # writeLines doesn't automatically create connection to gz file, so using
+        # fwrite (or any other function that does recognize and create gz connection)
+        fwrite(list("simulation_id","site","site_status","gcm","scenario","simulation_date","wl_hat","q_hat","m_hat","p_hat","pet_hat","gradient"),
+               treatment_paths[[TREATMENT]])
+        
+      }
+      
     }
     
     # Memory is a problem with this. Limiting memory usage by going rowwise
     # through the site/treatment combinations. Going through the gcm/scenario 
     # combinations takes more memory (365 * 6 * 10000 * 34)
     
-    simulation_intervals <-
+    simulation_intervals_wl <-
+      vector("list", nrow(model.params))
+    
+    simulation_intervals_pet <-
+      vector("list", nrow(model.params))
+    
+    # pet impact / gradient to get surface PET estimates
+    simulation_intervals_surface_pet <- 
       vector("list", nrow(model.params))
     
     simulation_proportions <- 
@@ -50,17 +67,30 @@ simulate_wetlands <-
                    wetland_model(.SD, params = PARAMS, future.forest.change = ASH_PERCENT)),
              by = .(simulation_id)]
       
+      cat(paste("Writing output to", treatment_paths[[STATUS]], "\n"))
+      
       fwrite(simulations, 
-             out.path,
-             append = TRUE)
+             treatment_paths[[STATUS]],
+             append = TRUE,
+             nThread = 4)
       
       cat(paste("Simulations for", SITE, STATUS, "complete\n"))
       
       cat(paste("Summarizing Simulations for", SITE, STATUS, "\n"))
       
-      simulation_intervals[[i]] <- 
+      simulation_intervals_wl[[i]] <- 
         simulations[,
-                    summarize_doy(wl_hat),
+                    summarize_doy(wl_hat, name = "wl"),
+                    keyby = .(site, site_status, gcm, scenario, simulation_date)]
+      
+      simulation_intervals_pet[[i]] <- 
+        simulations[,
+                    summarize_doy(filled_rolling_mean(pet_hat), name = "pet"),
+                    keyby = .(site, site_status, gcm, scenario, simulation_date)]
+      
+      simulation_intervals_surface_pet[[i]] <- 
+        simulations[,
+                    summarize_doy(filled_rolling_mean(pet_hat / gradient), name = "pet"),
                     keyby = .(site, site_status, gcm, scenario, simulation_date)]
       
       simulation_proportions[[i]] <- 
@@ -87,7 +117,9 @@ simulate_wetlands <-
                           paste("All Simulations complete", trunc(difftime(Sys.time(), start_time, units = 'mins')), "minutes."))
     }
     
-    list(intervals = rbindlist(simulation_intervals),
+    list(intervals_wl = rbindlist(simulation_intervals_wl),
+         intervals_pet = rbindlist(simulation_intervals_pet),
+         intervals_surface_pet = rbindlist(simulation_intervals_surface_pet),
          proportions = rbindlist(simulation_proportions))
     
     # ggplot(simulations[gcm == "ccsm4" & scenario == "rcp45"]) +
@@ -98,7 +130,11 @@ simulate_wetlands <-
 
 
 summarize_doy <- 
-  function(x, interval.widths = c(0.5, 0.66, 0.95)){
+  function(x, name = NULL, interval.widths = c(0.5, 0.67, 0.95)){
+    
+    if(!is.null(name)) {
+      name <- paste0("_", name)
+    }
     
     qis <- 
       data.table(ggdist::median_qi(x, 
@@ -112,11 +148,14 @@ summarize_doy <-
       data.table(median = median(x),
                  mean = mean(x),
                  mode = ggdist::Mode(x),
-                 interval_name = c(sprintf("qi_%0.3f", c(0.5 * (1 - interval.widths), 0.5 * ( 1 +interval.widths))),
-                                   sprintf("hdci_%0.3f", c(0.5 * (1 - interval.widths), 0.5 * ( 1 +interval.widths)))),
+                 interval_name = c(sprintf(paste0("qi", name, "_%0.3f"), c(0.5 * (1 - interval.widths), 0.5 * ( 1 +interval.widths))),
+                                   sprintf(paste0("hdci", name, "_%0.3f"), c(0.5 * (1 - interval.widths), 0.5 * ( 1 +interval.widths)))),
                  interval_value = c(qis$ymin, qis$ymax, hdcis$ymin, hdcis$ymax))
     
-    dcast(intervals, 
+    intervals <- 
+      dcast(intervals, 
           median + mean + mode ~ interval_name, 
           value.var = "interval_value")
+    
+    data.table::setnames(intervals, c("median", "mean", "mode"), paste0(c("median", "mean", "mode"), name))
   }

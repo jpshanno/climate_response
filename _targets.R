@@ -241,7 +241,13 @@ targets <- list(
     predict_test_period(data = testing_data[site %in% treatment_sites], 
                         model.params = model_params)
   )
-  
+
+  , tar_target(
+    test_data_future_forest_fits,
+    predict_test_period_future_forest(data = testing_data[site %in% treatment_sites], 
+                        model.params = model_params)
+  )
+
   , tar_target(
     wetland_model_metrics,
     calculate_wetland_model_metrics(data = test_data_fits, max_wl_data = esy_functions))
@@ -368,26 +374,38 @@ targets <- list(
 
   # Run Wetland Models on Synthetic Weather ---------------------------------
   
+  # TODO: Save output as individual disk.frames by treatment sharded by site and
+  # site status
   , tar_target(
     wetland_simulation_summaries,
-    simulate_wetlands(data = swg_simulations_loca, 
-                      model.params = model_params,
-                      out.path = "output/tabular/wetland_simulations.csv.gz"),
+    simulate_wetlands(data = simplify_scenarios(swg_simulations_loca),
+                      model.params = model_params[site %in% treatment_sites],
+                      out.dir = "output/tabular/"),
     format = "rds"
   )
 
+
+  # , tar_target(
+  #   hydrological_components,
+  #   summarize_hydrological_components(
+  #     files = fs::dir_ls("output/tabular/", regexp = "wetland_simulations_(Control|Treated|Future_Forested)"),
+  #     variable = "pet_hat",
+  #     dummy = wetland_simulation_summaries
+  #   )
+  # )
+
   , tar_target(
     analysis_simulations,
-    simplify_scenarios(wetland_simulation_summaries[["proportions"]][site %in% treatment_sites])
+    map(wetland_simulation_summaries, ~ simplify_scenarios(.x[site %in% treatment_sites])),
+    format = "rds"
   )
-  
 
   # Evaluate EAB and CC Impacts ---------------------------------------------
 
   , tar_target(
     total_impact_plot,
     create_total_impact_plot(
-      proportions = analysis_simulations,
+      proportions = analysis_simulations[["proportions"]],
       output.file = "output/figures/pointrange_and_slabinterval_ecohydrological_level_total_impact.tiff",
       type = "cairo",
       compression = "lzw",
@@ -401,8 +419,8 @@ targets <- list(
   , tar_target(
     eab_impact_plot,
     create_eab_impact_plot(
-      proportions = analysis_simulations,
-      output.file = "output/figures/pointrange_ecohydrological_level_eab_impact.tiff",
+      proportions = analysis_simulations[["proportions"]],
+      output.file = "output/figures/pointrange_and_slabinterval_ecohydrological_level_eab_impact.tiff",
       type = "cairo",
       compression = "lzw",
       dpi = 600,
@@ -415,8 +433,8 @@ targets <- list(
   , tar_target(
     climate_impact_plot,
     create_climate_impact_plot(
-      proportions = analysis_simulations,
-      output.file = "output/figures/pointrange_ecohydrological_level_climate_impact.tiff",
+      proportions = analysis_simulations[["proportions"]],
+      output.file = "output/figures/pointrange_and_slabinterval_ecohydrological_level_climate_impact.tiff",
       type = "cairo",
       compression = "lzw",
       dpi = 600,
@@ -428,7 +446,7 @@ targets <- list(
 
   , tar_target(
     impact_attribution_table,
-    create_impact_attribution_table(analysis_simulations),
+    create_impact_attribution_table(analysis_simulations[["proportions"]]),
     format = "rds"
   )
 
@@ -467,14 +485,29 @@ targets <- list(
   , tar_target(
     future_climate_plot,
     create_future_climate_plot(
-      observed.data = external_met,
+      observed.data = swg_data[station_name == "bergland_dam"],
       gcm.data = simplify_scenarios(loca_simulations[station_name == "bergland_dam"]),
+      solrad.coefs = solrad_coefs[station_name == "PIEM4"],
       output.file = "output/figures/density_ridges_future_and_observed_climatology.tiff",
       type = "cairo",
       compression = "lzw",
       dpi = 600,
       width = 10,
       height = 7.5),
+    format = "file"
+  )
+
+  , tar_target(
+    pet_impact_plot,
+    create_pet_impact_plot(
+      data = hydrological_components,
+      output.file = "output/figures/lines_pet_demand_by_cover_and_climate.tiff",
+      type = "cairo",
+      compression = "lzw",
+      dpi = 600,
+      width = 8,
+      height = 4
+    ),
     format = "file"
   )
 
