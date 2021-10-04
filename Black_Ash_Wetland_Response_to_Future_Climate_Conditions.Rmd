@@ -30,7 +30,10 @@ ash headwater wetlands and stream networks.
 Shifts in temperature, and precipitation (timing, frequency, and quantity)
 associated with climate change are already impacting global wetland ecology and
 will intensify into the future [@burkett-2000;
-@moomaw-2018]. In the Great Lakes region of North America (Figure
+@moomaw-2018]. 
+**Rework this to discuss model ranges. GDFL shows wetter, hotter summer (https://climatetoolbox.org/tool/Climate-Mapper)**
+*The Byun and Hayhoe results are for ensembles and there are differences between the models and scenarios*
+In the Great Lakes region of North America (Figure
 \@ref(fig:study-map)), summer precipitation is likely to decline while total
 annual precipitation is expected to stay stable or increase [@byun-2018;
 @hayhoe-2010]. These projected changes result in increased precipitation in the
@@ -373,6 +376,7 @@ inundation %>%
 -->
 
 #### Future Climate Conditions
+**GDFL-CM3 is more sensitive model, leading to hotter, wetter conditions**
 Wetland models were run under simulated current (1980-2009) and future
 (2070-2099) conditions. Future conditions were evaluated under the RCP 4.5 and
 RCP 8.5 representative concentration pathway scenarios. Daily climate
@@ -503,6 +507,14 @@ water network via streamflow and subsurface flow, and 'dry' conditions,
 representing periods where non-facultative wetland species could become 
 established.
 
+Consistency between the observation period used to train wetland water level
+models and future climate predictions is critical to drawing meaningful
+conclusions (**CITATION ABOUT FUTURE CLIMATE SCENRIO MODELING?**. We chose to
+compare our future scenario modeling to a modeled control baseline. The modeled
+control baseline was calculated using historical (1970-2000) climate simulations
+downscaled using LOCA. For the control baseline we pooled daily LOCA simulations
+from both CCSM4 and GFDL-CM3.
+
 ##### Water Level Categories??
 Explain connectivity, inundataion, drawdown better
 
@@ -575,6 +587,7 @@ knitr::include_graphics("output/figures/density_lines_loca_and_swg_climatology.t
 ```
 
 #### Wetland Water Level Model Performance
+# Need to update this based on reduced set of models
 Wetland water level model performance was evaluated using the retained
 independent testing datasets. We calculated *R^2^* as a metric for the
 relationship between observed and modeled values. *R^2^* cannot be used to
@@ -648,7 +661,7 @@ equal sample sizes between the control and future conditions.
 targets::tar_read(wetland_model_predicted_probs_table) %>%
   flextable::set_caption(
     caption = "Tests comparing probability of occurance for hydroecologically significant water levels. Connectivity, Inundation, and Drawdown respectively represent wetland water levels equal to or greater than modeled maximum water level, water levels within 10 cm of the wetland surface, and water levels more than 50 cm below the wetland surface.",
-    autonum = officer::run_autonum(seq_id = "tab", bkm = "pred-probs"))
+    autonum = officer::run_autonum(seq_id = "tab", bkm = "predicted-probs"))
 
 ```
 
@@ -664,8 +677,8 @@ knitr::include_graphics("output/figures/jitterpoint_and_pointrange_wetland_model
 #### Wetland Water Levels
 
 Wetland water levels under future climate conditions were highly variable under
-both scenarios and both vegetation types (Figure \@ref(fig:probabilities)).
-Figure \@ref(fig:probabilities) shows the probability that wetland water levels
+both scenarios and both vegetation types (Figure \@ref(fig:total-impact)).
+Figure \@ref(fig:total-impact) shows the probability that wetland water levels
 will be above or below the ecohydrologically relevant thresholds defined above.
 The reported probability is the proportion of observations where daily water
 level surpasses each threshold out of all modeled daily water levels in a month
@@ -677,16 +690,16 @@ a crossbar and shaded area.
 
 For non-forested conditions both future climate scenarios showed a decrease in
 probability of connectivity relative to current site conditions (Figure
-\@ref(fig:probabilities)A). The more sensitive climate scenario consistently
+\@ref(fig:total-impact)A). The more sensitive climate scenario consistently
 showed a lower median probability of connectivity and was more likely to have
 simulated conditions outside of the HDCI of current conditions. The
 less-sensitive climate scenario showed greatest agreement with current conditions
 in July and August. Future forested conditions were more likely to show
 connectivity in July and August under both climate scenarios, to a greater
-degree under the less sensitive climate scenario (Figure \@ref(fig:probabilities)B).
+degree under the less sensitive climate scenario (Figure \@ref(fig:total-impact)B).
 Connectivity to the larger hydrologic network was much less likely to occur
 under the more sensitive climate scenario and both vegetation conditions in May
-(Figure \@ref(fig:probabilities)A & B). Under both vegetation conditions the
+(Figure \@ref(fig:total-impact)A & B). Under both vegetation conditions the
 more-sensitive climate scenario resulted in a lower probability of connectivity
 relative to the less-sensitive climate scenario. While both vegetation conditions
 showed significant overlap between the less-sensitive climate conditions and
@@ -694,37 +707,37 @@ control conditions, the non-forested conditions tended to skew towards current
 drier years (lower probability of connectivity) and future forested conditions
 skewed towards current wetter years (high probability of connectivity).
 
-Inundation results in Figure \@ref(fig:probabilities)C & D closely resemble the
+Inundation results in Figure \@ref(fig:total-impact)C & D closely resemble the
 patterns observed in the connectivity results. This is inline with fit model
 parameters that showed maximum sustained water levels were above the surface for
 almost every wetland and treatment combination (**TABLE S1**). Generally,
 inundated conditions would be less prevalent under future non-forested
 conditions than the future-forested conditions. For non-forested conditions
 there was less overlap between observed conditions and the more-sensitive
-climate scenario results (Figure \@ref(fig:probabilities)D). This was contrary
+climate scenario results (Figure \@ref(fig:total-impact)D). This was contrary
 to non-forested conditions where the less-sensitive climate scenario results
 showed more overlap with current conditions. Under both future climate scenarios
-(Figure \@ref(fig:probabilities)C). Future-forested conditions showed increased
+(Figure \@ref(fig:total-impact)C). Future-forested conditions showed increased
 probability for inundation in July, August, and September (Figure
-\@ref(fig:probabilities)D).
+\@ref(fig:total-impact)D).
 
 The probability that water levels will drop to less than 50 cm below the wetland
 soil surface agree with the connectivity and inundation results (Figure
-\@ref(fig:probabilities)E & F). Under both climate scenarios the future forest
+\@ref(fig:total-impact)E & F). Under both climate scenarios the future forest
 conditions showed a lower probability of drawdown than was observed under the
 current black ash forest, with almost no overlap with current conditions in
-July, August, and September (Figure \@ref(fig:probabilities)F). Drawdown events
+July, August, and September (Figure \@ref(fig:total-impact)F). Drawdown events
 were very unlikely under replacement forested conditions under both climate
 scenarios. Probability of drawdown was greater in the more sensitive scenario
 relative to the less sensitive scenario and also more variable. Under the
 non-forest cover the probability of drawdown was more likely under both future
 climate scenarios. Differences from current conditions were greatest in August,
 but drawdown conditions were much more likely than current conditions from July
-through October (Figure \@ref(fig:probabilities)E).
+through October (Figure \@ref(fig:total-impact)E).
 
-```{r probabilities, fig.cap="Probability of observing water levels above (connectivity, inundation) or below (drawdown) ecohydrologically significant thresholds. Points represent median the median observed probability within a month and ranges represent 67% of the simulations as highest-density continuous interval (HDCI). Gray shaded area represents model simulations for control black (ash forest) conditions under the current climate and the black bar represents the control monthly median probability."}
+```{r total-impact, fig.cap="Probability of observing water levels above (connectivity, inundation) or below (drawdown) ecohydrologically significant thresholds. Points represent median the median observed probability within a month and ranges represent 67% of the simulations as highest-density continuous interval (HDCI). Gray shaded area represents model simulations for control black (ash forest) conditions under the current climate and the black bar represents the control monthly median probability."}
 
-knitr::include_graphics("output/figures/slabinterval_and_pointrange_ecohydrological_level_probabilities.tiff")
+knitr::include_graphics("output/figures/pointrange_and_slabinterval_ecohydrological_level_total_impact.tiff")
 
 ```
 
@@ -803,7 +816,7 @@ fall and winter (SON and DJF) precipitation is high enough to recharge the local
 hydrology driving these wetlands, restarting the cycle at or near maximum
 wetland water levels. When we consider only fall and winter precipitation we
 found 0%, 8.7%, and 10.1% of synthetic weather series had totals below the tenth
-percentile of observed data, less-sensitive and more-sensitive climate
+percentile of observed data, less-sensitive, and more-sensitive climate
 scenarios, respectively. Unsurprisingly close to 10% of the synthetic weather
 winters were drier than the tenth percentile of the LOCA downscaled values.
 Synthetic (and LOCA) winters were wetter than observed winters, supporting the
@@ -872,87 +885,48 @@ knitr::include_graphics("output/figures/line_plot_study_period_water_availabilit
 
 ```
 
-
-#### Wetland Water Level Models
-
-<!-- 
-wetland_model_metrics[
-  metric == "r2" & !(site %in% c("113", "119", "135")),
-  mean(value > 0.75),
-  by = .(site_status)]
--->
-
-Wetland model performance was adequate for the objective of this study, which
-was to observe changes in the gross hydrology of black ash wetlands. Overall the
-retained models showed good correlation between observed and modeled water
-levels (Figure \@ref(fig:model-metrics)A, Table \@ref(tab:model_metrics)). We
-found that 77.27% and 81.48% of site-year combinations had *R^2* values above
-0.75 for the control and treated condition models, respectively. Model
-performance varied by site with a median rRMedSE of 11.97% of annual water level
-range and median model error was 6.086 cm. Daily percent bias
-estimates (PBIAS) would be helpful to evaluate error relative to observed daily
-water level. However, wetland water levels cross 0 so that the relative error
-approaches infinity as water levels rise or fall towards the surface.
-
-<!--
-test_data_fits[, .(error_delta = (delta_wl_hat_cm - delta_wl_cm)), by = .(site)] %>%
-ggplot() + aes(x = site, y = error_delta) + geom_boxplot() + ylim(-10, 10)
--->
-
-Table \@ref(tab:predicted-probs) and Figure \@ref(fig:predicted-probabilities)
-show that observed and modeled probability of occurrence of connectivity,
-inundation, and drawdown were not different in the test data. They also showed 
-that the modeled wetland conditions were slightly drier than the observed 
-conditions. Importantly the pattern of those errors is consistent. Wetlands were 
-less likely to have wet conditions (connectivity, inundation) simulated and more 
-likely to have dry conditions (drawdown) simulated. The consistency in error 
-suggests that the errors from an overall negative model bias rather than from 
-an underestimate of the dynamic range of wetland water levels.
-
-Discussion on models [@marechaux-2021]:
-Q4 Which forest systems and which of their properties are most sensitive to changes in community composition across scales and why?
-Q5 Which factors control the resilience of forest ecosystems to various disturbances?
-Q6 What makes forests susceptible to rapid system shifts and how can we project tipping points?
-Q7 How do disturbance regimes and global change affect sustainable forest management strategies?
-
-RMedSE and relative RMedSE had similar patterns among sites 
-(Figure \@ref(fig:model-metrics)). This suggests that the wetland models were 
-less suited to wetlands with more stable water levels. More stable water levels 
-in these wetlands generally indicated consistently wet conditions. While the 
-patterns are consistent, the magnitude of difference among wetlands is greater 
-for relative RMedSE than for RMedSE. This suggests that from both absolute and 
-relative view the wetland models as developed capture dynamic wetland water 
-levels more accurately than static wetland water levels.
-
-Consistency between the observation period used to train wetland water level
-models and future climate predictions is critical to draw meaningful
-conclusions. This is why we chose to use external meteorologic data to develop
-our wetland models. And also why we use a modeled control baseline rather than 
-observed.
+#### Ecosystem Specific Yield
 
 The approach used to calculate *E~Sy~* for use in relating the magnitude of
 water level change to the drivers of that change was an alternative to those
 presented in previous research. We developed this alternative based on
 unsuccessful attempts to implement *E~Sy~* calculates through the rainfall/rise
-method described in McLaughlin, et al (-@mclaughlin-2014). Directly proving the 
-accuracy of this approach is outside the scope of this study. SectionCASE_STUDYin 
-ChapterTRANSDUCER_ERRORSdemonstrates that *ET* estimates derived using this approach 
-perform comparably to other implementations for calculating *E~Sy~* 
-(above). Figure \@ref(fig:esy-impact) shows the results of a simple quantile 
-regression explaining daily change in wetland water level as a function of *PET*
-*P* and *M* (not used elsewhere in this study). We found that *R<sup>2</sup>* of 
-the model improved from 0.69 to 0.78. While 0.69 is considered an acceptable 
-*R^2^* as set out in Moriasi (-@moriasi-2015), we can see that water level 
-drawdown is extremely underestimated by the unadjusted model 
-(Figure \@ref(fig:esy-impact)A). Our results show that mid-season periods 
-with the highest *PET* are not correctly modeled as having high rates of water 
-level decline. This supports the genearl conclusion that the 
-impact of *E~Sy~* increases as water levels drawdown and that flood conditions 
-approach an *E~Sy~* of 1 (CITATION). These results together with those in Section CASE_STUDY in 
-Chapter TRANSDUCER_ERRORS provide empirical evidence that this alternative 
-formulation captures the variation of *E~Sy~* with wetlands and can be used in 
-scenarios where the rainfall-runoff ratio approach is masked by outside 
-influences such as low-frequency hydrologic signals (@zhu-2011).
+method described in McLaughlin, et al (-@mclaughlin-2014). Directly proving the
+accuracy of this approach is outside the scope of this study, and would be best
+performed through theoretical and designed experimental work. Our research has
+however provided empirical evidence for the application of our approach. Section
+CASE_STUDY in Chapter TRANSDUCER_ERRORS demonstrates that *ET* estimates derived
+using this approach perform comparably to other implementations for calculating
+*E~Sy~* (see White method details above). Those results showed that calculated
+*ET* was correlated with daily *PET* estimates from nearby meteorological
+stations. In this work we can look at how well a simple regression between daily
+water level change and adjusted or unadjusted hydrologic drivers perform. Figure
+\@ref(fig:esy-impact) shows the results of a quantile regression (not used
+elsewhere in this study) explaining daily change in wetland water level as a
+function of *PET* *P* and *M*. We found that *R<sup>2</sup>* of the model
+improved from 0.69 to 0.78. While 0.69 is considered an acceptable *R^2^* as set
+out in Moriasi (-@moriasi-2015), we can see that water level drawdown is
+extremely underestimated by the unadjusted model (Figure
+\@ref(fig:esy-impact)A). Our results show that periods with the highest drawdown
+are not correctly modeled using the raw inputs. These periods of high drawdown
+are captured when the *E~Sy~* adjusted hydrologic inputs are used. Periods of
+high drawdown generally occurred mid-season when water levels were farther below
+the surface. Our approach agrees with others (**CITATIONS**) finding that the
+impact of *E~Sy~* increases as water levels drawdown and that flooded conditions
+approach an *E~Sy~* of 1 (CITATION). This relationship results in the largest
+adjustment to inputs during these mid-season periods, explaining the differences
+seen between panels A and B in Figure \@ref(fig:esy-impact). These results
+together with those in Section CASE_STUDY in Chapter TRANSDUCER_ERRORS provide
+empirical evidence that this alternative formulation captures the variation of
+*E~Sy~* with wetlands and can be used in scenarios where the rainfall-runoff
+ratio approach is masked by outside influences such as low-frequency hydrologic
+signals (@zhu-2011) and surface water connectivity (@watras-2017).
+
+What if the response of black ash transpiration to lowering water levels (rapid 
+increase in T) is actually the signal I am capturing, not *E~Sy~*? This may be 
+partly hapeening, but the response between rainfall and water level response is 
+well explained by the current *E~Sy~* response, suggesting that the modeled 
+phenomenon is primarily *E~Sy~*.
 
 ```{r esy-impact, fig.width=6, fig.height=8, fig.cap=""}
 
@@ -961,25 +935,158 @@ knitr::include_graphics("output/figures/scatterplot_and_zoom_delta_water_level_e
 ```
 
 
-##### Future Improvements
-The next step for these models is to fit them using a hierarchical Bayesian 
-approach. This should improve model fit by incorporating information from all 
-sites into a single model while still allowing model parameters to vary between 
-sites. If model performance does not significantly improve with that approach 
-more, or potentially all years of data can be used to parameterize the wetland 
-models. Using most or all of the data for model parameterization precludes the 
-options of evaluating model performance on truly independent data. Kozak and 
-Kozak (-@kozak-2003) provide an alternative view that replaces cross-validation 
-with lack-of-fit metrics, which evaluate model predictions for assumptions of 
-model assumptions. Their main conclusion was that cross-validation increase the 
-variance of model estimates potentially resulting in poor model choice.
+#### Wetland Water Level Models
+
+<!-- 
+wetland_model_metrics[
+  metric == "r2" & !(site %in% c("119", "156")),
+  mean(value > 0.75),
+  by = .(site_status)]
+-->
+
+Wetland model performance was adequate for the objective of this study, which
+was to observe changes in the hydrographs of black ash wetlands and compare the
+probability of critical ecohydrological water levels occurring. Overall the
+retained models showed good correlation between observed and modeled water
+levels (Figure \@ref(fig:model-metrics)A, Table \@ref(tab:model_metrics)). We
+found that 80% and 100% of site-year combinations outside of sites 119 and 156
+had *R^2* values above 0.6 for the control and treated condition models,
+respectively. Model performance varied by site with a median rRMedSE of 12.75%
+(Control: 13.03%, Treated: 12.58%) of annual water level range and median model
+error was -2.19 cm (Control: -1.93 cm, Treated: -2.28 cm). RMedSE and relative
+RMedSE had similar patterns among sites (Figure \@ref(fig:model-metrics)). This
+suggests that from both absolute and relative standpoint, the wetland models as
+developed capture dynamic wetland water levels more accurately than static
+wetland water levels. Daily percent bias estimates (PBIAS) would be helpful to
+evaluate error relative to observed daily water level. However, wetland water
+levels cross 0 so that the relative error approaches infinity as water levels
+rise or fall towards the surface.
+
+The wetland models performed well predicting the probability of occurrence of
+important hydroecological water levels. Table \@ref(tab:predicted-probs) and
+Figure \@ref(fig:predicted-probabilities) show how probability of occurrence of
+connectivity, inundation, and drawdown were not found to be different between
+the observed and modeled data in the test periods. They also show that there is
+no non-significant systematic model bias (positive or negative). Although no
+systematic model bias was identified, use a modeled control baseline is still an 
+important safeguard against drawing conclusions based on potential from model
+artefacts. Comparing the systematically-biased results could exaggerate or mask 
+real expectation of wetter or drier wetland conditions.
+
+The next step for these models is to fit them using a hierarchical Bayesian
+approach. This should improve model fit by incorporating information from all
+sites into a single model for each vegetation condition while still allowing
+model parameters to vary between sites. It will also increase the available data
+for model fitting as unbalanced vegetation-conditions would be accounted for in
+the structure of the model. If model performance does not significantly improve
+with that approach more, or potentially all years of data can be used to
+parameterize the wetland models. Using most or all of the data for model
+parameterization precludes the options of evaluating model performance on truly
+independent data. Kozak and Kozak (-@kozak-2003) provide an alternative view
+that replaces cross-validation with lack-of-fit metrics, which evaluate model
+predictions for assumptions of model assumptions. Their main conclusion was that
+cross-validation increase the variance of model estimates potentially resulting
+in poor model choice.
 
 #### Future Hydrology
 
-Relate future simulations to 'normal' years now. For instance non-forested less
-sensitive scenario: A 'wet' year under those conditions and scenario will be 
-similar to a somewhat 'dry' year now.
+The importance of these simulation results is to help relate potential future
+simulations to current conditions in dry, wet, or 'normal' years. This allows
+researchers and managers to answer questions similar to: What will these sites
+look like in a 'normal' year in the future? How will these sites respond to
+wet/dry conditions in the future? For example, we could expect that during a wet
+year under the more sensitive future climate scenario a non-forested wetland on
+these sites would have a similar probability of surface inundation as a black
+ash wetland does today (Figure \@ref(fig:total-impact)C). In general, black ash
+wetlands that become non-forested can be expected to be have wetter conditions
+under less- sensitive future climate scenarios, and under more-sensitive future
+climate scenarios are more likely to experience conditions similar to today.
+Conclusions could be reached for each combination of climate and vegetaiton
+scenario and this information can and should be used to influence management
+approaches and timing in responding to EAB in black ash wetlands.
 
+The combined impact of EAB and climate can be seen by comparing the future 
+climate conditions (blue and orange) to the control conditions under historical 
+climate (shaded gray) in Figure \@ref(fig:total-impact). We can draw 
+additional information about the individual effects of future climate and 
+vegetative cover on wetlands by altering how we calculate the baseline. In 
+Figure \@ref(fig:total-impact) the baseline is to simulated black ash forests
+under current climate conditions. To isolate the effects of each climate 
+scenario of wetland hydrology we can compare the response of a vegetative under 
+future climate conditions against its response under current climate conditions. 
+Conversely we can evaluate the impact of vegetative cover by comparing each 
+vegetative cover to simulated black ash forests under current climate conditions. 
+Figures \@ref(fig:climate-impact) and \@ref(fig:eab-impact) show the 
+probability of occurrence of each critical ecohydrological water level under 
+conditions where the vegetative cover and climate, respectively, are held 
+constant. Table \@ref(tab:impact-attribution) presents the change in probability 
+of occurrence for each critical water level and alternative vegetative condition 
+that can be attributed to EAB or a less or more sensitive future climate 
+scenario.
+
+We found that EAB impacts lead to slightly wetter conditions under non-forested
+conditions and the present climate. This agrees with observed water level
+response analysis in Van Grinsven, et al (-@vangrinsven-2017), where absolute
+water level response to simulated post-EAB conditions resulted in wetter
+conditions and significantly lower growing season drawdown rates. A modeled
+alternate forest composition (Future Forested) shows that EAB impact alone would
+lead to dramatically wetter conditions relative to black ash forests. This
+result is expected as we modeled our future forested conditions based on
+previous work showing that co-dominant hardwoods had significantly lower
+seasonal transpiration estimates than black ash (@shannon-2017). Under both
+alternative vegetative conditions we found that the isolated impact of future
+climate scenarios would lead to much drier sites. The probability of surface
+water connectivity or inundation occurring are dramatically decreased under both
+climate scenarios. The probability of wetland water levels dropping below 50 cm
+were increased under future climate scenarios for the non-forested conditions,
+but showed little change for non-forested conditions.
+
+```{r climate-impact, fig.width=6, fig.height=3, fig.cap="Probability of occurrence for critical ecohydrological wetland water levels under combinations of vegetative cover and climate conditions. Each column compares simulated wetland response within a fixed vegetation condition across multiple climate scenarios. Probability of occurence is the proportion of days in each month simulated water levels (10000 simulations) reached each threshold water level. Connectivity: connected to surface drainage; Inundation: within 10 cm of soil surface; Drawdown: more than 50 cm below soil surface. Values are reported as the median and the bounds of a 67% highest density continuous interval (an interval, potentially asymmetric, that contains 67% of simulated values)."}
+
+knitr::include_graphics("output/figures/pointrange_and_slabinterval_ecohydrological_level_climate_impact.tiff")
+
+```
+
+```{r eab-impact, fig.width=6, fig.height=3, fig.cap="Probability of occurrence for critical ecohydrological wetland water levels under combinations of vegetative cover and climate conditions. Each column compares simulated wetland response within a fixed climate scenario across multiple potential vegetative covers. Differences within a column represent the impact of EAB and potential management decisions. Probability of occurence is the proportion of days in each month simulated water levels (10000 simulations) reached each threshold water level. Connectivity: connected to surface drainage; Inundation: within 10 cm of soil surface; Drawdown: more than 50 cm below soil surface. Values are reported as the median and the bounds of a 67% highest density continuous interval (an interval, potentially asymmetric, that contains 67% of simulated values)."}
+
+knitr::include_graphics("output/figures/pointrange_and_slabinterval_ecohydrological_level_eab_impact.tiff")
+
+```
+
+```{r impact-attribution}
+
+targets::tar_read(impact_attribution_table) %>%
+  flextable::set_caption(
+    caption = "Expected change in probability of occurrence for critical ecohydrological water levels that can be attributed to future climate scenarios or emerald ash borer (EAB) impact and management response to EAB. EAB impact values represent the difference between simulated black ash forests and each alternative vegetative condition under current climate conditions. Climate impacts respresent the difference between each alternative vegetative condition under the current climate and future climate (less or more senstive) scenarios. Differences are calculated using the daily values from July through September, highlighting growing season impacts. Connectivity: connected to surface drainage; Inundation: within 10 cm of soil surface; Drawdown: more than 50 cm below soil surface. Values are reported as the median and the bounds of a 67% highest density continuous interval (an interval, potentially asymmetric, that contains 67% of simulated values).",
+    autonum = officer::run_autonum(seq_id = "tab", bkm = "impact-attribution"))
+
+```
+
+Our hypothesis that the impacts of EAB and climate change would counteract each
+other is partially supported by our hypothesis. The dynamics of wetland water
+levels are complex (**CITATION**) climate change and invasive species can each
+have major consequences (**CITATIONS**). We can summarize our findings by saying
+we expect wetlands that transition from black ash forests to non-forested sites
+to become drier, primarily due to the effects of increased summer evaporative demand (Figures \@ref(fig:total-impact) &
+\@ref(fig:future-climate), Table \@ref(tab:impact-attribution)). Our simulations saw less summer precipitation under the less sensitive scenario, while under the more sensitive scenario we obseved an increase in large storms (Figure \@ref(fig:future-climate). If management
+or natural regeneration leads to establishment of future forests with lower site
+transpiration rates, these wetlands can be expected to have the occurrence of high water
+conditions remain stable or increase in frequency, while dry conditions (water
+levels more than 50 cm below the surface) become more rare (Figures
+\@ref(fig:total-impact) & \@ref(fig:future-climate), Table
+\@ref(tab:impact-attribution)). Our results show that the impact of climate 
+change in this region will lead to consistently drier wetland conditions. Changes to vegetative cover 
+can amplify or counteract hydrologic alterations attributable to climate 
+change.
+
+```{r future-climate, fig.width=6, fig.height=3, fig.cap="Distribution of 30-day total precipitation and potential evapotranspiration presented by climate season and climate scenario. All data present is fro the Bergland Dam, MI, USA GHCND station. Observed climate is from 1980-2009, future climate is from LOCA-downscaled climate scenarios for the period from 2070-2099. Potential evapostranspiration was calculated from observed and GCM outputs using the Hargreaves-Samani equation ([@hargreaves-2003])."}
+
+knitr::include_graphics("output/figures/density_ridges_future_and_observed_climatology.tiff")
+
+```
+
+
+<!--
 The high interannual variability of these systems does not show much
 differentiation between climate scenarios and vegetation conditions. Examining
 the probability of occurrence of certain threshold water levels does show
@@ -990,76 +1097,97 @@ raw water level signal.
 Wetland water levels under observed conditions were highly variable
 [@vangrinsven-2017] similar to simulations.
 
-The drier/hotter more-sensitive scenario showed good aligned between future
-forested conditions and current conditions for connectivity and inundation, but
-also showed lower chances of dry conditions (drawdown) within the sites. Under
-the non-forested conditions the wetter/cooler (**is this comparison true? May
-need to make a less-sensitive vs more senstive figure**) less-senstive scenario
-was more similar to current conditions. So the future of black ash wetlands
-depends on both the management strategy implemented and the path of future
-climate change.
-
 Discuss skew of distributions. Some months (check panel C in probs figure) exhibit more positive or negative 
 skew in the observed probabilities.
 
 Observed water levels are highly variable so it's not surprising that future 
 conditions are also highly variable.
 
-Future water level rebound and recharge would be reliant on dormant season
-precipitation, especially under drier, non-forest conditions.
-
-Future-forested may be suffering from reduced solar radiation/undestory T 
-relative to non-forested. And suffering from reduced canopy T relative to ash 
-forest. Non-linear response in wetland plant communities affecting model results [@short-2016]
-
-Under all vegetation/indicator combinations more and less sensitive scenarios
-showed the same trend, drier conditions under more sensitive.
-
 Connectivity of landscape wetlands [@creed-2014]
+-->
 
 #### Drivers of Future Wetland Hydrology
 
-- Is any of this generalizeable to the region
+LOCA-downscaled climate simulations for the study region showed 
 
-- If we consider a fixed climate scenario what are the differences between the 
-vegetation types? 'We know that climate changing differently across range of 
-black ash, if we look within a climate scenario what does the role of vegetation
-mean?'
+It is expected that vegetation conditions with lower transpiration rates have
+lower rates of water level drawdown and therefore lower increased water levels.
+In these wetlands this effect is compounded by the dynamics of ~E*Sy*~. *E~Sy~*
+increases in magnitude as water levels decline (Figure @\ref(fig:esy-function)).
+The effect is that *PET* results in smaller changes to wetland water levels
+under wet conditions than dry conditions. In this way the impact of EAB may lead
+to a feedback loop in which water levels remain elevated:
 
-##### Make Driver Contributions Figures for Hydrologic Changes
+1. *AET* begins to draw down water levels, *E~Sy~* is low,  
+2. Water levels decline slowly because of reduced *AET* and low *E~Sy~*,  
+3. *E~Sy~* is lower than under black ash as *PET* increases to mid-season peak,  
+4. High *PET* impact on water levels are reduced by lower *AET* and sustained 
+low *E~Sy~*.  
 
-Decadal oscillations from @watras-2014 illustrate more potential sources of 
-variation
+Under the current black ash conditions *E~Sy~* increases more rapidly
+due to higher black ash *AET*. The increase in *E~Sy~* accelerates the impact of
+higher *AET*, creating faster and larger declines in wetland water level
+throughout the growing season. This feedback loop may partially explain the
+persistence of hydrologic impact following EAB disturbance observed in Michigan 
+and Minnesota [@diamond-2018; @kolka-2018]. In effect, the impact of EAB may 
+shock these systems into an alternative stable state of elevation water levels 
+[@scheffer-2003]. Our results indicate that future climate scenarios will likely 
+have a large enough impact to again shock these systems out of a stable state. 
+We cannot say from these simulations whether the wetlands will reach a 
+new stable state under future climate conditions or what that state would be.
 
-Use current climate simulations under both veg types to evlauate role of climate
-conditions vs role of veg cover. If ash-forest conditions and historical climate
-simulations are similar it means climate is the main control, where they differ
-it means veg conditions are important. Also compare climate scenarios across the
-cover types: are the probability patterns about the same within a climate 
-scenario? If so then it means climate is controlling that response and when 
-there are differences within a climate scenario we can assume cover type is the
-control
+Make sure talking about PET and P of future climates vs current climate in 
+reference to future-climate figure
 
-There are similar pattern,s, but some distinctions between connectivity and 
-inundation probabilities that may be important enough to note. Less uncertainty
-regarding connectivity relative to inundation for more sensitive.
-
-Did not compare with CCSM-4 RCP8.5 and GFDL-CM3 RCP4.5
-
-Earlier decrease in early growing season is from earlier snowmelt (check but
-I think CN did not do a great job adjusting to a smaller snowmelt). 
-
-Rain on snow melt can increase melt timing and result in reduced groundwater
-recharge, which will likely impact the immediacy of wetland water level drawdown.
-Idea from Meyers H028-07 AGU 2020
-
-#### Management Implications
-
-Use hydrograph results to reexamine list from Iverson and results from Looney &
-Bolton to see if any of the recommendations hold true, or if any new species
-could be considered depending on the simulation results
+We observed wetter conditions observed under our Future Forest simulations
+relative to both Black Ash and Non-Forested simulations under all climate
+scenarios (Figures \@ref(fig:predicted-probabilities), \@ref(fig:eab-impact)).
+Two factors are likely contributing to this result. The first is that our future
+forest composition is known to have lower transpiration rates than the existing
+black ash canopy [@shannon-2018]. As a model choice we opted to assume that the
+next most dominant canopy species would be the likely replacement canopy
+species. The future forest we modeled is a narrow range of potential future
+forest compositions. natural regeneration or planting efforts may lead to future
+forested species composition that more closely matches the evaporative potential
+of the current black ash canopy. Secondly, the future forested conditions may
+have a lower total *AET* than the non-forested conditions. In black ash wetlands
+in Minnesota simulated post-EAB conditions (girdled and standing ash) were found
+to have higher water levels than site were the ash stems were harvested and
+removed [@diamond-2018]. The authors attributed the result to limited *AET*
+leading to reduced solar energy and wind-driven boundary layer mixing due to the
+still standing stems. Our conditions have a notable difference from that study
+in that we are assuming there are living trees on site. However a closed canopy
+would have the same effect of reducing open water evaporation and understory
+transpiration. With suffificiently reduced canopy transpiration the effect of
+certain forest compositions could result in reduced overall *AET*. This was
+observed in reverse in northern Minnesota when total *AET* increased after
+low-transpiration black spruce was removed from a peatland (**CITATION**).
 
 #### Conclusions and Future Research
+
+It should be stated that these models and simulations cannot capture the full
+range of potential changes from EAB, other potential invasive species, and
+climate change. The following is a non-exhaustive list of further known
+assumptions within this analysis that could warrant further study.
+
+- The response of each species and plant community will show individual climate
+change responses that are not captured in these models and may be non-linear
+[@short-2016].  
+
+- @watras-2014 found that there are decadal scale oscillations of water levels 
+within the Great Lakes and inland lakes in the Great Lakes Region. These can be 
+expected to impact wetland water levels similarly.
+
+- While our results showed a smaller and earlier snowmelt pulse (TODO: output figure)
+we did not attempt to model the more complex dynamics of rain-on-snow events and 
+a compressed melting period reducing recharge to the intermediate groundwater 
+sources shown to feed these wetlands [**snowmetl citation**, **GROUNDWATER CITATION** @vangrinsven-2017].
+
+- Our single-year simulations do not account for the potential effects of 
+multi-year drought or for periods of significantly reduced fall/winter 
+precipitation on wetland water level rebound.
+
+
 
 Each wetland is being considered individually so it is not necessary to use a
 GLM that accounts for spatial correlation between observed conditions. To expand
@@ -1069,7 +1197,11 @@ in weather conditions.
 
 RCP8.5 may not be a likely worst case scenario any more [@harvey-2020; @hausfather-2020]
 
-Discuss bigger picture questions with @moomaw-2018,
+Discuss bigger picture questions with @moomaw-2018
+
+Use hydrograph results to reexamine list from Iverson and results from Looney &
+Bolton to see if any of the recommendations hold true, or if any new species
+could be considered depending on the simulation results
 
 ## Acknowledgements
 Andrew Verdin for discussion and code examples.
