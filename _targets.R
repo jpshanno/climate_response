@@ -386,14 +386,13 @@ targets <- list(
   )
 
 
-  # , tar_target(
-  #   hydrological_components,
-  #   summarize_hydrological_components(
-  #     files = fs::dir_ls("output/tabular/", regexp = "wetland_simulations_(Control|Treated|Future_Forested)"),
-  #     variable = "pet_hat",
-  #     dummy = wetland_simulation_summaries
-  #   )
-  # )
+  , tar_target(
+    pet_effects,
+    summarize_pet(
+      files = fs::dir_ls("output/tabular/", regexp = "wetland_simulations_(Control|Treated|Future_Forested)"),
+      dummy = wetland_simulation_summaries
+    )
+  )
 
   , tar_target(
     analysis_simulations,
@@ -501,7 +500,7 @@ targets <- list(
   , tar_target(
     pet_impact_plot,
     create_pet_impact_plot(
-      data = analysis_simulations[["intervals_pet"]],
+      data = pet_effects,
       output.file = "output/figures/lines_pet_demand_by_cover_and_climate.tiff",
       type = "cairo",
       compression = "lzw",
