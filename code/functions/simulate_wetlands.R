@@ -19,18 +19,15 @@ simulate_wetlands <-
     
     for(TREATMENT in treatments) {
       
-      treatment_paths[[TREATMENT]] <- fs::path(out.dir, glue::glue("wetland_simulations_{gsub(' ', '_', TREATMENT)}"), ext = "csv.gz")
+      treatment_paths[[TREATMENT]] <- fs::path(out.dir, glue::glue("wetland_simulations_{gsub(' ', '_', TREATMENT)}"))
       
-      if(fs::file_exists(treatment_paths[[TREATMENT]])){
+      if(fs::dir_exists(treatment_paths[[TREATMENT]])){
         
-        fs::file_delete(treatment_paths[[TREATMENT]])
-        
-        # writeLines doesn't automatically create connection to gz file, so using
-        # fwrite (or any other function that does recognize and create gz connection)
-        fwrite(list("simulation_id","site","site_status","gcm","scenario","simulation_date","wl_hat","q_hat","m_hat","p_hat","pet_hat","gradient"),
-               treatment_paths[[TREATMENT]])
+        fs::dir_delete(treatment_paths[[TREATMENT]])
         
       }
+      
+      fs::dir_create(treatment_paths[[TREATMENT]])
       
     }
     
@@ -69,10 +66,10 @@ simulate_wetlands <-
       
       cat(paste("Writing output to", treatment_paths[[STATUS]], "\n"))
       
-      fwrite(simulations, 
-             treatment_paths[[STATUS]],
-             append = TRUE,
-             nThread = 4)
+      fst::write_fst(
+        simulations, 
+        fs::path(treatment_paths[[STATUS]], SITE, ext = "fst"),
+        )
       
       cat(paste("Simulations for", SITE, STATUS, "complete\n"))
       
