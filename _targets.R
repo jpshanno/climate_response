@@ -186,6 +186,8 @@ targets <- list(
   # Train Wetland Models ----------------------------------------------------
 
   # Create Esy models for each wetland
+  # TODO: Try to adjust drawdown rates to account for rapid increase in black 
+  # ash T as water levels inrease. 
   , tar_target(
     esy_functions,
     build_esy_functions(training_data[["control"]]),
@@ -193,6 +195,8 @@ targets <- list(
   )
   
   # Optimize Control Models
+  # TODO: It it possible to set the upper limit MPET to 1. May likely require 
+  # evaluating Esy within the optimization model?
   , tar_target(
     control_optimization,
     fit_models(training_data[["control"]],
@@ -335,7 +339,10 @@ targets <- list(
   )
 
   # Evalute GCM & SWG ---------------------------------------------------------
-  , tar_target(
+
+    # TODO: Run and compare all 4 future climate scenarios. I can then 
+    # empirically decide which ones are the less and more sensitive scenario.
+    , tar_target(
     gcm_check_plot,
     create_gcm_check_plot(
       observed.data = tar_read(swg_data)[station_name == "bergland_dam"],
