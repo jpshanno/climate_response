@@ -205,14 +205,13 @@ targets <- list(
     format = "rds"
   )
   
-  # Reoptimize models for the control period
+  # Reoptimize models for the treatment period
   , tar_target(
     treated_optimization,
     refit_model(training_data[["treated"]],
                 control_optimization,
                 refit = list(MPET = 1, 
-                             MP = 1,
-                             maxWL = 10)),
+                             MP = 1)),
     format = "rds"
   )
   
