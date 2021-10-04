@@ -153,7 +153,9 @@ targets <- list(
       subset(site != "006") %>% 
       set(i = which(.$water_year %in% c(2016, 2020)), j = "wl_initial_cm", value = NA_real_) %>% 
       append_study_precip(precip.path = study_path("precip", study_data_paths)) %>% 
-      merge_external_met(external.met = external_met)
+      merge_external_met(external.met = external_met) %>%
+      # Adjusting site 053 water levels because of the well being moved
+      .[site == "053" & sample_year < 2016, wl_initial_cm := wl_initial_cm + 16]
   )
   
   , tar_target(
