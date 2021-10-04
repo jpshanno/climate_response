@@ -1,6 +1,7 @@
-create_future_climate_plot <- function(observed.data, gcm.data, output.file, ...) {
-  # observed.data <- tar_read(external_met)
+create_future_climate_plot <- function(observed.data, gcm.data, solrad.coefs, output.file, ...) {
+  # observed.data <- tar_read(swg_data)[station_name == "bergland_dam"]
   # gcm.data <- simplify_scenarios(tar_read(loca_simulations)[station_name == "bergland_dam"])
+  # solrad.coefs <- solrad_coefs[station_name == "PIEM4"]
 
   darkblue <- "#3085c7"
   orange <- "#d55e00"
@@ -8,11 +9,31 @@ create_future_climate_plot <- function(observed.data, gcm.data, output.file, ...
   gcm.data <- gcm.data[scenario != "historical"]
   gcm.data[, Climate := fifelse(scenario == "rcp85" & gcm == "gfdl-cm3", "More Sensitive Future Scenario", "Less Sensitive Future Scenario")]
   
+  gcm.data <- gcm.data %>%
+    calculate_mean_temp() %>% 
+    calculate_solar_radiation(coefs = solrad.coefs,
+                              stop.on.error = FALSE,
+                              return.vector = FALSE) %>% 
+    calculate_hargreaves_pet(lambda.MJ.kg = 2.45)
+  
+  observed.data <- observed.data %>%
+    calculate_mean_temp() %>% 
+    calculate_solar_radiation(coefs = solrad.coefs,
+                              stop.on.error = FALSE,
+                              return.vector = FALSE) %>% 
+    calculate_hargreaves_pet(lambda.MJ.kg = 2.45)
+
   dat <- 
-    rbind(observed.data[, .(Climate = "Observed Climate", sample_date = as.Date(sample_date), tmin_c, tmax_c, precip_cm)],
-          gcm.data[, .(Climate, sample_date, tmin_c, tmax_c, precip_cm)])
+    rbind(observed.data[, .(Climate = "Observed Climate", sample_year, sample_date = as.Date(sample_date), pet_cm = abs(pet_cm), precip_cm)],
+          gcm.data[, .(Climate, sample_year, sample_date, pet_cm = abs(pet_cm), precip_cm)])
     
   dat[, sample_season := as.climate_season(sample_date, FALSE)]
+  
+  dat <- dat[
+    .SDcols = c("precip_cm", "pet_cm"),
+    j = c(list(sample_season = sample_season), lapply(.SD, filled_rolling_sum)),
+    by = .(Climate, sample_year)
+  ]
   
   dat[
     j = `:=`(
@@ -32,8 +53,8 @@ create_future_climate_plot <- function(observed.data, gcm.data, output.file, ...
   
   setnames(
     x = dat, 
-    old = c("tmin_c", "tmax_c", "precip_cm"),
-    new = c("Maximum Temperature (ºC)", "Minimum Temperature (ºC)", "Daily Precipitation (cm)")
+    old = c("pet_cm", "precip_cm"),
+    new = c("30-day Potential Evapotranspiration (cm)", "30-day Precipitation (cm)")
   )
 
   
@@ -54,12 +75,11 @@ create_future_climate_plot <- function(observed.data, gcm.data, output.file, ...
           "More Sensitive Future Scenario")
       )
     ) +
-    facet_wrap(~ sample_season, nrow = 1, scales = "free")
+    facet_wrap(~ sample_season, nrow = 1)
   
   fig <- 
-    {base_plot + geom_density_ridges(scale = 5, alpha = 0.8, color = "gray70", aes(x = `Maximum Temperature (ºC)`))} /
-    {base_plot + geom_density_ridges(scale = 5, alpha = 0.8, color = "gray70", aes(x = `Minimum Temperature (ºC)`))} /
-    {base_plot + geom_density_ridges(scale = 5, alpha = 0.8, color = "gray70", aes(x = `Daily Precipitation (cm)`)) + scale_x_sqrt()} +
+    {base_plot + geom_density_ridges(scale = 5, alpha = 0.8, color = "gray70", aes(x = `30-day Potential Evapotranspiration (cm)`))} /
+    {base_plot + geom_density_ridges(scale = 5, alpha = 0.8, color = "gray70", aes(x = `30-day Precipitation (cm)`))} +
     plot_layout(guides = "collect") &
     theme_minimal(base_size = 12) &
     theme(
