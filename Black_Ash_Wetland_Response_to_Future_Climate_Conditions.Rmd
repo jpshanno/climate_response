@@ -760,14 +760,15 @@ likely a result of reversion to the seasonal mean due to a lack of available
 external weather drivers. Under future climate scenarios extreme events are 
 expected to be more common place (**CITATION**), and these results suggest that 
 could be better parameterized by increasing the probability of extreme events 
-through selection of distribution choices (@verdin-2019). This shortcoming of 
-the SWGs should not affect our findings because our objective is not to 
-model response to extreme events, but overall probability of certain threshold 
-water levels. These water levels will be affected by extreme precipitation 
-events but the systems do not have infinite storage and more extreme events 
-can be expected to pulse through the system more quickly (**CITATION**). The 
-quicker the pulse passes through the system the smaller the impact on overall 
-probability of wetland water levels maintaining above a certain level.
+through selection of distribution choices and modeling framework (@verdin-2019). 
+This shortcoming of the SWGs should not affect our findings because our
+objective is not to model response to extreme events, but overall probability of
+certain threshold water levels. These water levels will be affected by extreme
+precipitation events but the systems do not have infinite storage and more
+extreme events can be expected to pulse through the system more quickly
+(**CITATION**). The quicker the pulse passes through the system the smaller the
+impact on overall probability of wetland water levels maintaining above a
+certain level.
 
 <!-- 
 # Get the CVs
@@ -1112,11 +1113,14 @@ LOCA-downscaled climate simulations for the study region showed
 
 It is expected that vegetation conditions with lower transpiration rates have
 lower rates of water level drawdown and therefore lower increased water levels.
-In these wetlands this effect is compounded by the dynamics of ~E*Sy*~. *E~Sy~*
-increases in magnitude as water levels decline (Figure @\ref(fig:esy-function)).
-The effect is that *PET* results in smaller changes to wetland water levels
-under wet conditions than dry conditions. In this way the impact of EAB may lead
-to a feedback loop in which water levels remain elevated:
+In these wetlands this effect is compounded by the dynamics of *E~Sy~*. *E~Sy~*
+increases in magnitude as water levels decline (Figure @\ref(fig:esy-function)),
+which may be a result of reduced soil pore space and wetland cross-sectional
+area so that a smaller volume of change results in a large water level
+difference (**CITATIONS**). The effect is that *PET* results in smaller changes
+to wetland water levels under wet conditions than dry conditions. In this way
+the impact of EAB may lead to a feedback loop in which water levels remain
+elevated:
 
 1. *AET* begins to draw down water levels, *E~Sy~* is low,  
 2. Water levels decline slowly because of reduced *AET* and low *E~Sy~*,  
@@ -1163,49 +1167,80 @@ certain forest compositions could result in reduced overall *AET*. This was
 observed in reverse in northern Minnesota when total *AET* increased after
 low-transpiration black spruce was removed from a peatland (**CITATION**).
 
-#### Conclusions and Future Research
+The contrast between the Non-Forested and Future-Forested simulated hydrology
+suggests an important management tool. Iverson et al [-@iverson-2016] and the
+work from Bolton [-@bolton-2018] and Looney [-@looney-2015] laid out a framework
+and results for evaluating potential replacement species considering site
+conditions of black ash wetlands. The results presented here show the
+opportunity for management decisions that take into account the impact of future
+vegetation on site hydrologic conditions. The general trend of drier future
+conditions can be to some degree counteracted by management for cover with lower
+evapotranspiration rates. This tactic could be used to retain water on the
+landscape, creating refugia of standing water or cool moist soils for flora and
+fauna.
+
+### Future Research
 
 It should be stated that these models and simulations cannot capture the full
 range of potential changes from EAB, other potential invasive species, and
 climate change. The following is a non-exhaustive list of further known
 assumptions within this analysis that could warrant further study.
 
+- @watras-2014 found that there are decadal scale oscillations of water levels 
+within the Great Lakes and inland lakes in the Great Lakes Region. These can be 
+expected to impact wetland water levels similarly.  
+- While our results showed a smaller and earlier snowmelt pulse (TODO: output figure)
+we did not attempt to model the more complex dynamics of rain-on-snow events and 
+a compressed melting period reducing recharge to the intermediate groundwater 
+sources shown to feed these wetlands [**snowmetl citation**, **GROUNDWATER CITATION** @vangrinsven-2017].  
+- Our single-year simulations do not account for the potential effects of 
+multi-year drought or for periods of significantly reduced fall/winter 
+precipitation on wetland water level rebound.  
 - The response of each species and plant community will show individual climate
 change responses that are not captured in these models and may be non-linear
 [@short-2016].  
 
-- @watras-2014 found that there are decadal scale oscillations of water levels 
-within the Great Lakes and inland lakes in the Great Lakes Region. These can be 
-expected to impact wetland water levels similarly.
+Beyond the potential for unforeseen vegetation responses to future climates is 
+the uncertainty of future climate conditions. The authors of the fourth 
+national climate assessment have highlighted that early climate prediction have 
+under-predicted contemporary shifts in response to climate change 
+(**CITATION**). Unfortunately this means that our models built on those 
+simulations may be underestimating the magnitude of future changes.
 
-- While our results showed a smaller and earlier snowmelt pulse (TODO: output figure)
-we did not attempt to model the more complex dynamics of rain-on-snow events and 
-a compressed melting period reducing recharge to the intermediate groundwater 
-sources shown to feed these wetlands [**snowmetl citation**, **GROUNDWATER CITATION** @vangrinsven-2017].
+Wetlands provide a range of ecological services from water quality and stormflow
+retention to carbon storage, all of which stand to be impacted by climate change
+[@moomaw-2018]. We did not attempt to quantify how changes in wetland hydrology 
+will influence these other services. By highlighting the magnitude and drivers 
+of hydrologic change in these systems we hope to spur future research.
 
-- Our single-year simulations do not account for the potential effects of 
-multi-year drought or for periods of significantly reduced fall/winter 
-precipitation on wetland water level rebound.
+### Conclusions
 
+Our research has shown that changes in evaporative demand and precipitation
+regimes will likely result in drier conditions on what are now black ash
+wetlands. In addition the functional loss of black ash due to EAB presents 
+challenges and opportunities for the future of these wetlands. A large extent of 
+forested wetlands may require intervention to retain desired benefits or 
+features they currently provide. These interventions can be used to drive sites 
+towards wetter conditions, retaining water on the landscape that may otherwise 
+be lost under a changing climate.  
 
+To implement long-term management objectives in wetland and forest management 
+requires a deep understanding of the systems. We have shown that as water levels 
+decline, the impact of each additional driver increases due to changes in
+*E~Sy~*. Changes in *AET* can interact with *E~Sy~* to create feedback loops 
+underscoring that knowledge of species adaptation to wet conditions and capacity 
+to respond quickly to drying conditions is critical for projected future site 
+conditions. The transition from black ash to alternative vegetative cover can 
+counteract or amplify the impacts of future conditions with higher evaporative 
+demand. And the relationship between evaporative demand and *E~Sy~* can amplify 
+the effect of wetland water level drawdown.
 
-Each wetland is being considered individually so it is not necessary to use a
-GLM that accounts for spatial correlation between observed conditions. To expand
-this work to an assessment of the impact of EAB on regional hydrology would
-require the GLM treat the region as a single system and capture spatial trends
-in weather conditions.
+### Acknowledgements
+I would like to thank Andrew Verdin for discussion of synthetic weather 
+generators and code examples. Additionally my wife Danielle Shannon for both the 
+support she provided during writing, and for share her knowledge of evaluting 
+and communicating climate change impacts on forests.
 
-RCP8.5 may not be a likely worst case scenario any more [@harvey-2020; @hausfather-2020]
-
-Discuss bigger picture questions with @moomaw-2018
-
-Use hydrograph results to reexamine list from Iverson and results from Looney &
-Bolton to see if any of the recommendations hold true, or if any new species
-could be considered depending on the simulation results
-
-## Acknowledgements
-Andrew Verdin for discussion and code examples.
-
-# References
+### References
 
 
