@@ -6,7 +6,7 @@ output:
   bookdown::word_document2:
     reference_docx : output/dissertation_chapter/climate_change_impacts.docx
     fig_caption: TRUE
-    number_sections: TRUE
+    number_sections: FALSE
     toc: FALSE
 header-includes:
 - \usepackage{float}
