@@ -30,24 +30,25 @@ ash headwater wetlands and stream networks.
 Shifts in temperature, and precipitation (timing, frequency, and quantity)
 associated with climate change are already impacting global wetland ecology and
 will intensify into the future [@burkett-2000;
-@moomaw-2018]. 
-**Rework this to discuss model ranges. GDFL shows wetter, hotter summer (https://climatetoolbox.org/tool/Climate-Mapper)**
-*The Byun and Hayhoe results are for ensembles and there are differences between the models and scenarios*
-In the Great Lakes region of North America (Figure
-\@ref(fig:study-map)), summer precipitation is likely to decline while total
-annual precipitation is expected to stay stable or increase [@byun-2018;
+@moomaw-2018]. In general, the Great Lakes region of North America (Figure
+\@ref(fig:study-map)) is expect to see declining summer precipitation while total
+annual precipitation stays stable or increases [@byun-2018;
 @hayhoe-2010]. These projected changes result in increased precipitation in the
 spring and winter months. Winter precipitation will also experience a phase
 change, seeing a reduction in the proportion of precipitation as snow and
 increased occurrence of rain-on-snow melt events in the winter and spring
-[@notaro-2015]. Taken together the shift in precipitation timing, the reduction
-of total snowmelt, and an earlier snowmelt will reshape the annual hydrologic
-budget. These changes will alter wetland hydroperiods, with water availability
+[@notaro-2015]. Locally conditions will vary and our study area (see below) is 
+projected in numerous downscaling scenarios across multiple GCMs to see a smaller 
+than regional decline or even slight increases in summer precipitation [LOCA sitation, 
+https://climatetoolbox.org/tool/Climate-Mapper, @byun-2018 Figure 7]. Taken 
+together the shift in precipitation timing, the reduction of total snowmelt, and 
+an earlier snowmelt will reshape the annual hydrologic budget. 
+These changes will alter wetland hydroperiods, with water availability
 increasing in the winter and spring and decreasing in the summer and early fall.
-The impact of reduced water availability in the summer will be compounded by
+The impact of reduced or steady precipitation in the summer will be compounded by
 increased evaporative demand [@byun-2018]. Summer temperatures are expected to
-increase 2-8C&deg; [@byun-2018; @hayhoe-2010], which combined with decreased
-summer precipitation will lead to more frequent drought conditions and increased
+increase 2-8C&deg; [@byun-2018; @hayhoe-2010], and without a commenserate 
+increase in summer precipitation will lead to more frequent drought conditions and increased
 water stress on ecosystems.
 
 Black ash (*Fraxinus nigra* Marsh) is an important hardwood component of many
@@ -587,7 +588,8 @@ knitr::include_graphics("output/figures/density_lines_loca_and_swg_climatology.t
 ```
 
 #### Wetland Water Level Model Performance
-# Need to update this based on reduced set of models
+
+**Need to update this based on reduced set of models**
 Wetland water level model performance was evaluated using the retained
 independent testing datasets. We calculated *R^2^* as a metric for the
 relationship between observed and modeled values. *R^2^* cannot be used to
@@ -770,8 +772,7 @@ extreme events can be expected to pulse through the system more quickly
 impact on overall probability of wetland water levels maintaining above a
 certain level.
 
-<!-- 
-# Get the CVs
+<!-- Get the CVs
 loca_simulations[
   i = station_name == "bergland_dam",
   by = .(gcm, scenario, climate_season = as.climate_season(sample_date, TRUE)),
@@ -824,8 +825,7 @@ Synthetic (and LOCA) winters were wetter than observed winters, supporting the
 assumption that dormant-season precipitation would be enough to recharge wetland
 water levels.
 
-<!--
-# Drought Years
+<!-- Drought Years
 swg_simulations_loca[
   (gcm == "ccsm4" & scenario == "rcp45") |
     (gcm == "gfdl-cm3" & scenario == "rcp85"),
@@ -838,8 +838,9 @@ swg_simulations_loca[
     }),
   by = .(gcm, scenario)]
 
+-->
 
-# Percentage of dry winters simulated compared to loca simulation and observed
+<!-- Percentage of dry winters simulated compared to loca simulation and observed
 
 obs_dry <- external_met[, .(precip_cm = sum(precip_cm)),
              by = .(sample_year, station_name, climate_season = as.climate_season(sample_date, TRUE))
@@ -1177,7 +1178,12 @@ vegetation on site hydrologic conditions. The general trend of drier future
 conditions can be to some degree counteracted by management for cover with lower
 evapotranspiration rates. This tactic could be used to retain water on the
 landscape, creating refugia of standing water or cool moist soils for flora and
-fauna.
+fauna. Although much of the region is expected to have drier summer our localized 
+study area is expected to have wetter summers. Our results can still be applied 
+to the broader region. The impact of climate change in other areas of the region 
+would become even more pronounced. Vegetation conditions would still amplify 
+or counteract climate impacts, and may become even more important to providing 
+wet or moist refugia on the landscape.
 
 ### Future Research
 
