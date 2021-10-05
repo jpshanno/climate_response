@@ -176,7 +176,7 @@ treatment sites all ash trees greater than 1" in diameter were hand-felled and
 left on site.
 
 Daily precipitation and daily minimum/maximum temperatures from existing
-meteorological stations were used inputs to the wetland water level models
+meteorological stations were used as inputs to the wetland water level models
 described below. From these input drivers we derived daily solar radiation, PET,
 precipitation as snowfall and rain, and snowmelt. Precipitation records were
 retrieved from the National Centers for Environmental Information Hourly
@@ -187,7 +187,7 @@ WI), USC00476939 (Rainbow Reservoir Lake, Tomahawk, WI), USC00477140 (Rice
 Reservoir, Tomahawk, WI), and USC00208680 (Watersmeet Fish Hatchery) and summed
 to daily values. Daily minimum and maximum temperatures were taken from the
 Global Historical Climatology Network (GHCND) dataset [@ghcnd; @menne-2012] for
-the same stations, which were collocated HPD and GHCND sites. Where data were
+the same stations, which were collocated stations for HPD and GHCND. Where data were
 missing, values were filled using inverse distance weighting with data retrieved
 from the Mesowest [@horel-2002] network stations BPLM4 (Baraga Plains, MI),
 KTNM4 (Kenton, MI), PIEM4 (Pelkie, MI), WKFM4 (Wakefield, MI), WMTM4
@@ -211,61 +211,51 @@ knitr::include_graphics("output/figures/climate_study_map.png")
 ```
 
 #### Wetland Hydrology Models
-<!--
-Attempted to weight log-likelihood in MLE with more weight given to less
-frequently observed values. Having the mode of wetland water levels centered
-around inundation leads to optimization that favors getting the flooded portion
-correct. I would prefer to get drawdown correct and then flooded conditions
-should follow. Performance did not improved.
-
-Minimizing RSR did improve performance. Attempted to improve fit by converting
-water level data to cumulative water level change rather than actual water
-level. Thought this could help account for any discrepancy in well-height and
-cable-length changes between growing seasons. Fit improved in some areas, but 
-overall decrease in performance with some deceases drastic.
--->
 
 The link between hydrology drivers (rainfall, snowmelt, PET) and daily water
 level response has been shown to be non-linear and varying with stage
 [@loheideii-2008; @white-1932]. In wetland systems the relationship between the
 driver magnitude and response magnitude has been termed the ecosystem specific
-yield (E~Sy~) [@mclaughlin-2014] (see **Section #### in Chapter #### on Pressure
-Transducer Uncertainty for more information about the development of E~Sy~ over
-time**). E~Sy~ has been empirically derived as the ratio between precipitation
-inputs and water level rise ($\frac{P}{\Delta\;WL}$). The relationship between
-empirical E~Sy~ and water level is modeled to provide a continuous estimate of
-E~Sy~. Models fit to the E~Sy~\~Water Level relationship include exponential
-[@mclaughlin-2014; @watras-2017], quadratic [@mclaughlin-2014], and step-wise
-regression [@mclaughlin-2014]. This approach can be unworkable in the presence
-of confounding hydrologic variation such as surface water connectivity and
-low-frequency seasonal changes in water availability [@watras-2017; @zhu-2011].
-Similar to these studies our sites did not show clear a relationship to E~Sy~ as
-defined above, requiring an alternative approach.
+yield (E~Sy~) [@mclaughlin-2014] (see **Section #### in Chapter #### on
+Pressure Transducer Uncertainty for more information about the development of
+E~Sy~ over time**). E~Sy~ has previously been empirically derived as the ratio
+between precipitation inputs and water level rise ($\frac{P}{\Delta\;WL}$)
+[@mclaughlin-2014]. The relationship between empirical E~Sy~ and water level
+can then be modeled to provide a continuous estimate of E~Sy~. Models fit to
+the E~Sy~\~Water Level relationship include exponential [@mclaughlin-2014;
+@watras-2017], quadratic [@mclaughlin-2014], and step-wise regression
+[@mclaughlin-2014]. Identifying *E~Sy~* using the rainfall-rise ratio can be
+unworkable in the presence of confounding hydrologic variation such as surface
+water connectivity and low-frequency seasonal changes in water availability
+[@watras-2017; @zhu-2011]. Both of these factors were present in our study 
+wetlands and no clear relationship existed to model *E~Sy~* with the above 
+model forms, requiring an alternative approach.
 
-As an alternative we fit an inverse analog to $\frac{P}{\Delta\;WL}$. We began
-by fitting a quadratic curve to the relationship between
-a year-to-date water availability index from the beginning of the growing season to the point
+As an alternative we fit an inverse analog to $\frac{P}{\Delta\;WL}$, deriving
+*E~Sy~* from the ratio of cumulative water availability and water level. We
+began by fitting a quadratic curve to the relationship between a year-to-date
+water availability index from the beginning of the growing season to the point
 of minimum wetland water level (Figure \@ref(fig:esy-function)), where
 
 $$WA_{YTD}\;=\;P_{YTD} + M_{YTD} - PET_{YTD},$$  
 
 $WA_{YTD}$, $P_{YTD}$, $M_{YTD}$, and $PET_{YTD}$ are year-to-date water
 availability, rainfall, snow melt, and potential evapotranspiration,
-respectively. Empirical E~Sy~ was then considered as the first derivative of the
+respectively. Empirical *E~Sy~* was then considered as the first derivative of the
 quadratic curve, which has the form $\frac{\Delta\;WL}{\Delta\;WA}$. This
-approach resulted in an asymptotic relationship between E~Sy~ and water level,
+approach resulted in an asymptotic relationship between *E~Sy~* and water level,
 suggesting agreement with the exponential forms in
-@mclaughlin-2014 and @watras-2017. Defining E~Sy~ as
-$\frac{\Delta\;WL}{\Delta\;WA}$ provided additional information on the
-relationship between E~Sy~ and water level as we were not limited to days with
-rainfall. Models for E~Sy~ were fit using the year with the greatest water level
-drawdown for each wetland to ensure the widest range of E~Sy~ variation. Each
-wetland had the same basic form of E~Sy~ function. The functions were fit using
+@mclaughlin-2014 and @watras-2017. Defining *E~Sy~* as
+$\frac{\Delta\;WL}{\Delta\;WA}$ provided additional information to fit the
+relationship between *E~Sy~* and water level as we were not limited to days with
+rainfall. Models for *E~Sy~* were fit using the year with the greatest water level
+drawdown for each wetland to capture the widest range of *E~Sy~* variation. Each
+wetland had the same basic form of *E~Sy~* function. The functions were fit using
 a single hierarchical model with each of the coefficients allowed to vary
 independently within sites. Models were fit using the `brms` package in R
-[@burkner-2017; @burkner-2018]. The asymptotic structure of the E~Sy~ function
-requires that a lower bound be placed on E~Sy~ predictions to avoid values less
-than or equal to zero. The minimum value of E~Sy~ was allowed to vary by wetland
+[@burkner-2017; @burkner-2018]. The asymptotic structure of the *E~Sy~* function
+requires that a lower bound be placed on *E~Sy~* predictions to avoid values less
+than or equal to zero. The minimum value of *E~Sy~* was allowed to vary by wetland
 and was fit along with other model parameters as described below.
 
 ```{r esy-function, fig.cap="Derivation of ecosystem specific yield for a single study wetland. Panel A shows the quadratic relationship between wetland water level and water balance (total liquid inputs minus potential evapotranspiration) for the drawdown period. Panel B shows the relationship between the derivative of the fitted line from Panel A, representing an emprical estimate of E~Sy~ and wetland water level."}
