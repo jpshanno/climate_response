@@ -156,23 +156,23 @@ two opposing drivers should result in some moderation to both impacts.
 Wetland water levels measured at fourteen black ash-dominated wetlands in the
 western Upper Peninsula of Michigan, USA were used to develop and evaluate our
 wetland hydrologic models (Fig. \@ref(fig:study-map)). The wetlands range in
-size from 0.29 to 1.19 ha and 30&ndash;80% of the basal area consists of black
-ash with histosol soils over a confining layer located at an average depth of
-118.8 cm [@davis-2017; @vangrinsven-2017]. The region has average minimum and
-maximum annual temperatures of -11.3 &deg;C and 18.2 &deg;C and an average
-annual precipitation of 101 cm for the climate period of 1980-2009 at the
-Bergland Dam (46&deg;35'13"N, 89&deg;32'51"W) meteorological station
-[@arguez-2012]. Wetland water levels were continuously monitored in 2"
-inner-diameter driven wells from 2012-2020 and logged every fifteen minutes
-using Solinst Levellogger Junior pressure transducers (Solinst, Ontario, CA),
-with more details available in [@vangrinsven-2017]. Barometric compensation was
-performed using data from Solinst Levellogger Junior pressure transducers
-deployed at a subset of study wetlands. Compensated water levels were corrected
-for temperature differentials as in Shannon, et al. Following an initial control
-period of two growing seasons two-thirds of the wetlands were treated to
-simulate the impacts of an EAB infestation. At one-third of the sites all ash
-trees greater than 1" in diameter were girdled and at the other half of the
-treatment sites all ash trees greater than 1" in diameter were hand-felled and
+size from 0.29 to 1.19 ha and 30--80% of the basal area consists of black ash
+with histosol soils over a confining layer located at an average depth of 118.8
+cm [@davis-2017; @vangrinsven-2017]. The region has average minimum and maximum
+annual temperatures of -11.3 &deg;C and 18.2 &deg;C and an average annual
+precipitation of 101 cm for the climate period of 1980-2009 at the Bergland Dam
+(46&deg;35'13"N, 89&deg;32'51"W) meteorological station [@arguez-2012]. Wetland
+water levels were continuously monitored in 2" inner-diameter driven wells from
+2012-2020 and logged every fifteen minutes using Solinst Levellogger Junior
+pressure transducers (Solinst, Ontario, CA), with more details available in
+[@vangrinsven-2017]. Barometric compensation was performed using data from
+Solinst Levellogger Junior pressure transducers deployed at a subset of study
+wetlands. Compensated water levels were corrected for temperature differentials
+as in Shannon, et al (In Review). Following an initial control period of two
+growing seasons, two-thirds of the wetlands in the study were treated to 
+simulate the impacts of an EAB infestation. At one-third of the sites all ash 
+trees greater than 1" in diameter were girdled and at the other half of the 
+treatment sites all ash trees greater than 1" in diameter were hand-felled and 
 left on site.
 
 Daily precipitation and daily minimum/maximum temperatures from existing
@@ -381,6 +381,18 @@ inundation %>%
                      data = .,
                      family = Gamma)
 -->
+
+Because individual models were trained for each wetland there are no training 
+data available for non-forested conditions under the field-study control sites. 
+Therefore we fit wetland water levels models to all of the treatment (n = 8; 
+girlde and ash cut) study wetlands. Comparisons of the combined and separate 
+impacts of EAB and climate change were performed against modeled baselines 
+rather than field-study observed conditions. Limiting the number of sites and 
+comparing to modeled baselines comparisons of future simulated baselines with each alternative vegetation 
+condition was not biased by the number of hydrology of sites within each group. 
+Control conditions are represented by the modeled baselines, avoiding the
+potential of identifying model artifacts as significant when comparing observed 
+and modeled results.
 
 #### Future Climate Conditions
 **GDFL-CM3 is more sensitive model, leading to hotter, wetter conditions**
