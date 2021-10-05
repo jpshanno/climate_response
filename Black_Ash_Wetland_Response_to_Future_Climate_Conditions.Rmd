@@ -48,18 +48,18 @@ increasing in the winter and spring and decreasing in the summer and early fall.
 The impact of reduced or steady precipitation in the summer will be compounded by
 increased evaporative demand [@byun-2018]. Summer temperatures are expected to
 increase 2-8C&deg; [@byun-2018; @hayhoe-2010], and without a commenserate 
-increase in summer precipitation will lead to more frequent drought conditions and increased
-water stress on ecosystems.
+increase in summer precipitation will lead to more frequent drought conditions 
+and increased water stress on ecosystems.
 
 Black ash (*Fraxinus nigra* Marsh) is an important hardwood component of many
-forested wetlands in the northern United States and southern Canada. These
-wetlands with a large or majority black ash component face the same climate
-change impacts as other wetlands in the region. Additionally they face loss of
-the major canopy species due to an invasive insect, Emerald Ash Borer (*Agrilus
+forested wetlands in the northern United States and southern Canada. Wetlands 
+with a large or majority black ash component face the same climate change 
+impacts as other wetlands in the region. They also face loss of the 
+major canopy species due to an invasive insect, Emerald Ash Borer (*Agrilus
 planipennis* Fairmaire, EAB). Emerald ash borer was first found in the United
-States in southeast Michigan in 2002 **CITATION**. It is known to infest and
-cause high mortality in all ash native to North America **CITATION**. As of this
-writing it is present in AAA US states and BBB Canadian provinces **CITATION**.
+States in southeast Michigan in 2002 [@haack-2002]. It is known to infest and
+cause high mortality in all ash native to North America [@herms2014]. As of this
+writing it is present in 35 US states and 5 Canadian provinces.
 High mortality and the importance of ash in regional forested wetlands has led
 to research on the impacts of their loss and strategies to mitigate those
 impacts. @iverson-2016 evaluated the potential replacement species for black ash 
@@ -74,67 +74,73 @@ four necessary components to evaluate mitigation efforts in black ash wetlands:
 conditions, 3) site conditions following EAB infestation, and 4) site conditions
 in a future climate.
 
-Researchers in Michigan [@bolton-2018], Minnesota [@looney-2015], and Wisconsin
-[@bolton-2018], have planted seedlings to evaluate potential canopy species at
-the wetland rather than landscape level. The plantings in @bolton-2018 and
-@looney-2015 took place under simulated EAB infestation, where the seedlings
-were subjected to adverse conditions due to the hydrologic impact of the loss of
-black ash [@slesak-2014; @vangrinsven-2017], as well as the increased
-competition from herbaceous growth under increased light conditions
-[@looney-2016; @looney-2017a; @davis-2017]. The work in Michigan and Minnesota
-assessed mitigation in light of three of the four components of the combined
-impact of climate change and EAB on black ash wetlands. The researchers selected
-some species at the northern edge of their current range, evaluated them under
-present-day site conditions, and under simulated-EAB site conditions. It is not
-possible for the field studies to address the interaction of EAB and climate
-change on site conditions. And just as we have seen EAB impacts cascade through
-black ash ecosystems affecting hydrology, plant communities, and nutrient
-cycling, we can expect the future climate-driven changes to hydrology to result
-in similar cascades. Focusing on the future hydrologic characteristics of
-these wetlands will inform us on the impacts to other functions, as hydrology is
-the critical control on wetland ecosystems [@brinson-1993]. In order to understand
-future hydrologic conditions we have derived wetland water level models to 
-evaluate under future climate scenarios.
+Previous and ongoing work in Michigan and Minnesota has assessed mitigation in
+light of three of the four components of the combined impact of climate change
+and EAB on black ash wetlands. Researchers in Michigan [@bolton-2018],
+Minnesota [@looney-2015], and Wisconsin [@bolton-2018], planted seedlings to
+evaluate potential canopy species at the wetland rather than landscape level.
+The plantings in @bolton-2018 and @looney-2015 took place under simulated EAB
+infestation, where the seedlings were subjected to adverse conditions due to
+the hydrologic impact of the loss of black ash [@slesak-2014;
+@vangrinsven-2017], as well as the increased competition from herbaceous growth
+under increased light conditions [@looney-2016; @looney-2017a; @davis-2017].
+
+The researchers addressed 3 of the 4 components necessary for mititgation
+efforts in black ash wetlands: 1) some planted species were at the northern
+edge of their current range and evaluated 2) under present-day site conditions
+and 3) under simulated-EAB site conditions. What is not possible in field
+studies is addressing the interaction of EAB and climate change on site
+conditions. Just as we have seen EAB impacts cascade through black ash
+ecosystems affecting hydrology, plant communities, and nutrient cycling, we can
+expect the future climate-driven changes to hydrology to result in similar
+cascades. Focusing on the future hydrologic characteristics of these wetlands
+will inform us on the impacts to other functions, as hydrology is the critical
+control on wetland ecosystems [@brinson-1993]. In order to understand future
+hydrologic conditions we have derive wetland water level models and evaluate
+under future climate scenarios.
 
 Simulated daily time-step weather conditions are available for various future
-climate scenarios to serve as model inputs **CITATION**. However, previous
-studies have demonstrated high-interannual variation in seasonal wetland water
-level drawdown and rebound in black ash wetlands. Estimating the behavior of a
-highly variable system with 30 years of daily climate projects could lead to
-biased results and improper conclusions about the combined impacts of climate
-change and EAB. A 30-year period provides a representation of normal climate
-variation, but the weather sequences underlying a certain climate can take many
-more forms than the observed (or simulated) 30 annual weather sequences.
-Therefore, simulation studies of alternative scenarios or future conditions
-require more weather sequences to quantify the most likely response and the
-distribution of possible responses. Stochastic weather generators (SWGs) provide
-a tool for generating synthetic time series of weather that simulate conditions
-under an observed or projected climatology [@wilks-1999]. SWGs have also been
-used as a downscaling technique for global or regional climate models
-[@wilks-2012; @verdin-2015; @verdin-2019]. One class of SWG known
-as Richardson [@wilks-2012] are built from parametric representations fit to
-climate conditions using multiple generalized linear models and varied
-statistical distributions. This approach can be implemented using any observed
-(or simulated) weather series that define particular climatic conditions. This
-characteristic makes them well suited to compare multiple climate scenarios
-without the overhead cost of executing complete GCM runs.
+climate scenarios to serve as model inputs, providing realizations of 30-year
+climate periods. However, previous studies have demonstrated high-interannual
+variation in seasonal wetland water level drawdown and rebound in black ash
+wetlands [@vanginsven-2017]. Estimating the behavior of a highly variable
+system with 30 years of daily climate projects could lead to biased or
+high-variance results making it difficult to draw proper conclusions about the
+combined impacts of climate change and EAB. A 30-year period provides a
+representation of normal climate variation, but the weather sequences
+underlying a certain climate can take many more forms than the observed (or
+simulated) 30 annual weather sequences. Therefore, simulation studies of
+alternative scenarios or future conditions require more weather sequences to
+quantify the most likely response and the distribution of possible responses.
+Stochastic weather generators (SWGs) provide a tool for generating synthetic
+time series of weather that simulate conditions under an observed or projected
+climatology [@wilks-1999]. SWGs have also been used as a downscaling technique
+for global or regional climate models [@wilks-2012; @verdin-2015;
+@verdin-2019]. One class of SWG known as Richardson [@wilks-2012] are built
+from parametric representations fit to climate conditions using multiple
+generalized linear models and varied statistical distributions. This approach
+can be implemented using any observed (or simulated) weather series that define
+particular climatic conditions. This characteristic makes them well suited to
+compare multiple climate scenarios without the overhead cost of executing
+complete GCM or regional climate model (RCM) runs.
 
 We have performed simulation experiments combining observed wetland hydrology
 and synthetic weather sequences to quantify the interactions of EAB and future
 climate scenarios. We developed wetland hydrology models for current canopy
-conditions (ash-dominated forested wetlands), non-forested conditions (herbaceous
-and shrub/scrub wetlands), and potential future canopy conditions (forested
-wetlands under current co-dominant species). We evaluated each class of model
-under two potential future climate scenarios for the end of the 21st century
-(2070-2099). The two future scenarios are defined by a less sensitive GCM
-(projects smaller climate impacts) under the moderate relative concentration
-pathway (RCP 4.5) , and a more sensitive GCM (projects larger climate impacts)
-under the **_high_** relative concentration pathway (RCP 8.5)  **IPCC
-CITATION**. The two-model ‘bookend’ approach provides a range of potential
-future conditions as opposed to a multi-model ensemble approach which masks
-some of the uncertainty in potential future conditions [@swanston-2016]. For an
-unbiased comparison between current and future conditions both GCMs are used to
-evaluate the wetland models under historic (1980-2009) climate conditions.
+conditions (ash-dominated forested wetlands), non-forested conditions
+(herbaceous and shrub/scrub wetlands), and potential future canopy conditions
+(forested wetlands under current co-dominant species). We evaluated each class
+of model under two potential future climate scenarios for the end of the 21st
+century (2070-2099). The two future scenarios are defined by a less sensitive
+GCM (generally projects smaller magnitude regional climate impacts) under the
+moderate relative concentration pathway (RCP 4.5), and a more sensitive GCM
+(projects larger magnitude regional climate impacts) under the relative
+concentration pathway (RCP 8.5) [@vanvurren-2011]. The two-scenario ‘bookend’
+approach provides a range of potential future conditions as opposed to a
+multi-model ensemble approach which masks some of the uncertainty in potential
+future conditions [@swanston-2016]. For an unbiased comparison between current
+and future conditions both GCMs are used to evaluate the wetland models under
+historic (1980-2009) climate conditions.
 
 We expect that the interaction of hydrologic impacts of EAB and climate change
 will result in a tempering of the two individual impacts in this region. While
@@ -745,6 +751,8 @@ knitr::include_graphics("output/figures/pointrange_and_slabinterval_ecohydrologi
 
 ### Discussion
 
+#### Check for using 'simulations' instead of 'projections' for GCMS
+
 #### SWG
 
 Our SWG performed well at simulating weather series that conformed to LOCA-
@@ -1220,6 +1228,9 @@ will influence these other services. By highlighting the magnitude and drivers
 of hydrologic change in these systems we hope to spur future research.
 
 ### Conclusions
+
+"3) site conditions following EAB infestation, and 4) site conditions
+in a future climate."
 
 Our research has shown that changes in evaporative demand and precipitation
 regimes will likely result in drier conditions on what are now black ash
