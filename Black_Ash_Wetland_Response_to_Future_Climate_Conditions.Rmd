@@ -8,6 +8,10 @@ output:
     fig_caption: TRUE
     number_sections: FALSE
     toc: FALSE
+  bookdown::html_document2:
+    fig_caption: TRUE
+    number_sections: FALSE
+    toc: TRUE
 header-includes:
 - \usepackage{float}
 bibliography: resources/references.bib
@@ -507,12 +511,23 @@ and precip occurrence [@wilks-2012]
 
 #### Data Analysis
 
+Tests for statistical significance are unperformed and unreported with a single
+exception. This research is entirely dependent on simulation data drawing
+conclusions from modeled wetland water levels driven by synthetic weather
+series generated from parametric descriptions of LOCA downscaled of GCM
+projections. Reporting statistical significance and *p*-values would provide a
+false sense of certainty and dichomtomy to the future climate and wetland
+conditions. In our results we report and account for the uncertainty inherent
+in this type of simulation work. We draw conclusions by contrasting the
+probability of observing certain wetland condutions under different vegetation
+types and climate scenarios.
+
 ##### Total, EAB, and Climate Impacts
 
 The distribution of modeled wetland water levels was evaluated for each future
 vegetation and climate scenario combination. The 10,000 simulations for each
 combination were summarized by simulated day of year to compute the median and
-the 67% highest density intervals [@mcelreath-2200] for each combination. This
+the 67% highest density intervals [@mcelreath-2020] for each combination. This
 approach was used to quantify future conditions and baseline scenarios for
 comparison and benchmarking. Modeled baselines provide consistency between the
 baseline, or control, period and alternative vegetation cover and climate
@@ -541,7 +556,7 @@ near the soil surface with surface water likely in microtopography hollows, and
 wetland (\@ref(tab:critical-ecohydrological-thresholds)). Wetland water levels 
 were compared to these thresholds and the number of days that a wetland was 
 above or a below a given threshold could be used to calculate the probability of
-occurrence of that *CEHT*. We chose to calculate these probabilities at the  
+occurrence of that *CEHT*. We chose to calculate these probabilities at the 
 monthly scale, though can than be computed for time scales from daily to 
 annually.
 
@@ -574,6 +589,7 @@ data.frame(
   Definition = definitions
 ) |>
 flextable::flextable() |>
+flextable::autofit() |>
 flextable::set_caption(
     caption = "Water level thresholds and defintions of three conditions considered as critical ecohydrological thresholds. The occurrence of these thresholds were used to compare the impacts of EAB and climate change on the future of black ash wetland hydrology.",
     autonum = officer::run_autonum(seq_id = "tab", bkm = "critical-ecohydro-thresholds")
@@ -581,15 +597,6 @@ flextable::set_caption(
 
 ```
 
-Tests for statistical significance are unperformed and unreported with a single
-exception. This research is entirely dependent on simulation data: modeled
-wetland water levels driven by synthetic weather series generated from
-parametric descriptions of LOCA downscaled of GCM projections. Reporting
-statistical significance and *p*-values would provide a false sense of
-certainty to the future climate and wetland conditions. In our results we report 
-and account for the uncertainty inherent in this type of simulation work. We 
-draw conclusions by contrasting the probability of observing certain wetland 
-condutions under different vegetation types and climate scenarios.
 
 ### Results
 
@@ -599,42 +606,44 @@ Synthetic weather generator performance can be evaluated by comparing generated
 weather sequences with the underlying observed/simulated climate data. The
 summary statistics of the sequences should align well with underlying data and
 the distribution of observed values should closely match the shape of the
-underlying data [@gregory-1993]. When comparing all of the simulated SWG data
-(10000 years) the mean values and interquartile ranges of daily minimum and
-maximum temperature and precipitation align well with the LOCA-generated daily
-values (Table \@ref(tab:swg-check-table)). Fewer monthly precipitation total
-outliers were observed for the SWG synthetic series than the LOCA climatology.
-Minimum and maximum temperatures showed an increase in outliers in the synthetic
+underlying data [@gregory-1993]. Table \@ref(tab:swg-check-table) shows
+seasonal and climate model scenario summaries of LOCA and SWG variables. Values
+are reported as the mean and a 95% confidence interval (1.96 times standard
+deviations) around the mean. The percent of outliers were calculated using the
+intervals defined by the LOCA dataset. <!-- TODO: change mean ± sd to median
+and HDCI --> When comparing all of the simulated SWG data (equivalent to 10,000
+years) the mean values and interquartile ranges of daily minimum and maximum
+temperature and precipitation align well with the LOCA-generated daily values
+(Table \@ref(tab:swg-check-table)). Fewer total monthly precipitation outliers
+were observed for the SWG synthetic series than the LOCA climatology. Minimum
+and maximum temperatures showed an increase in outliers in the synthetic
 weather series for JJA and SON seasons, and a decrease in outliers for the DJF
 and MAM seasons. The difference in outliers was small and may be partially
-explained by the scale of the two datasets. The LOCA data represents 30 years of
-data compared to the 10,000 years of synthetic weather series. To compare the
-SWG and LOCA values as climatologies, we randomly sampled 30 sets of 30 years
-from the observed 10,000 synthetic series. The distribution of these samples
-were compared to the distribution of LOCA values in Figure
+explained by the scale of the two datasets. The LOCA data represents 30 years
+of data compared to the 10,000 years of synthetic weather series. To compare
+the SWG and LOCA values as climatologies, we randomly sampled 30 sets of 30
+years from the observed 10,000 synthetic series. The distribution of these
+samples were compared to the distribution of LOCA values in Figure
 \@ref(fig:swg-check-plot). Figure \@ref(fig:swg-check-plot)A shows good
 agreement for all seasons for daily minimum and maximum temperature. The
 distribution of simulated monthly precipitation totals are shown in Figure
-\@ref(fig:swg-check-plot)B. Relative to minimum and maximum temperature, monthly
-precipitation totals show greater variability among the 30 sets of 30-year
-synthetic weather series. All three variables show that the synthetic weather
-climatologies cluster around the LOCA value as a mean.
+\@ref(fig:swg-check-plot)B. Relative to minimum and maximum temperature,
+monthly precipitation totals show greater variability among the 30 sets of
+30-year synthetic weather series. All three variables show that the synthetic
+weather climatologies cluster around the LOCA value as a mean.
 
-**MAKE NOTE THAT THIS IS 95% CI, DON'T JUST RELY ON THE FORMULA**
-
-```{r, swg-check-table}
+```{r swg-check-table}
 
 targets::tar_read(swg_check_table) %>%
   flextable::set_caption(
-    caption = "Comparison of 30 years of LOCA-generated climate values and 10,000 simulated weather series (SWG). Value are presented as mean (± 1.96*SD). Percentage of outliers is the number of each value type that falls outside of the interval defined by ± 1.96*SD for the LOCA-generated values.",
+    caption = "Comparison of 30 years of LOCA-generated climate values and 10,000 simulated weather series (SWG). Value are presented as mean with the 95% confidence interval in parentheses (± 1.96*SD). Percentage of outliers is the number of each value type that falls outside of the interval defined by ± 1.96*SD for the LOCA-generated values.",
     autonum = officer::run_autonum(seq_id = "tab", bkm = "swg-check-table")
   )
 
 ```
 
-**MAKE GRAY LINES PALE GREEN**
 
-```{r swg-check-plot, fig.cap="Density plots of 30 years of LOCA generated data, and 30 random samples of 30-year periods from the full 10,000 years of SWG synthetic weather series. Bold lines represent LOCA climatology, and gray or fine red and blue plots show individual 30-year samples of SWG data."}
+```{r swg-check-plot, fig.cap="Density plots of 30 years of LOCA generated data (bold), and 30 random samples of 30-year periods from the full 10,000 years of SWG synthetic weather series (light). Bold lines represent LOCA climatology, and fine lines show individual 30-year samples of SWG data."}
 
 knitr::include_graphics("output/figures/density_lines_loca_and_swg_climatology.tiff")
 
@@ -642,56 +651,43 @@ knitr::include_graphics("output/figures/density_lines_loca_and_swg_climatology.t
 
 #### Wetland Water Level Model Performance
 
-**Need to update this based on reduced set of models**
 Wetland water level model performance was evaluated using the retained
 independent testing datasets. We calculated *R^2^* as a metric for the
 relationship between observed and modeled values. *R^2^* cannot be used to
 evaluate the accuracy of the models because consistent over or under predictions
-would still result in high *R^2^* values [@krause-2005]. We use the median
+can still result in high *R^2^* values [@krause-2005]. We use the median
 prediction error to measure model bias and the root median squared error 
 (RMedSE) to assess overall predictive accuracy. RMedSE was used in place of RMSE 
 becuase we expect some outlier errors where regionally-informed rainfall records 
 do not match observed wetland rainfall. In addition to the
 overall accuracy of the models we want the models to accurately capture the
-hydrologic dynamics of interest (inundation, connectivity, and drawdown). We
+probability of occurrence of the *CEHT*s. We
 tested the predicted probabilities of inundation, connectivity, and drawdown to
 the observed probabilities of the same conditions.
 
-Two sites, 113 and 119, had more than 50% of the withheld training years with
-*R^2^* below 0.6, which was chosen as a threshold for unsatisfactory model
-results by @moriasi-2015 (Figure \@ref(fig:model-metrics)). Site 135 had much
-higher errors than all other sites excluding 113. Results from wetland model
-performance and simulation data from these sites have been excluded from further
-analysis due to consistently the poor performance in the test data. Based on
-knowledge of these sites the authors believe these sites would require different
-hydrologic process models. Site 119 is a closed basin with no surface outlet and
-was shown to have different source water characteristics than other sites
-[@vangrinsven-2017]. Site 113 has multiple defined seeps which provide direct
-surface water inputs to the site. Site 135 is the driest of all study sites and
-unlike other sites has only infrequent and localized surface water.
+One wetland, 119, had all of the withheld training years with *R^2^* below 0.6,
+which was chosen as a threshold for unsatisfactory model results based on work
+by @moriasi-2015 (Figure \@ref(fig:model-metrics)). Models at this wetland did
+not show noticeably higher rates of bias or error relative to the other
+wetlands. Site 119 is a closed basin with no surface outlet and was shown to
+have different source water characteristics than other sites
+[@vangrinsven-2017]. Table \@ref(tab:model-metrics) summarizes the wetland
+model metrics by site status, presenting the minimum, maximum, mean, and median
+values observed across all site-year combinations. Mean and median model
+performance was the similar between site statuses for all model metrics
+(\@ref(tab:model-metrics)). After excluding wetland 119 *R^2* values ranged
+from 0.44 0.95.
 
-**Add panel labels**
-
-```{r model-metrics, fig.cap="Wetland model performance metrics. Metrics were calculated for each site-year combination and are presented within sites. RMedSE and rRMedSE are root median squared error and root median squared error relative to wetland water level range within that year. The threes `Outlier Sites` were found to perform much worse than the remaining 10 sites and were excluded from further analysis. Site characteristics suggest that the outlier sites would require new hydrologic models."}
+```{r model-metrics, fig.cap="Wetland model performance metrics. Metrics were calculated for each site-year combination and are presented within sites. RMedSE and rRMedSE are root median squared error and root median squared error relative to wetland water level range within that year."}
 
 knitr::include_graphics("output/figures/boxplot_wetland_model_metrics.tiff")
 
 ```
 
-Table \@ref(tab:model-metrics) summarizes the wetland model metrics by site
-status after the above outlier sites were removed, presenting the minimum,
-maximum, and median values observed across all site-year combinations. Median
-model performance was the same between site statuses for *R^2* and rRMedSE
-(\@ref(tab:model-metrics)). The treated models showed lower median values for
-median error and RMedSE (\@ref(tab:model-metrics)). For the remaining sites
-*R^2* values ranged from -0.10 to 0.98. The one observed negative *R^2* value
-occurred at an extremely wet site (157) which generally shows very little
-drawdown, resulting in magnified relative errors (Figure
-\@ref(fig:model-metrics)A & D).
-
 ```{r model-metrics-table}
 
 targets::tar_read(wetland_model_metrics_table) %>%
+  flextable::autofit() %>%
   flextable::set_caption(
     caption = "Minimum, maximum, and median values of wetland water level model metrics, comparing observed and modeled wetland water levels. Metrics were evaluated on withheld test data for each combination of site and year of data. Prior to calculating these metrics three sites with incompatible hydrology for the model structure were removed from the analysis.",
     autonum = officer::run_autonum(seq_id = "tab", bkm = "model-metrics"))
@@ -699,31 +695,34 @@ targets::tar_read(wetland_model_metrics_table) %>%
 
 ```
 
-Modeled wetland water levels showed no significant difference in probability of
-ecohydrologically significant water levels (Table \@ref(tab:pred_probs)). The
-range of site-level probability of each level of interest were similar between
-modeled and observed data (Figure \@ref(fig:predicted-probabilities)). Though
-non-significant these results show a systematic bias towards drier conditions in
-the modeled wetland water levels. All comparisons of current conditions to
-combinations of future vegetation conditions and climate scenarios will use
-modeled current conditions. This comparison ensures that the described
-non-significant model bias does not impact results or conclusions. It also sets
-equal sample sizes between the control and future conditions.
+When compared to observed wetland water levels, modeled wetland water levels
+showed no significant difference in probability of occurrence of *CEHT*s (Table
+\@ref(tab:pred-probs)). Reported values and significant tests are from a linear
+mixed model with dependent variable probability of occurrence, population
+effects of observed/predicted and wetland status, and a group effect for
+wetland [@lenth-2021]. Summary and statistical tests were performed using
+estimated marginal means [@bates-2015]. The range of site-level probability of
+each level of interest were similar between modeled and observed data (Figure
+\@ref(fig:predicted-probabilities)). Though non-significant these results show
+a slight systematic bias towards drier conditions in the modeled wetland water
+levels. All remaining comparisons of current conditions to combinations of
+future vegetation conditions and climate scenarios will use modeled current
+conditions. This comparison ensures that the described non-significant model
+bias does not impact results or conclusions. It also sets equal sample sizes
+between the control and future conditions.
 
 **Try vertical text for variable label then can horizontally expand LOCA and SWG values**
 ```{r predicted-probabilities}
 
 targets::tar_read(wetland_model_predicted_probs_table) %>%
+  flextable::autofit() %>%
   flextable::set_caption(
-    caption = "Tests comparing probability of occurance for hydroecologically significant water levels. Connectivity, Inundation, and Drawdown respectively represent wetland water levels equal to or greater than modeled maximum water level, water levels within 10 cm of the wetland surface, and water levels more than 50 cm below the wetland surface.",
+    caption = "Tests comparing predicted probability of occurrence for critical ecohydrological thresholds (*CEHT*). Connectivity, Inundation, and Drawdown respectively represent wetland water levels equal to or greater than modeled maximum water level, water levels within 10 cm of the wetland surface, and water levels more than 50 cm below the wetland surface. Reported values show the seasonal probability of daily water level exceeding the respective *CEHT*. Control and treated conditions refer to **observed** control and treated conditions or **predicted** modeled black ash and modeled non-forested conditions. All data presented derived from only the withheld test period for each wetland.",
     autonum = officer::run_autonum(seq_id = "tab", bkm = "predicted-probs"))
 
 ```
 
-**Explain that this is only predicted values for the test data set**
-**Update axis label to probability of occurrence**
-**Check that probability of treated data is only calculated from days with observed water level.**
-```{r predicted-probs, fig.cap="Observed and wetland model predicted probability of hydroecologically-relevation water levels. Probability is derived from number of observed days at each water level."}
+```{r predicted-probs, fig.cap="Tests comparing predicted probability of occurrence for critical ecohydrological thresholds (*CEHT*). Connectivity, Inundation, and Drawdown respectively represent wetland water levels equal to or greater than modeled maximum water level, water levels within 10 cm of the wetland surface, and water levels more than 50 cm below the wetland surface. Reported values show the seasonal probability of daily water level exceeding the respective *CEHT*. Control and treated conditions refer to **observed** control and treated conditions or **predicted** modeled black ash and modeled non-forested conditions. Black point and error bar represents estimated marginal mean and its 95% confidence interval. Individual points represents data observed or simulated for 1 year at 1 site. All data presented derived from only the withheld test period for each wetland."}
 
 knitr::include_graphics("output/figures/jitterpoint_and_pointrange_wetland_model_predicted_probability.tiff")
 
@@ -734,61 +733,65 @@ knitr::include_graphics("output/figures/jitterpoint_and_pointrange_wetland_model
 Wetland water levels under future climate conditions were highly variable under
 both scenarios and both vegetation types (Figure \@ref(fig:total-impact)).
 Figure \@ref(fig:total-impact) shows the probability that wetland water levels
-will be above or below the ecohydrologically relevant thresholds defined above.
-The reported probability is the proportion of observations where daily water
-level surpasses each threshold out of all modeled daily water levels in a month
-(~30,000). The median probability and a range representing 67% of all
-observations (highest density continuous intervals, HDCI) are shown as point and
-line estimates for the less and more sensitive future climate scenarios. Modeled
-control conditions are also reported as the median and 67% HDCI, represented as
-a crossbar and shaded area.
+will be above or below the *CEHT*s defined above. The reported probability is
+the proportion of observations where daily water level surpasses each threshold
+out of all modeled daily water levels in a month (~240,000). The median
+probability and a range representing 67% of all observations (highest density
+continuous intervals, HDCI) are shown as point and line estimates for the less
+and more sensitive future climate scenarios. Modeled black ash conditions are
+also reported as the median and 67% HDCI, represented as a crossbar and shaded
+area. Figures \@ref(fig:eab-impact) & \@ref(fig:climate-impact) present other
+comparisons using the same symbology structure.
 
 For non-forested conditions both future climate scenarios showed a decrease in
-probability of connectivity relative to current site conditions (Figure
-\@ref(fig:total-impact)A). The more sensitive climate scenario consistently
+probability of connectivity relative to current wetland conditions (Figure
+\@ref(fig:total-impact)A). The less sensitive climate scenario consistently
 showed a lower median probability of connectivity and was more likely to have
 simulated conditions outside of the HDCI of current conditions. The
-less-sensitive climate scenario showed greatest agreement with current conditions
-in July and August. Future forested conditions were more likely to show
-connectivity in July and August under both climate scenarios, to a greater
-degree under the less sensitive climate scenario (Figure \@ref(fig:total-impact)B).
-Connectivity to the larger hydrologic network was much less likely to occur
-under the more sensitive climate scenario and both vegetation conditions in May
-(Figure \@ref(fig:total-impact)A & B). Under both vegetation conditions the
-more-sensitive climate scenario resulted in a lower probability of connectivity
-relative to the less-sensitive climate scenario. While both vegetation conditions
-showed significant overlap between the less-sensitive climate conditions and
-control conditions, the non-forested conditions tended to skew towards current
-drier years (lower probability of connectivity) and future forested conditions
-skewed towards current wetter years (high probability of connectivity).
+more-sensitive climate scenario showed greatest agreement with current
+conditions in July and August. Future forested conditions were more likely to
+show connectivity in July and August under the more senstive climate scenario,
+and only slightly less likely than current conditions under the less sensitive
+climate scenario (Figure \@ref(fig:total-impact)B). Connectivity to the larger
+hydrologic network was much less likely to occur under the more sensitive
+climate scenario and both vegetation conditions in May (Figure
+\@ref(fig:total-impact)A & B). Under both vegetation conditions the
+less-sensitive climate scenario resulted in a lower probability of connectivity
+relative to the more-sensitive climate scenario. While both vegetation
+conditions showed significant overlap between the less-sensitive climate
+conditions and control conditions, the non-forested conditions tended to skew
+towards current drier years (lower probability of connectivity) and future
+forested conditions skewed towards current wetter years (high probability of
+connectivity).
 
 Inundation results in Figure \@ref(fig:total-impact)C & D closely resemble the
-patterns observed in the connectivity results. This is inline with fit model
-parameters that showed maximum sustained water levels were above the surface for
-almost every wetland and treatment combination (**TABLE S1**). Generally,
-inundated conditions would be less prevalent under future non-forested
-conditions than the future-forested conditions. For non-forested conditions
-there was less overlap between observed conditions and the more-sensitive
-climate scenario results (Figure \@ref(fig:total-impact)D). This was contrary
-to non-forested conditions where the less-sensitive climate scenario results
-showed more overlap with current conditions. Under both future climate scenarios
-(Figure \@ref(fig:total-impact)C). Future-forested conditions showed increased
-probability for inundation in July, August, and September (Figure
+patterns observed in the connectivity results. Probability of inundation and
+connectivity are not exclusive. This is inline with fit model parameters that
+showed maximum sustained water levels were above the surface for almost every
+wetland and treatment combination (**TABLE S1**). Generally, inundated
+conditions would be less prevalent under future non-forested conditions than
+the future-forested conditions. For non-forested conditions there was little
+overlap between baseline conditions and the less sensitive climate scenario
+results (Figure \@ref(fig:total-impact)D). This was contrary to non-forested
+conditions where the less-sensitive climate scenario results showed more
+overlap with baseline conditions, and the more senstive scenario varied by
+month relative to baseline conditions. Future-forested conditions showed
+increased probability for inundation in July, August, and September and both
+vegetation conditions showed lower probability for inundation in June (Figure
 \@ref(fig:total-impact)D).
 
-The probability that water levels will drop to less than 50 cm below the wetland
-soil surface agree with the connectivity and inundation results (Figure
+The probability that water levels will drop to less than 50 cm below the
+wetland soil surface agree with the connectivity and inundation results (Figure
 \@ref(fig:total-impact)E & F). Under both climate scenarios the future forest
-conditions showed a lower probability of drawdown than was observed under the
-current black ash forest, with almost no overlap with current conditions in
-July, August, and September (Figure \@ref(fig:total-impact)F). Drawdown events
-were very unlikely under replacement forested conditions under both climate
-scenarios. Probability of drawdown was greater in the more sensitive scenario
-relative to the less sensitive scenario and also more variable. Under the
-non-forest cover the probability of drawdown was more likely under both future
-climate scenarios. Differences from current conditions were greatest in August,
-but drawdown conditions were much more likely than current conditions from July
-through October (Figure \@ref(fig:total-impact)E).
+conditions showed a lower probability of drawdown than under baseline
+condtiions, with almost no overlap with current conditions in July, August, and
+September (Figure \@ref(fig:total-impact)F). Drawdown events were very unlikely
+with near zero probability of occurring under future forested conditions under
+both climate scenarios. Probability of drawdown in non-forested conditions
+increased in magnitude and variability dramatically from July through August
+under both future climate scenarios. Differences from current conditions were
+greatest in August under the less senstive climate scenario (Figure
+\@ref(fig:total-impact)E).
 
 ```{r total-impact, fig.cap="Probability of observing water levels above (connectivity, inundation) or below (drawdown) ecohydrologically significant thresholds. Points represent median the median observed probability within a month and ranges represent 67% of the simulations as highest-density continuous interval (HDCI). Gray shaded area represents model simulations for control black (ash forest) conditions under the current climate and the black bar represents the control monthly median probability."}
 
@@ -798,7 +801,8 @@ knitr::include_graphics("output/figures/pointrange_and_slabinterval_ecohydrologi
 
 ### Discussion
 
-#### Check for using 'simulations' instead of 'projections' for GCMS
+**Talk about more senstive connectivity in May and inundation in June as indicators of earlier melt**
+**Can tie it back to the sourcewater work for when snowmelt signal was present**
 
 #### SWG
 
