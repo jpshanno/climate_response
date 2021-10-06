@@ -58,7 +58,7 @@ impacts as other wetlands in the region. They also face loss of the
 major canopy species due to an invasive insect, Emerald Ash Borer (*Agrilus
 planipennis* Fairmaire, EAB). Emerald ash borer was first found in the United
 States in southeast Michigan in 2002 [@haack-2002]. It is known to infest and
-cause high mortality in all ash native to North America [@herms2014]. As of this
+cause high mortality in all ash native to North America [@herms-2014]. As of this
 writing it is present in 35 US states and 5 Canadian provinces.
 High mortality and the importance of ash in regional forested wetlands has led
 to research on the impacts of their loss and strategies to mitigate those
@@ -103,7 +103,7 @@ Simulated daily time-step weather conditions are available for various future
 climate scenarios to serve as model inputs, providing realizations of 30-year
 climate periods. However, previous studies have demonstrated high-interannual
 variation in seasonal wetland water level drawdown and rebound in black ash
-wetlands [@vanginsven-2017]. Estimating the behavior of a highly variable
+wetlands [@vangrinsven-2017]. Estimating the behavior of a highly variable
 system with 30 years of daily climate projects could lead to biased or
 high-variance results making it difficult to draw proper conclusions about the
 combined impacts of climate change and EAB. A 30-year period provides a
@@ -135,7 +135,7 @@ century (2070-2099). The two future scenarios are defined by a less sensitive
 GCM (generally projects smaller magnitude regional climate impacts) under the
 moderate relative concentration pathway (RCP 4.5), and a more sensitive GCM
 (projects larger magnitude regional climate impacts) under the relative
-concentration pathway (RCP 8.5) [@vanvurren-2011]. The two-scenario ‘bookend’
+concentration pathway (RCP 8.5) [@vanvuuren-2011]. The two-scenario ‘bookend’
 approach provides a range of potential future conditions as opposed to a
 multi-model ensemble approach which masks some of the uncertainty in potential
 future conditions [@swanston-2016]. For an unbiased comparison between current
@@ -266,20 +266,21 @@ knitr::include_graphics("output/figures/scatter_plot_and_line_empirical_esy.png"
 
 
 Wetland water levels were simulated on a continuous basis using daily inputs.
-For each daily step wetland water level change was determined as a function of
-the current water level, daily rainfall, daily PET, daily snowmelt, and
-estimated streamflow (Equation EQAAA; Table \@ref(tab:parameter-table)). Maximum
-wetland water levels for the control period were estimated as the mode of the
+For each daily step, wetland water level change was determined as a function of
+the current water level, daily rainfall (*R*), daily *PET*, daily snowmelt (*M*), and
+estimated streamflow (*Q*) (Equation EQAAA; Table \@ref(tab:parameter-table)). Maximum
+wetland water levels were estimated from the the control period as the mode of the
 wetland water level record. Streamflow was assumed to occur whenever wetland
 water levels were at or above the maximum water level. This is similar to the
 approach in @mclaughlin-2019 where wetland surface water connectivity was
 determined from wetland water level records. The current water level was used to
-estimate $\hat_{E}~Sy~$ which was then used as a multiplier for rainfall, PET,
-and snowmelt components. In addition each driver (R, PET, M, Q) had a best fit
+estimate $\hat_{E}~Sy~$ which was then used as a multiplier for rainfall, *PET*,
+and snowmelt components. In addition each driver (*R*, *PET*, *M*, *Q*) had a 
 coefficient (fitting described below). Snowmelt and precipitation were also fit
 with a first order autoregressive filter to simulate slow flow contributions to
-wetland water levels. Within a day only the larger of PET or P was used as
-driver of water level change.
+wetland water levels. Within a single day only the larger of *PET* or *P* was used 
+as driver of water level change, accounting for suppressed transpiration in from
+wet leaves.
 
 $$
 \begin{align*}
@@ -321,22 +322,25 @@ flextable(tab) %>%
 Training data for wetland water level models was selected for each wetland as
 the year with the greatest water level drawdown within the control period. The
 remaining control-period years were used for wetland model evaluation. Wetland
-parameters were estimated using minimize the weighted root-mean square error of
-the predictions. Weights were applied asymmetrically where days with
-observed water levels greater than or equal to *WL<sub>max</sub>* were assigned 
-the original equal weight (1/n). As observed water levels decreased below
+parameters were estimated using the L-BFGS-B algorithm via the R `optim()`
+function [@rcoreteam-2019] minimizing the weighted root-mean square error of
+the predictions. Weights were applied asymmetrically where days with observed
+water levels greater than or equal to *WL<sub>max</sub>* were asszigned the
+original equal weight (1/n). As observed water levels decreased below
 *WL<sub>max</sub>* weights increased as the square of the difference between
-observed water level and *WL<sub>max</sub>*. To model impacted
-wetlands that have not recovered to a fully forested state the observed
-treatment data are used to reparameterize the model. Treatment-period training
-data were also selected to maximize water level drawdown in the training set.
-The wetland models were then reparameterized for the $\hat{\beta}_{PET}$,
-$\hat{\beta}_{R}$, and $WL_{max}$ terms. Additionally we simulated reforested
-black ash wetlands under future conditions assuming a mix of the current
-co-dominant species, red maple and yellow birch. Future forested simulations
-were performed using the same parameters as the control period with a reduction
-of $\hat{\beta}_{PET}$. The reduction in $\hat{\beta}_{PET}$ is a function of
-water level and current proportion of site basal area as black ash: 
+observed water level and *WL<sub>max</sub>*. To model impacted wetlands that
+have not recovered to a fully forested state the observed treatment data from
+the same site were used to reparameterize the control condition model.
+Treatment-period training data were also selected to maximize water level
+drawdown in the training set. The wetland models were reparameterized for only
+$\hat{\beta}_{PET}$, $\hat{\beta}_{R}$ terms. Finally we simulated reforested
+black ash wetlands under one set of potential future forest composition. For
+the future forest conditions we assumed a mix of the current co-dominant
+species, red maple and yellow birch, would become established with similar
+stand basal area. Future forested simulations were performed using the same
+parameters as the control period with a reduction of $\hat{\beta}_{PET}$. The
+reduction in $\hat{\beta}_{PET}$ was a function of water level and current
+proportion of site basal area as black ash:
 
 $$\hat{\beta}_{PET-Adj} = \hat{\beta}_{PET}*[(1 - BA_{ash}) + BA_{ash} * [1.45077 - 0.05869 * (WL-WL_{max})]^{-1}]$$
 This equation is derived from previous work showing a water level-depended
@@ -372,43 +376,44 @@ inundation %>%
                      family = Gamma)
 -->
 
-Because individual models were trained for each wetland there are no training 
-data available for non-forested conditions under the field-study control sites. 
-Therefore we fit wetland water levels models to all of the treatment (n = 8; 
-girlde and ash cut) study wetlands. Comparisons of the combined and separate 
-impacts of EAB and climate change were performed against modeled baselines 
-rather than field-study observed conditions. Limiting the number of sites and 
-comparing to modeled baselines comparisons of future simulated baselines with each alternative vegetation 
-condition was not biased by the number of hydrology of sites within each group. 
-Control conditions are represented by the modeled baselines, avoiding the
-potential of identifying model artifacts as significant when comparing observed 
-and modeled results.
+Because individual models were trained for each wetland there are no training
+data available for non-forested conditions under the field-study control sites.
+Therefore we fit wetland water level models to only of 8 of the field-study
+wetlands: the 8 treatment (girdle and ash cut) wetlands. Comparisons of the
+combined and separate impacts of EAB and climate change were performed against
+modeled baselines rather than field-study observed conditions. Limiting the
+number of sites and comparing to modeled future simulated baselines with each
+alternative vegetation condition ensures that comparisons are not biased by the
+number of hydrology of sites within each group. Control conditions are
+represented by the modeled baselines, avoiding the potential of identifying
+model artifacts as significant when comparing observed and modeled results.
 
 #### Future Climate Conditions
-**GDFL-CM3 is more sensitive model, leading to hotter, wetter conditions**
+
 Wetland models were run under simulated current (1980-2009) and future
 (2070-2099) conditions. Future conditions were evaluated under the RCP 4.5 and
-RCP 8.5 representative concentration pathway scenarios. Daily climate
-projections for all scenario-period combinations were taken from the localized
-constructed analogs downscaling (LOCA) for the General Fluid Dynamics Lab
-Coupled Model (GFDL-CM3) and National Center for Atmospheric Research Community
-Earth System Model (CCSM4) global climate models (GCMS) [@pierce-2014;
-@gent-2011; @griffies-2011]. LOCA downscaled data were retrieved from the
-downscaled CMIP3 and CMIP5 Climate and Hydrology Projections archive
+RCP 8.5 representative concentration pathway scenarios [@vanvuuren-2011]. Daily
+climate projections for all scenario-period combinations were taken from the
+localized constructed analogs (LOCA) downscaling for the General Fluid Dynamics
+Lab Coupled Model (GFDL-CM3) and National Center for Atmospheric Research
+Community Earth System Model (CCSM4) global climate models (GCMS)
+[@pierce-2014; @gent-2011; @griffies-2011]. LOCA downscaled data were retrieved
+from the downscaled CMIP3 and CMIP5 Climate and Hydrology Projections archive
 (http://gdo-dcp.ucllnl.org/downscaled_cmip_projections/).
 
 Performance of GCMs in the North American Great Lake region varies due to the
-mostly unaccounted for regional climate impact of the Great Lakes [@notaro-2015;
-@rood-2018]. GCM model selection was guided by performance and sensitivity
-(magnitude of change under a given emissions scenario relative to other GCMs) of
-the models in the Great Lakes region [@byun-2018]. Both GFDL-CM3 and CCSM4 were
-found to be well performing models for the Great Lakes region, and CCSM4 and
-GFDL-CM3 represent a less and more sensitive models, respectively. Inspection of
-LOCA daily simulations of GFDL-CM3 and CCSM4 for the 1980-2009 period show
-excellent alignment with observed conditions during the same period (Figure
-\@ref(fig:gcm-evaluation)). Monthly and seasonal precipitation totals showed 
-good agreement between the LOCA and observed datasets and no bias-correction was 
-performed. 
+mostly unaccounted for regional climate impact of the Great Lakes
+[@notaro-2015; @rood-2018]. GCM model selection was guided by performance and
+sensitivity (magnitude of change under a given emissions scenario relative to
+other GCMs) of the models in the Great Lakes region [@byun-2018]. Both GFDL-CM3
+and CCSM4 were found to be well performing models for the Great Lakes region,
+and CCSM4 and GFDL-CM3 represent a less and more sensitive models,
+respectively. Inspection of LOCA daily simulations of GFDL-CM3 and CCSM4 for
+the 1980-2009 period show excellent alignment with observed conditions during
+the same period (Figure \@ref(fig:gcm-evaluation)). There appreas to be fewer
+dry days in the LOCA dataset relative to the observed dataset. Monthly and
+seasonal precipitation totals showed good agreement between the LOCA and
+observed datasets and no bias-correction was performed.
 
 ```{r gcm-evaluation, fig.cap = "Comparison of LOCA daily projections and observed values for the climate normal period (1980-2009) from the GFDL-CM3 (A-C) and CCSM4 (D-F) global climate models. Points show median value, bold and thin bar show 1 and 2 standard devations respectively, and filled polygons show distribution of values."}
 
@@ -453,7 +458,8 @@ scale parameters. The shape parameter is extracted from a gamma-family GLM with
 a log link fit to the observed precipitation amounts. The predictors in the
 model are a pair of Fourier harmonics and the seasonal precipitation totals. The
 scale of gamma distribution describing the distribution of storm sizes is a
-function of the scale and the predictors of the model. This approach allows the
+function of the GLM gamma-family shape and the predictors from GLM fit to 
+precipitation amounts. This approach allows the
 storm distribution to vary temporally and capture seasonality in not only total
 precipitation but also the size of the storms. When seasonal means and totals
 are included as predictors within the GLM predictors it is said that the SWG is
@@ -464,21 +470,22 @@ amounts will remain constant under the new seasonally-defined climate scenario
 separate SWGs for each model-scenario combination using the LOCA daily
 projections for GLM fitting.
 
-The work in @verdin-2015 shows that these SWGs can capture and simulate
-the spatial correlation in temperature and precipitation. We did not include
-spatial correlation in our SWGs because of the relatively small size of the study
-area and the fact that each wetland is considered an independent system. For
-each model-scenario combination the SWG was fit using LOCA daily projections
-from GHCN-D sites USC00200718, USC00206220, USC00204104, USC00476398,
-USC00207812, USC00201088, USC00204328, USC00475352, USC00206215, USC00476398,
-USC00476518, USC00476939, USC00477140, USC00208680 to calculate annual regional
-seasonal precipitation temperature for conditioning data. The projected daily
-data from the coordinates of the Bergland Dam meteorological station were used
-to fit the SWG GLMs. Each SWG was used to simulate 10,000 individual weather
-series with seasonal conditioning drawn randomly from the 30 years of projection
-data. Conditioning the models on individual years of observed data will increase
-interannual (or inter-simulation) variability, which can otherwise be limited in
-SWGs [@wilks-1999].
+The work in @verdin-2015 shows that these SWGs can capture and simulate the
+spatial correlation in temperature and precipitation. We did not include
+spatial correlation in our SWGs because of the relatively small size of the
+study area and the fact that each wetland is considered an independent system.
+For each model-scenario combination the SWG was fit using LOCA daily
+projections from GHCN-D sites USC00200718, USC00206220, USC00204104,
+USC00476398, USC00207812, USC00201088, USC00204328, USC00475352, USC00206215,
+USC00476398, USC00476518, USC00476939, USC00477140, USC00208680 to calculate
+annual regional seasonal precipitation and temperature for conditioning data.
+The projected daily data from the coordinates of the Bergland Dam
+meteorological station were used to fit the SWG GLMs. Each SWG was used to
+simulate 10,000 individual synthetic weather series with seasonal conditioning
+drawn randomly from the 30 years of projection data. Conditioning the models on
+individual years of observed data is intended to increase interannual (or
+inter-simulation) variability, which can otherwise be limited in SWGs
+[@wilks-1999].
 
 <!-- 
 It currently looks like the errors for the tmin and tmax models are too small 
@@ -500,51 +507,89 @@ and precip occurrence [@wilks-2012]
 
 #### Data Analysis
 
-##### Water Level Impacts
-The distribution of modeled wetland water levels was evaluated for each
-model-scenario combination. We compared the median and the highest density
-interval for each combination. Additionally we compare the wetland water levels
-along a gradient of simulated wetness based on synthetic precipitation. We
-developed daily empirical cumulative density functions (ECDFs) for simulated
-wetland water levels. Using these ECDFs we estimated the number of days water
-levels were expected to be at certain critical levels. We chose to look at the
-number of days water levels were within 10cm of the wetland surface, within 5 cm
-of the control-condition wetland maximum water levels, and and more than
-50 cm below the wetland surface. These levels represent wetland inundation,
-important for vegetative cover, connectivity to the larger hydrologic surface
-water network via streamflow and subsurface flow, and 'dry' conditions, 
-representing periods where non-facultative wetland species could become 
-established.
+##### Total, EAB, and Climate Impacts
 
-Consistency between the observation period used to train wetland water level
-models and future climate predictions is critical to drawing meaningful
-conclusions (**CITATION ABOUT FUTURE CLIMATE SCENRIO MODELING?**. We chose to
-compare our future scenario modeling to a modeled control baseline. The modeled
-control baseline was calculated using historical (1970-2000) climate simulations
-downscaled using LOCA. For the control baseline we pooled daily LOCA simulations
-from both CCSM4 and GFDL-CM3.
+The distribution of modeled wetland water levels was evaluated for each future
+vegetation and climate scenario combination. The 10,000 simulations for each
+combination were summarized by simulated day of year to compute the median and
+the 67% highest density intervals [@mcelreath-2200] for each combination. This
+approach was used to quantify future conditions and baseline scenarios for
+comparison and benchmarking. Modeled baselines provide consistency between the
+baseline, or control, period and alternative vegetation cover and climate
+scenarios, which is critical to drawing meaningful conclusions. <!-- TODO: find
+citation about comparing future climate predictions to modeled baselines as
+best practice --> Apart from the advanatage of consistency, modeled baselines
+can also provide a flexible tool to answer more questions about the drivers of
+the the observed changes. Different baselines can be computed from the
+simulations by combining the six vegetation-climate combinations. To evaluate
+total impact of EAB and climate change, future non-black ash conditions were
+compared to black ash under the current climate. Alternative baseline
+comparisons include comparing each vegetation cover to itself under alternative
+climate scenarios, and comparing vegetation covers to each other within a
+climate scenario. These two alternative baselines allowed us to attribute how
+much of the observed total impact was attributable to each driver.
 
-##### Water Level Categories??
-Explain connectivity, inundataion, drawdown better
+##### Critical Ecohydrological Thresholds
+Observed water levels within these wetlands show high interannual variation 
+under field control and treatment conditions. Rather than consider this 
+low-signal, high-variance variable, we defined critical ecohydrological 
+thresholds (*CEHTs*) as a measure of impact. *CEHTs* were 
+set to capture wetland **connectivity** to the downstream hydrologic network via 
+streamflow and subsurface flow, **inundation** when wetland water levels were 
+near the soil surface with surface water likely in microtopography hollows, and 
+**drawdown** when wetland water levels dropped far below the surface of the 
+wetland (\@ref(tab:critical-ecohydrological-thresholds)). Wetland water levels 
+were compared to these thresholds and the number of days that a wetland was 
+above or a below a given threshold could be used to calculate the probability of
+occurrence of that *CEHT*. We chose to calculate these probabilities at the  
+monthly scale, though can than be computed for time scales from daily to 
+annually.
 
-<!--
-##### SWG Evaluation
-Accuracy of the SWGs in representing the climatology of the model-scenario
-combinations is critical to draw conclusions from the water level impacts.
-Synthetic weather sets were compared on a seasonal basis to the daily LOCA
-projections. For each season in each simulation the synthetic data were compare
-to the LOCA daily projections for the same season using a two-sided
-Kolmogorov-Smirnov test to determine if the distributions of the datasets match.
-A two-tailed *t*-test was also performed across the same partitioning to examine
-if the means of the two datasets were not significantly different. We expected
-to find that approximately 2000 of these comparisons would be determined to be
-significantly different as we are testing with $\alpha=0.05$. By conditioning
-the precipitation on the previous day's precipitation we could expect to find a
-representation of wet and dry spell length and distribution [@wilks-1999]. As
-the region has a relatively homogeneous distribution of precipitation without
-regular prolonged wet and dry spells the SWG model outputs were not evaluated
-for this variable.
--->
+```{r critical-ecohydro-thresholds}
+
+threshold_names <-
+  factor(
+    x = c("Connectivity", "Inundation", "Drawdown"),
+    levels = c("Connectivity", "Inundation", "Drawdown"),
+    ordered = TRUE
+  )
+
+water_levels <- 
+  factor(
+    x = c("≤ 5 cm below maximum site water level", "≤ 10 cm below wetland surface", "> 50 cm below wetland surface"),
+    levels = c("≤ 5 cm below maximum site water level", "≤ 10 cm below wetland surface", "> 50 cm below wetland surface"),
+    ordered = TRUE
+  )
+
+definitions <-
+  factor(
+    x = c("Wetland is contributing water downstream", "Wetland has surface flooding or soil saturation", "Wetland has dry surface and non-saturated soils"),
+    levels = c("Wetland is contributing water downstream", "Wetland has surface flooding or soil saturation", "Wetland has dry surface and non-saturated soils"),
+    ordered = TRUE
+  )
+
+data.frame(
+  Name = threshold_names,
+  Threshold = water_levels,
+  Definition = definitions
+) |>
+flextable::flextable() |>
+flextable::set_caption(
+    caption = "Water level thresholds and defintions of three conditions considered as critical ecohydrological thresholds. The occurrence of these thresholds were used to compare the impacts of EAB and climate change on the future of black ash wetland hydrology.",
+    autonum = officer::run_autonum(seq_id = "tab", bkm = "critical-ecohydro-thresholds")
+  )
+
+```
+
+Tests for statistical significance are unperformed and unreported with a single
+exception. This research is entirely dependent on simulation data: modeled
+wetland water levels driven by synthetic weather series generated from
+parametric descriptions of LOCA downscaled of GCM projections. Reporting
+statistical significance and *p*-values would provide a false sense of
+certainty to the future climate and wetland conditions. In our results we report 
+and account for the uncertainty inherent in this type of simulation work. We 
+draw conclusions by contrasting the probability of observing certain wetland 
+condutions under different vegetation types and climate scenarios.
 
 ### Results
 
