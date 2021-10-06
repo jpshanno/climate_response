@@ -160,6 +160,7 @@ create_wetland_model_probability_plot <- function(data, tests, output.file, ...)
   fig <-
     ggplot(data) +
     aes(x = site_status, y = Probability) +
+    ylab("Probability of Occurrence") +
     geom_point(aes(color = type, shape = type), position = position_jitterdodge()) +
     geom_pointrange(data = tests,
                     aes(y = estimate, ymin = conf.low, ymax = conf.high, group = type),
@@ -182,11 +183,12 @@ create_wetland_model_metrics_table <- function(data) {
   tab <- data[,
     .(`Minimum\nObserved` = pretty_round(min(value), 2),
       `Maximum\nObserved` = pretty_round(max(value), 2),
+      Mean = pretty_round(mean(value), 2),
       `Median` = pretty_round(median(value), 2)),
     by = .(`Model\nMetric` = metric, `Site\nCondition` = site_status)]
   
   tab[, 
-      `Model\nMetric` := str_replace_all(`Model\nMetric`, c("r2" = "R<sup>2</sup>", "med_err" = "Median Error (cm)", "^rmedse$" = "RMedSE", "rmedse_range" = "rRMedSE"))]
+      `Model\nMetric` := str_replace_all(`Model\nMetric`, c("r2" = "R~2~", "med_err" = "Median Error (cm)", "^rmedse$" = "RMedSE", "rmedse_range" = "rRMedSE"))]
   
   flextable::flextable(tab) %>%
     flextable::merge_v(j = 1:2) %>%
