@@ -204,7 +204,7 @@ create_swg_plot <- function(loca.data, swg.data, output.file, ...) {
                               by = .(sample_year, season)],
                    alpha = 0.9,
                    size = 0.05,
-                   color = 'gray30')
+                   color = green)
     
     if(i == 30){
       precip_plot <- 
