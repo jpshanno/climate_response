@@ -48,6 +48,7 @@ create_total_impact_plot <- function(proportions, output.file, ...){
          value.name = "Probability")
   
   fig <- ggplot(summary_dat) + 
+    ylab("Probability of Occurrence") +
     stat_gradientinterval(data = baseline,
                           color = NA,
                           aes(x = simulation_month,
@@ -159,6 +160,7 @@ create_eab_impact_plot <- function(proportions, output.file, ...){
          value.name = "Probability")
   
   fig <- ggplot(summary_dat) + 
+    ylab("Probability of Occurrence") +
     stat_gradientinterval(data = baseline,
                           color = NA,
                           aes(x = simulation_month,
@@ -260,6 +262,7 @@ create_climate_impact_plot <- function(proportions, output.file, ...){
          value.name = "Probability")
   
   fig <- ggplot(summary_dat) + 
+    ylab("Probability of Occurrence") +
     stat_gradientinterval(data = baseline,
                           color = NA,
                           aes(x = simulation_month,
