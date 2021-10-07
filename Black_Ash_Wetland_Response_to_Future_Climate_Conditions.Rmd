@@ -1209,7 +1209,7 @@ flextable::set_caption(
 It is expected that vegetation conditions with lower transpiration rates have
 lower rates of water level drawdown and therefore lower increased water levels.
 In these wetlands this effect is compounded by the dynamics of *E~Sy~*. *E~Sy~*
-increases in magnitude as water levels decline (Figure @\ref(fig:esy-function)),
+increases in magnitude as water levels decline (Figure \@ref(fig:esy-function)),
 which may be a result of reduced soil pore space and wetland cross-sectional
 area so that a smaller volume of change results in a large water level
 difference [@mclaughlin-2014]. The effect is that *PET* results in smaller changes
