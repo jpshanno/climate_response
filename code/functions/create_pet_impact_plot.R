@@ -30,11 +30,11 @@ create_pet_impact_plot <- function(data, output.file, ...) {
         scenario == "rcp45", "Less Sensitive",
         scenario == "rcp85", "More Sensitive"
       ),
-      site_status = fcase(
-        site_status == "Control", "Modeled Black Ash",
-        site_status == "Treated", "Non-Forested",
-        site_status == "Future Forested", "Future Forested"
-      )
+      site_status = factor(
+        site_status,
+        level = c("Control", "Treated", "Future Forested"),
+        labels = c("Modeled Black Ash", "Non-Forested", "Future Forested"),
+        ordered = TRUE)
     )
   ]
 
@@ -72,7 +72,7 @@ create_pet_impact_plot <- function(data, output.file, ...) {
     scale_color_manual(name = "AET", values = c("Modeled AET" = gray, "Effective AET" = palegreen)) +
     scale_fill_manual(name = "AET", values = c("Modeled AET"= gray, "Effective AET" = palegreen)) +
     scale_linetype_manual(name = "AET", values = c("Modeled AET" = "longdash", "Effective AET" = "solid")) +
-    theme_minimal() +
+    theme_minimal(base_size = 10) +
     xlab(NULL) +
     ylab(as.expression("Evapotranspiration (cm)")) +
     theme(legend.title = element_blank(),
