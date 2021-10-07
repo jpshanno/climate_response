@@ -12,10 +12,10 @@
 #' 
 create_pet_impact_plot <- function(data, output.file, ...) {
 
-  # data <- tar_read(hydrological_components)
+  # data <- tar_read(pet_effects)
   
-  green <- "#2b730b"
-  brown <- "#756953" 
+  palegreen <- "#009E73"
+  gray <- "gray50" 
   blue <- "#3096bd"
   
   orange <- "#d55e00"
@@ -61,14 +61,22 @@ create_pet_impact_plot <- function(data, output.file, ...) {
     ),
     by = .(site_status, Climate, simulation_date)]
   
-  fig <- ggplot(data) +
+  fig <- 
+    ggplot(data) +
     aes(x = simulation_date) +
-    ggpattern::geom_ribbon_pattern(aes(ymin = aet_hat.lower, ymax = aet_hat.upper, fill = "Est. AET"), color = NA, alpha = 0.2, pattern_fill = "#ffffffff", pattern_colour = "#ffffffff") +
+    ggpattern::geom_ribbon_pattern(aes(ymin = aet_hat.lower, ymax = aet_hat.upper, fill = "Modeled AET"), color = NA, alpha = 0.4, pattern_fill = "#ffffffff", pattern_colour = "#ffffffff") +
     geom_ribbon(aes(ymin = aet_effect.lower, ymax = aet_effect.upper, fill = "Effective AET"), color = NA, alpha = 0.2) +
-    geom_line(aes(y = aet_hat, color = "Est. AET", linetype = "Est. AET")) +
+    geom_line(aes(y = aet_hat, color = "Modeled AET", linetype = "Modeled AET")) +
     geom_line(aes(y = aet_effect, color = "Effective AET", linetype = "Effective AET")) +
     facet_grid(site_status~Climate) +
-    theme_minimal()
+    scale_color_manual(name = "AET", values = c("Modeled AET" = gray, "Effective AET" = palegreen)) +
+    scale_fill_manual(name = "AET", values = c("Modeled AET"= gray, "Effective AET" = palegreen)) +
+    scale_linetype_manual(name = "AET", values = c("Modeled AET" = "longdash", "Effective AET" = "solid")) +
+    theme_minimal() +
+    xlab(NULL) +
+    ylab(as.expression("Evapotranspiration (cm)")) +
+    theme(legend.title = element_blank(),
+          legend.position = "bottom")
   
   # fixed_climate_fig <- ggplot(data) +
   #   aes(
