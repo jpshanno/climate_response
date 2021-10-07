@@ -518,6 +518,16 @@ targets <- list(
     format = "file"
   )
 
+  , tar_target(
+    future_climate_table,
+    create_future_climate_table(
+      observed.data = swg_data[station_name == "bergland_dam"],
+      gcm.data = simplify_scenarios(loca_simulations[station_name == "bergland_dam"]),
+      solrad.coefs = solrad_coefs[station_name == "PIEM4"]
+    ),
+    format = "rds"
+  )
+
 )
 
 # End with a call to tar_pipeline() to wrangle the targets together.
