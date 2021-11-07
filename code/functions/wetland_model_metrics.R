@@ -25,7 +25,7 @@ create_wetland_model_metrics_plot <- function(data, output.file, metrics, ...) {
   
   data <- copy(data[metric %in% metrics])
   
-  data[, metric := str_replace_all(metric, c("r2" = "R<sup>2</sup>", "med_err" = "Median Error (cm)", "^rmedse$" = "RMedSE", "rmedse_range" = "rRMedSE"))]
+  data[, metric := str_replace_all(metric, c("r2" = "R<sup>2</sup>", "med_err" = "Median Error (cm)", "^rmedse$" = "RMedSE (cm)", "rmedse_range" = "rRMedSE (cm)"))]
   
   # Keeping split + combine to label y-axis with metric. Could melt the data and
   # then facet by variable. But this was set up from when there were outlier 
