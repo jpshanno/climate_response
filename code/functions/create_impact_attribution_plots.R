@@ -1,6 +1,6 @@
 create_total_impact_plot <- function(proportions, output.file, ...){
   
-  # proportions <- tar_read(analysis_simulations)
+  # proportions <- tar_read(analysis_simulations)$proportions
   green <- "#2b730b"
   brown <- "#756953" 
   blue <- "#3096bd"
@@ -47,7 +47,8 @@ create_total_impact_plot <- function(proportions, output.file, ...){
     melt(id.vars = "simulation_month",
          value.name = "Probability")
   
-  fig <- ggplot(summary_dat) + 
+  fig <-
+    ggplot(summary_dat) + 
     ylab("Probability of Occurrence") +
     stat_gradientinterval(data = baseline,
                           color = NA,
@@ -57,6 +58,7 @@ create_total_impact_plot <- function(proportions, output.file, ...){
     geom_crossbar(data = baseline,
                   stat = "summary",
                   fun = median,
+                  show.legend = FALSE,
                  aes(x = simulation_month,
                      y = Probability,
                      color = "Baseline: Modeled Black Ash, Current Climate")
@@ -66,6 +68,7 @@ create_total_impact_plot <- function(proportions, output.file, ...){
                         ymin = ymin,
                         ymax = ymax,
                         color = scenario),
+                    # show.legend = FALSE,
                     position = position_dodge(width = 0.6)) +
     geom_text(
       data = summary_dat[j = .(site_status = unique(site_status), max_prob = max(ymax)), by = .(variable)][order(variable, site_status), .(variable, site_status, label = LETTERS[1:6], x = 0.75, y = 0.75 * max_prob)],
@@ -169,6 +172,7 @@ create_eab_impact_plot <- function(proportions, output.file, ...){
     geom_crossbar(data = baseline,
                   stat = "summary",
                   fun = median,
+                  show.legend = FALSE,
                   aes(x = simulation_month,
                       y = Probability,
                       color = "Baseline: Modeled Black Ash")
@@ -271,6 +275,7 @@ create_climate_impact_plot <- function(proportions, output.file, ...){
     geom_crossbar(data = baseline,
                   stat = "summary",
                   fun = median,
+                  show.legend = FALSE,
                   aes(x = simulation_month,
                       y = Probability,
                       color = "Baseline: Current Climate")
