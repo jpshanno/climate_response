@@ -452,6 +452,18 @@ targets <- list(
   )
 
   , tar_target(
+    impact_attribution_plot,
+    create_impact_attribution_plot(
+      proportions = analysis_simulations[["proportions"]],
+      output.file = "output/figures/pointrange_impact_attribution.png",
+      dpi = 600,
+      width = 6,
+      height = 8
+    ),
+    format = "file"
+  )
+
+  , tar_target(
     impact_attribution_table,
     create_impact_attribution_table(analysis_simulations[["proportions"]]),
     format = "rds"
