@@ -45,10 +45,10 @@ summary_dat <-
                 inundation_min = ci_function(prop_above_neg_10, .width = ci_width)[[1]],
                 inundation_max = ci_function(prop_above_neg_10, .width = ci_width)[[2]]),
               by = .(site_status, 
-                     scenario = fcase(scenario == "rcp45", "Less Sensitive", 
-                                      scenario == "rcp85", "More Sensitive"),
+                     scenario = fcase(scenario == "rcp45", "Warm & Dry", 
+                                      scenario == "rcp85", "Hot & Wet"),
                      simulation_month = month(simulation_date, label = TRUE, abbr = TRUE))] %>% 
-  transform(scenario = factor(scenario, levels = c("Less Sensitive", "More Sensitive"), ordered = TRUE)) %>% 
+  transform(scenario = factor(scenario, levels = c("Warm & Dry", "Hot & Wet"), ordered = TRUE)) %>% 
   melt(id.vars = c("site_status", "scenario", "simulation_month"),
        measure.vars = list(Probability = c("connectivity", "inundation", "drawdown"),
                            ymin = c("connectivity_min", "inundation_min", "drawdown_min"),
@@ -92,9 +92,9 @@ fig <-
                   # show.legend = FALSE,
                   position = position_dodge(width = 0.6)) +
   scale_color_manual(values = c(`Baseline: Modeled Black Ash, Current Climate` = "gray30",
-                                `Less Sensitive` = darkblue,
-                                `More Sensitive` = orange),
-                     breaks = c("Less Sensitive", "More Sensitive", "Baseline: Modeled Black Ash, Current Climate")) +
+                                `Warm & Dry` = darkblue,
+                                `Hot & Wet` = orange),
+                     breaks = c("Warm & Dry", "Hot & Wet", "Baseline: Modeled Black Ash, Current Climate")) +
   facet_grid(variable ~ site_status,
              scales = "free") +
   guides(
@@ -125,8 +125,8 @@ eab_baseline <- proportions[
   j = .(
     simulation_month = month(simulation_date, label = TRUE, abbr = TRUE),
     scenario = fcase(scenario == "historical", "Current Climate",
-                     scenario == "rcp45", "Less Sensitive", 
-                     scenario == "rcp85", "More Sensitive"),
+                     scenario == "rcp45", "Warm & Dry", 
+                     scenario == "rcp85", "Hot & Wet"),
     Connectivity = prop_within_5cm_max_wl,
     Drawdown = 1-prop_above_neg_50,
     Inundation = prop_above_neg_10
@@ -159,10 +159,10 @@ eab_summary_dat <-
                 inundation_max = ci_function(prop_above_neg_10, .width = ci_width)[[2]]),
               by = .(site_status, 
                      scenario = fcase(scenario == "historical", "Current Climate",
-                                      scenario == "rcp45", "Less Sensitive", 
-                                      scenario == "rcp85", "More Sensitive"),
+                                      scenario == "rcp45", "Warm & Dry", 
+                                      scenario == "rcp85", "Hot & Wet"),
                      simulation_month = month(simulation_date, label = TRUE, abbr = TRUE))] %>% 
-  transform(scenario = factor(scenario, levels = c("Current Climate", "Less Sensitive", "More Sensitive"), ordered = TRUE)) %>% 
+  transform(scenario = factor(scenario, levels = c("Current Climate", "Warm & Dry", "Hot & Wet"), ordered = TRUE)) %>% 
   melt(id.vars = c("site_status", "scenario", "simulation_month"),
        measure.vars = list(Probability = c("connectivity", "inundation", "drawdown"),
                            ymin = c("connectivity_min", "inundation_min", "drawdown_min"),
@@ -269,10 +269,10 @@ climate_summary_dat <-
                 inundation_min = ci_function(prop_above_neg_10, .width = ci_width)[[1]],
                 inundation_max = ci_function(prop_above_neg_10, .width = ci_width)[[2]]),
               by = .(site_status, 
-                     scenario = fcase(scenario == "rcp45", "Less Sensitive", 
-                                      scenario == "rcp85", "More Sensitive"),
+                     scenario = fcase(scenario == "rcp45", "Warm & Dry", 
+                                      scenario == "rcp85", "Hot & Wet"),
                      simulation_month = month(simulation_date, label = TRUE, abbr = TRUE))] %>% 
-  transform(scenario = factor(scenario, levels = c("Less Sensitive", "More Sensitive"), ordered = TRUE)) %>% 
+  transform(scenario = factor(scenario, levels = c("Warm & Dry", "Hot & Wet"), ordered = TRUE)) %>% 
   melt(id.vars = c("site_status", "scenario", "simulation_month"),
        measure.vars = list(Probability = c("connectivity", "inundation", "drawdown"),
                            ymin = c("connectivity_min", "inundation_min", "drawdown_min"),
@@ -315,9 +315,9 @@ climate_fig <- ggplot(climate_summary_dat) +
                       color = scenario),
                   position = position_dodge(width = 0.6)) +
   scale_color_manual(values = c(`Baseline: Current Climate` = "gray30",
-                                `Less Sensitive` = darkblue,
-                                `More Sensitive` = orange),
-                     breaks = c("Less Sensitive", "More Sensitive", "Baseline: Current Climate")) +
+                                `Warm & Dry` = darkblue,
+                                `Hot & Wet` = orange),
+                     breaks = c("Warm & Dry", "Hot & Wet", "Baseline: Current Climate")) +
   facet_grid(variable ~ site_status,
              scales = "free") +
   guides(
@@ -403,7 +403,7 @@ eab_impact <-
     variable.name = "impact_source"
   )
 
-# Calculate impact of less sensitive climate scenario relative to the same
+# Calculate impact of Warm & Dry climate scenario relative to the same
 # vegetation conditions under the current climate
 cc_l_impact <- 
   proportions[
@@ -425,18 +425,18 @@ cc_l_impact <-
   ] %>%
   .[!is.na(future)] %>% 
   .[
-    j = `Climate Impact (Less Sensitive)` := future - historical
+    j = `Climate Impact (Warm & Dry)` := future - historical
   ] %>%
   .[
-    j = median_hdci(.SD, `Climate Impact (Less Sensitive)`, .width = 0.67),
+    j = median_hdci(.SD, `Climate Impact (Warm & Dry)`, .width = 0.67),
     by = .(variable, site_status),
   ] %>% 
   melt(
-    measure.vars = "Climate Impact (Less Sensitive)",
+    measure.vars = "Climate Impact (Warm & Dry)",
     variable.name = "impact_source"
   )
 
-# Calculate impact of more sensitive climate scenario relative to the same
+# Calculate impact of Hot & Wet climate scenario relative to the same
 # vegetation conditions under the current climate
 cc_h_impact <- 
   proportions[
@@ -458,21 +458,21 @@ cc_h_impact <-
   ] %>%
   .[!is.na(future)] %>% 
   .[
-    j = `Climate Impact (More Sensitive)` := future - historical
+    j = `Climate Impact (Hot & Wet)` := future - historical
   ] %>%
   .[
-    j = median_hdci(.SD, `Climate Impact (More Sensitive)`, .width = 0.67),
+    j = median_hdci(.SD, `Climate Impact (Hot & Wet)`, .width = 0.67),
     by = .(variable, site_status),
   ] %>%
   melt(
-    measure.vars = "Climate Impact (More Sensitive)",
+    measure.vars = "Climate Impact (Hot & Wet)",
     variable.name = "impact_source",
   )
 
 tab_dat <- rbindlist(
   list(
-    # eab_impact[, c(.SD, list(scenario = "Less Sensitive"))],
-    # eab_impact[, c(.SD, list(scenario = "More Sensitive"))],
+    # eab_impact[, c(.SD, list(scenario = "Warm & Dry"))],
+    # eab_impact[, c(.SD, list(scenario = "Hot & Wet"))],
     eab_impact,
     cc_l_impact,
     cc_h_impact
@@ -520,16 +520,16 @@ attribution_fig <-
     name = NULL,
     values = c(
       "EAB Impact" = brown,
-      "Climate Impact (Less Sensitive)" = darkblue,
-      "Climate Impact (More Sensitive)" = orange
+      "Climate Impact (Warm & Dry)" = darkblue,
+      "Climate Impact (Hot & Wet)" = orange
     )
   ) +
   scale_shape_manual(
     name = NULL,
     values = c(
       "EAB Impact" = 21,
-      "Climate Impact (Less Sensitive)" = 22,
-      "Climate Impact (More Sensitive)" = 25
+      "Climate Impact (Warm & Dry)" = 22,
+      "Climate Impact (Hot & Wet)" = 25
     )
   ) +
   theme(legend.position = "bottom",
@@ -557,7 +557,7 @@ darkblue <- "#3085c7"
 orange <- "#d55e00"
 
 gcm.data <- gcm.data[scenario != "historical"]
-gcm.data[, Climate := fifelse(scenario == "rcp85" & gcm == "gfdl-cm3", "More Sensitive Future Scenario", "Less Sensitive Future Scenario")]
+gcm.data[, Climate := fifelse(scenario == "rcp85" & gcm == "gfdl-cm3", "Hot & Wet Future Scenario", "Warm & Dry Future Scenario")]
 
 gcm.data <- gcm.data %>%
   calculate_mean_temp() %>% 
@@ -583,7 +583,7 @@ dat[
   j = `:=`(
     Climate = factor(
       Climate,
-      levels = c("More Sensitive Future Scenario", "Less Sensitive Future Scenario", "Observed Climate"),
+      levels = c("Hot & Wet Future Scenario", "Warm & Dry Future Scenario", "Observed Climate"),
       ordered = TRUE
     ),
     sample_season = factor(
@@ -628,13 +628,13 @@ base_plot <- ggplot(dat) +
   scale_fill_manual(
     values = c(
       "Observed Climate" = "gray30",
-      "Less Sensitive Future Scenario" = darkblue,
-      "More Sensitive Future Scenario" = orange),
+      "Warm & Dry Future Scenario" = darkblue,
+      "Hot & Wet Future Scenario" = orange),
     breaks = c(
       c(
         "Observed Climate",
-        "Less Sensitive Future Scenario",
-        "More Sensitive Future Scenario")
+        "Warm & Dry Future Scenario",
+        "Hot & Wet Future Scenario")
     )
   )
 
@@ -656,6 +656,31 @@ ggsave(
   drivers_plots,
   width = 6,
   height = 8,
+  units = "in",
+  dpi = 300
+)
+
+# ESY Figure --------------------------------------------------------------
+
+tar_load(control_optimization)
+pars <- control_optimization$params[[7]]
+
+esy_plot <- ggplot() +
+  geom_function(
+    fun = ~pars$funESY(.x, pars$minESY),
+    xlim = c(-150, pars$maxWL + 10)
+  ) +
+  labs(
+    x = "Water Level Relative to Ground (cm)",
+    y = "Ratio of Water Level Change to Input Magnitude"
+  ) +
+  theme_minimal(base_size = 14)
+
+ggsave(
+  "~/phd/defense_figures/esy_example.png",
+  esy_plot,
+  width = 8,
+  height = 6,
   units = "in",
   dpi = 300
 )
