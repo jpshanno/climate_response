@@ -1,5 +1,9 @@
 ####### WORK WITH ONLY TREATED SITES TO AVOID UNEVEN GROUP SIZES
 
+### Likelihood should probably go back to dnorm with obs sd
+### Need to think about matching scale of ll for likelihood and prior
+### Need to get proposal function better tuned
+
 source("code/load_project.R")
 tar_load(training_data)
 tar_load(testing_data)
