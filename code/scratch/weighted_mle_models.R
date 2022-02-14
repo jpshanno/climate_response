@@ -1,9 +1,14 @@
+####### WORK WITH ONLY TREATED SITES TO AVOID UNEVEN GROUP SIZES
+
 source("code/load_project.R")
 tar_load(training_data)
 tar_load(testing_data)
 tar_load(treatment_sites)
 tar_load(esy_functions)
+training_data[["control"]][esy_functions, `:=`(max_wl = i.max_wl, funESY = i.pred_fun)]
 
+# This overrides the existing optimize_params function so that you can use
+# the model fitting code from targets.R
 optimize_params <- 
   function(data, par, fixed = NULL, ...){
     opt <- optim(par = par,
@@ -63,8 +68,6 @@ control_optimization <-
                           phiM = 0.9,
                           phiP = 0.5))
 
-training_data[["control"]][esy_functions, `:=`(max_wl = i.max_wl, funESY = i.pred_fun)]
-
 control_population_optim <-
   optim(
     par = list(
@@ -88,11 +91,12 @@ control_population_optim <-
           f = training_data[["control"]]$site
         )
 
+        # future::plan(future::multicore, workers = 4)
         sum(
           purrr::map_dbl(
           .x = split_data,
           .f = ~{
-            site_params <- 
+            site_params <-
               c(params, list(maxWL = unique(.x$max_wl), funESY = .x$funESY[[1]]))
 
             wl_hat <-
@@ -124,6 +128,7 @@ control_population_optim <-
           }
         )
         )
+        # future::plan(future::sequential)
 
       }
 )
