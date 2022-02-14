@@ -250,67 +250,51 @@ wetland_model <-
     
     # Loop through weather data
     for(t in 2:n){
-      
+
+      ######## Esy
       # Calculate gradient2 of drawdown 
       gradient[t] <- 
         esy_fun(wl_hat[t-1], minESY)
-      
+
+      ######## PET or P times Esy
       # Use net input to determine if water level increases or decreases
-      if((P[t] + PET[t]) <= 0){
-        
+      # Assuming AET is negligible on days where P >= PET
+      if((P[t] + PET[t]) <= 0) {
         # Water level drawdown = PET2, if P2 <= PET2 then it can be assumed to be
-        # less than interception (not necessarily true, but works as a 
+        # less than interception (not necessarily true, but works as a
         # simplifying assumption)
         pet_hat[t] <- 
           pet_fun(wl_hat[t-1], maxWL, future.forest.change) * (MPET * PET[t]) * gradient[t]
-        
         wl_hat[t] <-
           wl_hat[t-1] + pet_hat[t]
-        
       } else {
-        
-        # Water rise is P2 - PET2, which fits better, but need to rethink my
-        # justification for this
         p_hat[t] <- 
           (MP * P[t]) * gradient[t]
-        
         wl_hat[t] <-
           wl_hat[t-1] + p_hat[t]
-        
       }
-      
-      # # Add in G
-      # if(P[t-1] + PET[t-1] > 0){
-      #   wl_hat[t] <- 
-      #     wl_hat[t] + MG * P[t-1]
-      # }
-      
-      
+
+      ######## Snowmelt
       # Directly add melt to water level. This should probably have some sort of
       # multiplier
-      
       m_hat[t] <- 
         MM * M[t] * gradient[t]
-      
       wl_hat[t] <-
         wl_hat[t] + m_hat[t]
-      
+
+      ####### Streamflow
       # If WL is above spill point threshold then lose some to streamflow. 
       # This could probably be improved using the morphology models to determine
       # streamflow
-      
       if(wl_hat[t-1] > maxWL){
-        
         q_hat[t] <-
           MQ * (wl_hat[t-1] - maxWL)
-        
         q_hat[t] <- 
           pmin(q_hat[t], wl_hat[t] - maxWL)
-        
         wl_hat[t] <-
           wl_hat[t] - q_hat[t]
       }
-      
+
     }
     data.table::data.table(wl_hat, q_hat, m_hat, p_hat, pet_hat, gradient)
   }
