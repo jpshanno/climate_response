@@ -17,27 +17,54 @@ con_dat <- con_dat[(!(month(sample_date) == 2 & mday(sample_date) == 29)),]
 site <- "151"
 dat <- con_dat[site == "151"]
 
-init_weight <- 1 / 365
-
 # Weights increase asymmetrically as water levels drop
-# create_weights <- function()
-wghts <- pmax(init_weight, init_weight * (dat$max_wl - dat$wl_initial_cm))
+create_weights <- function(x, scale) {
+  init_weight <- 1 / sum(!is.na(x))
+  wghts <- pmax(init_weight, init_weight * (scale - x))
+  # Weights are squared
+  wghts <- wghts^2
+  wghts[is.na(x)] <- 0
+  wghts <- wghts / sum(wghts)
+}
 
-# Weights are squared
-wghts <- wghts^2
-wghts[is.na(dat$wl_initial)] <- 0
+create_data_matrix <- function(data, var) {
+  lapply(
+    X = sort(unique(data[["site"]])),
+    FUN = \(x) matrix(data[site == x][[var]], nrow = 1)
+  ) %>%
+  purrr::reduce(rbind)
+}
+
+con_dat[, wghts := create_weights(wl_initial_cm, max_wl), by = .(site)]
+con_dat[, filled_wl := nafill(wl_initial_cm ,"const", -9999)]
+esy_functions[sort(unique(con_dat$site))]$pred_fun
+esy_params <- matrix(
+  c(
+    0.9440797, 9.68796681237216, 0.963832093292945, 0.011490387703557,
+    1.2087133, 9.6930777345254, 2.10532835889272, 0.0157893963100476,
+    1.1956961, 9.35343568266112, 1.62678535681258, 0.00984811084065675,
+    1.1942750, 8.85796577611301, 2.0742188380092, 0.0148425995465377,
+    1.3711603, 9.79628207399244, 1.31799862570157, 0.00835140512795191,
+    1.4753461, 9.92020216902697, 2.40233114598982, 0.0103268508715977,
+    1.0764391, 9.56079966326987, 1.17368355521875, 0.00762101076778987,
+    0.2738756, 9.64372934079638, 2.0767145808409, 0.0127361070535151),
+  byrow = TRUE,
+  ncol = 4
+)
+
+obs_sds <- con_dat[, .(v = sd(diff(wl_initial_cm), na.rm = TRUE)), by = .(site)][["v"]]
 
 stan_data <- list(
   D = 365L,
-  K = 1L,
-  pet = matrix(dat$pet_cm, nrow = 1),
-  rain = matrix(dat$rain_cm, nrow = 1),
-  melt = matrix(dat$melt_cm, nrow = 1),
-  wghts = matrix(wghts, nrow = 1),
-  maxWL = as.array(unique(dat$max_wl)), # wrapping in as.array found as recommended fix for dims 'declared=(1); dims found=()' error
-  y = matrix(nafill(dat$wl_initial_cm, "const", -9999), nrow = 1),
-  esyParams = matrix(c(1.0764391, 9.56079966326987, 1.17368355521875, 0.00762101076778987), nrow = 1),
-  ySD = as.array(sd(diff(dat$wl_initial_cm), na.rm = TRUE))
+  K = length(unique(con_dat$site)),
+  pet = create_data_matrix(con_dat, "pet_cm"),
+  rain = create_data_matrix(con_dat, "rain_cm"),
+  melt = create_data_matrix(con_dat, "melt_cm"),
+  wghts = create_data_matrix(con_dat, "wghts"),
+  maxWL = create_data_matrix(con_dat, "max_wl")[, 1],
+  y = create_data_matrix(con_dat, "filled_wl"),
+  esyParams = esy_params,
+  ySD = obs_sds
 )
 
 
