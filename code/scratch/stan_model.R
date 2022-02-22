@@ -20,6 +20,7 @@ dat <- con_dat[site == "151"]
 init_weight <- 1 / 365
 
 # Weights increase asymmetrically as water levels drop
+# create_weights <- function()
 wghts <- pmax(init_weight, init_weight * (dat$max_wl - dat$wl_initial_cm))
 
 # Weights are squared
@@ -58,10 +59,27 @@ fit <- mod$sample(
 )
 
 fit$summary()
-mcmc_hist(fit$draws(c("bPET", "bRain", "bMelt")))
+mcmc_hist(fit$draws(c("bPET", "bRain", "bMelt", "bQ")))
 
 fit_mcmc <- as_mcmc.list(fit)
 
 # color_scheme_set("mix-blue-pink")
-mcmc_trace(fit_mcmc,  pars = c("bPET", "bRain", "bMelt"), n_warmup = 1000,
+mcmc_trace(fit_mcmc,  pars = c("bPET", "bRain", "bMelt", "bQ"), n_warmup = 1000,
                 facet_args = list(nrow = 2, labeller = label_parsed))
+
+
+new_params <- list(
+  MPET = 1.36,
+  MP = 1.48,
+  MM = 1.04,
+  MQ = 0.516,
+  minESY = esy_functions[site][["min_esy"]],
+  phiM = 0,
+  phiP =0,
+  maxWL = unique(dat$max_wl),
+  funESY = esy_functions[site, pred_fun]
+)
+test <- wetland_model(dat, new_params)
+test
+plot(dat$wl_initial_cm, type = "l")
+lines(test$wl_hat, col = 'red', lty = "dashed")

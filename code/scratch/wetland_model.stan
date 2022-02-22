@@ -62,7 +62,7 @@ functions {
          // This could probably be improved using the morphology models to determine
          // streamflow
          if(wlHat[t-1] > maxWL){
-            qHat[t] = bQ * (wlHat[t-1] - maxWL);
+            qHat[t] = bQ * (wlHat[t-1] - maxWL)^2;
             if(qHat[t] > wlHat[t] - maxWL){
                qHat[t] = wlHat[t] - maxWL;
             }
@@ -94,7 +94,7 @@ parameters {
    real<lower=0, upper=2> bPET;
    real<lower=0, upper=2> bRain;
    real<lower=0, upper=2> bMelt;
-   // real<lower=0, upper=2> bQ;
+   real<lower=0, upper=2> bQ;
    vector<lower=0>[K] sigma;
 }
 model {
@@ -103,8 +103,8 @@ model {
    bRain ~ normal(1.5, 0.75);
    // real bMelt = 1;
    bMelt ~ normal(1, 0.5);
-   real bQ = 0.5;
-   // bQ ~ normal(0.5, 0.25);
+   // real bQ = 0.5;
+   bQ ~ normal(0.5, 0.25);
 
    for(k in 1:K) {
       sigma[k] ~ normal(ySD[k], 2);
