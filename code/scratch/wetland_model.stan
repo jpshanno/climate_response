@@ -94,7 +94,7 @@ parameters {
    real<lower=0, upper=2> bPET;
    real<lower=0, upper=2> bRain;
    real<lower=0, upper=2> bMelt;
-   real<lower=0, upper=2> bQ;
+   // real<lower=0, upper=2> bQ;
    vector<lower=0>[K] sigma;
 }
 model {
@@ -103,8 +103,8 @@ model {
    bRain ~ normal(1.5, 0.75);
    // real bMelt = 1;
    bMelt ~ normal(1, 0.5);
-   // real bQ = 0.5;
-   bQ ~ normal(0.5, 0.25);
+   real bQ = 0.5;
+   // bQ ~ normal(0.5, 0.25);
 
    for(k in 1:K) {
       sigma[k] ~ normal(ySD[k], 2);
@@ -114,11 +114,11 @@ model {
       }
    }
 }
-generated quantities{
-   // real bMelt = 1; // ~ normal(1, 0.5);
-   // real bQ = 0.5; // ~ normal(0.5, 0.5);
-   array[K,D] real wl;
-   for(k in 1:K) {
-          wl[k] = normal_rng(wetlandModel(D, maxWL[k], y[k], melt[k], bMelt, pet[k], bPET, rain[k], bRain, bQ, esyParams[k,1], esyParams[k,2], esyParams[k,3], esyParams[k,4]), sigma[k]);
-   }
-}
+// generated quantities{
+//    // real bMelt = 1; // ~ normal(1, 0.5);
+//    real bQ = 0.5; // ~ normal(0.5, 0.5);
+//    array[K,D] real wl;
+//    for(k in 1:K) {
+//           wl[k] = normal_rng(wetlandModel(D, maxWL[k], y[k], melt[k], bMelt, pet[k], bPET, rain[k], bRain, bQ, esyParams[k,1], esyParams[k,2], esyParams[k,3], esyParams[k,4]), sigma[k]);
+//    }
+// }
