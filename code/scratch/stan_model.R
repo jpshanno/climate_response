@@ -44,8 +44,9 @@ library(cmdstanr)
 library(posterior)
 library(bayesplot)
 mod <- cmdstan_model(stan_file = "code/scratch/wetland_model.stan")
-# Last fit was with all 4 parameters. Looks like 1 chain went bad when bQ was
-# included. Probably have to fine tune how it gets used
+# On the last fit with all 4 parameters it look like 1 chain went bad when bQ
+# was included. Probably have to fine tune the priors or the specification in
+# the model
 fit <- mod$sample(
   data = stan_data,
   seed = 1234567,
@@ -57,10 +58,10 @@ fit <- mod$sample(
 )
 
 fit$summary()
-mcmc_hist(fit$draws(c("bPET", "bRain", "bMelt", "bQ")))
+mcmc_hist(fit$draws(c("bPET", "bRain", "bMelt")))
 
 fit_mcmc <- as_mcmc.list(fit)
 
 # color_scheme_set("mix-blue-pink")
-mcmc_trace(fit_mcmc,  pars = c("bPET", "bRain", "bMelt", "bQ"), n_warmup = 1000,
+mcmc_trace(fit_mcmc,  pars = c("bPET", "bRain", "bMelt"), n_warmup = 1000,
                 facet_args = list(nrow = 2, labeller = label_parsed))
