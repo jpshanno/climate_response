@@ -62,7 +62,7 @@ functions {
          // This could probably be improved using the morphology models to determine
          // streamflow
          if(wlHat[t-1] > maxWL){
-            qHat[t] = bQ * (wlHat[t-1] - maxWL)^2;
+            qHat[t] = bQ * (wlHat[t-1] - maxWL);
             if(qHat[t] > wlHat[t] - maxWL){
                qHat[t] = wlHat[t] - maxWL;
             }
