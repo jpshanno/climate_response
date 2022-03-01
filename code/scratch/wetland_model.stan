@@ -11,26 +11,24 @@ data {
    matrix[K,D] y; // PET
    matrix[K,4] esyParams; // minESY, esyA, esyB, esyC
    vector[K] maxWL;
-   // vector[K] ySD;
+   vector[K] ySD;
 }
 parameters {
-   real bPET;
-   real bRain;
-   real bMelt;
-   real bQ;
-   real<lower=0> sigma;
+   real<lower=0, upper=2> bPET;
+   real<lower=0, upper=2> bRain;
+   real<lower=0, upper=2> bMelt;
+   real<lower=0, upper=2> bQ;
+   vector<lower=0>[K] sigma;
 }
 model {
    matrix[K,D] yHat;
    bPET ~ normal(1, 0.5);
    bRain ~ normal(1.5, 0.75);
-   // real bMelt = 1;
    bMelt ~ normal(1, 0.5);
-   // real bQ = 0.5;
    bQ ~ normal(0.5, 0.25);
-   sigma ~ normal(5, 0.5);
 
    for(k in 1:K) {
+      sigma[k] ~ normal(ySD[k], 2);
       yHat[k] = wetlandModel(D, maxWL[k], y[k], melt[k], bMelt, pet[k], bPET, rain[k], bRain, bQ, esyParams[k,1], esyParams[k,2], esyParams[k,3], esyParams[k,4]);
       for(i in 1:D){
          target +=  normal_lpdf(y[k,i] | yHat[k,i], sigma) * wghts[k,i];

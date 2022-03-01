@@ -65,7 +65,7 @@ row_vector wetlandModel(int D, real maxWL, row_vector obsWL, row_vector melt, re
       // This could probably be improved using the morphology models to determine
       // streamflow
       if(wlHat[t-1] > maxWL){
-        qHat[t] = bQ * (wlHat[t-1] - maxWL);
+        qHat[t] = bQ * (wlHat[t-1] - maxWL)^2;
         if(qHat[t] > wlHat[t] - maxWL){
             qHat[t] = wlHat[t] - maxWL;
         }
