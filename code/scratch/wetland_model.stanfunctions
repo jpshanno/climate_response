@@ -35,7 +35,7 @@ row_vector wetlandModel(int D, real maxWL, row_vector obsWL, row_vector melt, re
 
       // Esy
       // Calculate gradient of drawdown 
-      if(wlHat[t] > maxWL) {
+      if(wlHat[t-1] > maxWL) {
         gradient[t] = minESY;
       } else {
         gradient[t] = predEsy(wlHat[t-1], esyA, esyB, esyC);
