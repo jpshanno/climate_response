@@ -26,7 +26,6 @@ model {
    bRain ~ normal(1.5, 0.75);
    bMelt ~ normal(1, 0.5);
    bQ ~ normal(0.5, 0.25);
-   sigma ~ normal(4, 0.05);
 
    for(k in 1:K) {
       sigma[k] ~ normal(ySD[k], 1);
