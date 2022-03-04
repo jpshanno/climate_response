@@ -20,12 +20,12 @@ library(bayesplot)
 
 # Weights increase asymmetrically as water levels drop
 create_weights <- function(x, scale) {
-  init_weight <- 1 / 365 # sum(!is.na(x))
+  init_weight <- 1 / 365
   wghts <- pmax(init_weight, init_weight * (scale - x))
   # Weights are squared
   wghts <- wghts^2
   wghts[is.na(x)] <- 0
-  wghts <- wghts / sum(wghts)
+  # Weights are not scaled to 1, messes with test fits
   assertthat::assert_that(assertthat::noNA(wghts))
   wghts
 }
