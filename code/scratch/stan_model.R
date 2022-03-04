@@ -114,13 +114,29 @@ fit <- mod$sample(
 )
 
 fit$summary()
-mcmc_hist(fit$draws(c("bPET", "bRain", "bMelt", "bQ"), inc_warmup = TRUE))
+mcmc_hist(fit$draws(c("bPET", "bQ", "bMelt", "bRain"), inc_warmup = TRUE))
 
 fit_mcmc <- as_mcmc.list(fit)
 
 # color_scheme_set("mix-blue-pink")
-mcmc_trace(fit_mcmc,  pars = c("bPET", "bRain", "bMelt", "bQ"), n_warmup = 100,
-                facet_args = list(nrow = 2, labeller = label_parsed))
+mcmc_trace(
+  fit_mcmc,
+  pars = c("bPET", "bQ", "bMelt", "bRain"),
+  n_warmup = 500,
+  facet_args = list(nrow = 2, labeller = label_parsed)
+  )
+
+draws <- map(
+  seq_len(4),
+  ~list.files(
+    "/var/folders/h_/8p62bvmn4b73006tnwkgfrlc0000gn/T/",
+    recursive = TRUE,
+    pattern = "wetland_model-202203032157",
+    full.names=TRUE
+  )[.x] %>%
+  readr::read_csv(skip = 45)
+)
+par(mfrow = c(2,2)); map(draws, ~plot(.x$accept_stat__, type = "l")); par(mfrow = c(1,1))
 
 # Hierarchical Model
 mod_hc <- cmdstan_model(
