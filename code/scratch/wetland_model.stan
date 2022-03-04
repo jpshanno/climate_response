@@ -11,10 +11,9 @@ data {
    matrix[K,D] y; // PET
    matrix[K,4] esyParams; // minESY, esyA, esyB, esyC
    vector[K] maxWL;
-   vector[K] ySD;
+   vector[K] ySD; // SD of daily water level change by site
 }
 parameters {
-   // vector<lower = 0>[4] params;
    real<lower=0, upper=2> bPET;
    real<lower=0, upper=2> bRain;
    real<lower=0, upper=2> bMelt;
@@ -23,18 +22,6 @@ parameters {
 }
 model {
    matrix[K,D] yHat;
-   // real bPET;
-   // real bRain;
-   // real bMelt;
-   // real bQ;
-   // row_vector[4] priors;
-   // priors = [1, 1.5, 1, 0.5];
-   // Sigma ~ lkj_corr(2);
-   // params ~ multi_normal(priors, Sigma);
-   // bPET = params[1];
-   // bRain = params[2];
-   // bMelt = params[3];
-   // bQ = params[4];
    bPET ~ normal(1, 0.5);
    bRain ~ normal(1.5, 0.75);
    bMelt ~ normal(1, 0.5);
