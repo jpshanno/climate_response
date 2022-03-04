@@ -14,11 +14,11 @@ data {
    vector[K] ySD; // SD of daily water level change by site
 }
 parameters {
-   real<lower=0, upper=2> bPET;
-   real<lower=0, upper=2> bRain;
-   real<lower=0, upper=2> bMelt;
-   real<lower=0, upper=2> bQ;
-   real<lower=0> sigma;
+   real bPET;
+   real bRain;
+   real bMelt;
+   real bQ;
+   vector<lower=0>[K] sigma;
 }
 model {
    matrix[K,D] yHat;
@@ -29,10 +29,10 @@ model {
    sigma ~ normal(4, 0.05);
 
    for(k in 1:K) {
-      // sigma[k] ~ normal(ySD[k], 2);
+      sigma[k] ~ normal(ySD[k], 1);
       yHat[k] = wetlandModel(D, maxWL[k], y[k], melt[k], bMelt, pet[k], bPET, rain[k], bRain, bQ, esyParams[k,1], esyParams[k,2], esyParams[k,3], esyParams[k,4]);
       for(i in 1:D){
-         target +=  normal_lpdf(y[k,i] | yHat[k,i], sigma) * wghts[k,i];
+         target +=  normal_lpdf(y[k,i] | yHat[k,i], sigma[k]) * wghts[k,i];
       }
    }
 }
