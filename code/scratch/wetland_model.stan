@@ -19,8 +19,7 @@ parameters {
    real<lower=0, upper=2> bRain;
    real<lower=0, upper=2> bMelt;
    real<lower=0, upper=2> bQ;
-   // corr_matrix[4] Sigma;
-   vector<lower=0>[K] sigma;
+   real<lower=0> sigma;
 }
 model {
    matrix[K,D] yHat;
@@ -40,12 +39,13 @@ model {
    bRain ~ normal(1.5, 0.75);
    bMelt ~ normal(1, 0.5);
    bQ ~ normal(0.5, 0.25);
+   sigma ~ normal(4, 0.05);
 
    for(k in 1:K) {
-      sigma[k] ~ normal(ySD[k], 2);
+      // sigma[k] ~ normal(ySD[k], 2);
       yHat[k] = wetlandModel(D, maxWL[k], y[k], melt[k], bMelt, pet[k], bPET, rain[k], bRain, bQ, esyParams[k,1], esyParams[k,2], esyParams[k,3], esyParams[k,4]);
       for(i in 1:D){
-         target +=  normal_lpdf(y[k,i] | yHat[k,i], sigma[k]) * wghts[k,i];
+         target +=  normal_lpdf(y[k,i] | yHat[k,i], sigma) * wghts[k,i];
       }
    }
 }
