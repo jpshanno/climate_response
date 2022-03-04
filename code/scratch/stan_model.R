@@ -74,15 +74,23 @@ stan_data <- list(
   ySD = obs_sds
 )
 
-init_values <- function() {
-  x <- list(
-    bPET = runif(1, 0.9, 1.1),
-    bRain = runif(1, 0.9, 1.1),
-    bMelt = runif(1, 0.9, 1.1),
-    bQ = runif(1, 0.4, 0.7)
-  )
-  x$sigma <- rep(4, 8)
-  x
+init_values <- function(pooling) {
+  set.seed(8675309)
+  generate_values <- function(pooling) {
+    x <- list(
+      bPET = runif(1, 0.9, 1.1),
+      bRain = runif(1, 0.9, 1.1),
+      bMelt = runif(1, 0.9, 1.1),
+      bQ = runif(1, 0.4, 0.7)
+    )
+    x$sigma <- switch(pooling,
+      "full" = 1,
+      "partial" = rep(1, 8),
+      "none" = rep(1, 8)
+    )
+    x
+  }
+  replicate(generate_values(pooling), n = 4, simplify = FALSE)
 }
 
 
