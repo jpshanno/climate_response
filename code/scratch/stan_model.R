@@ -117,14 +117,11 @@ fit <- mod$sample(
   chains = 4,
   parallel_chains = 4,
   adapt_delta = 0.70,
-  # step_size = 0.0223,
-  # max_treedepth = 10,
   iter_warmup = 500,
   iter_sampling = 100,
   refresh = 50,
   save_warmup = TRUE,
   init = 0
-  # init = init_values("full")
 )
 
 # saveRDS(fit, "/Users/jpshanno/phd/climate_response/tmp/fit_20220304.rds")
@@ -139,21 +136,7 @@ fit <- mod$sample(
 fit$summary()
 mcmc_hist(fit$draws(c("bPET", "bRain", "bMelt", "bQ", "sigma"), inc_warmup = TRUE))
 
-matrix(
-  c(
-    1, 0, 0, 0,
-    0.243, 0.8, 0, 0,
-    0.287, 0.226, 0.392, 0,
-    0.129, 0.201, 0.424, 0.544
-  ),
-  ncol = 4,
-  byrow = TRUE
-)
-
-
-
 fit_mcmc <- as_mcmc.list(fit)
-
 # color_scheme_set("mix-blue-pink")
 mcmc_trace(
   fit_mcmc,
@@ -207,10 +190,10 @@ mcmc_trace(fit_mcmc_hc,  pars = c("bPETPop", "bRainPop", "bMeltPop", "bQPop"), n
 test_site <- "151"
 dat <- con_dat[site == test_site]
 new_params <- list(
-  MPET = 1.56,
-  MP = 1.83,
-  MM = 2,
-  MQ = 0.61,
+  MPET = 0.637,
+  MP = 0.448,
+  MM = 0.703,
+  MQ = 0.585,
   minESY = esy_functions[test_site][["min_esy"]],
   phiM = 0,
   phiP =0,
