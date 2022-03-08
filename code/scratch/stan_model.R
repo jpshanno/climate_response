@@ -148,8 +148,8 @@ draws <- map(
 
 par(mfrow = c(2,2)); iwalk(draws, ~plot(log10(.x$stepsize__), type = "l", main = .y)); par(mfrow = c(1,1))
 
-test_site <- "053"
-dat <- con_dat[site == test_site]
+test_site <- "151"
+dat <- testing_data[site == test_site][water_year == min(water_year)]
 new_params <- list(
   MPET = 1.07,
   MP = 1.22,
@@ -158,7 +158,7 @@ new_params <- list(
   minESY = esy_functions[test_site][["min_esy"]],
   phiM = 0,
   phiP =0,
-  maxWL = unique(dat$max_wl),
+  maxWL = esy_functions[test_site, max_wl],
   funESY = esy_functions[test_site, pred_fun]
 )
 test <- wetland_model(dat, new_params)
