@@ -88,10 +88,10 @@ data {
    vector[K] obs_sigma; // mean of daily water level change by site
 }
 parameters {
-   real<lower = 0, upper = 2> bPET;
-   real<lower = 0, upper = 2> bRain;
-   real<lower = 0, upper = 2> bMelt;
-   real<lower = 0, upper = 2> bQ;
+   real<lower = 0> bPET;
+   real<lower = 0> bRain;
+   real<lower = 0> bMelt;
+   real<lower = 0> bQ;
    real<lower = 0> sigma;
    // vector<lower = 0, upper = 2>[4] params;
    // cholesky_factor_corr[4] Sigma;
@@ -99,9 +99,9 @@ parameters {
 model {
    matrix[K,D] yHat;
    // bPET ~ normal(1, 0.5);
-   target +=  normal_lpdf(bPET | 1, 0.1);
+   target += normal_lpdf(bPET | 1, 0.1);
    // bRain ~ normal(1.5, 0.75);
-   target +=  normal_lpdf(bRain | 1, 0.1);
+   target += normal_lpdf(bRain | 1, 0.1);
    // bMelt ~ normal(1, 0.5);
    target += normal_lpdf(bMelt | 1, 0.1);
    // bQ ~ normal(0.5, 0.25);
