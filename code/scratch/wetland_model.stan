@@ -99,13 +99,13 @@ parameters {
 model {
    matrix[K,D] yHat;
    // bPET ~ normal(1, 0.5);
-   target += normal_lpdf(bPET | 1, 0.1);
+   target += normal_lpdf(bPET | 1, 0.25);
    // bRain ~ normal(1.5, 0.75);
-   target += normal_lpdf(bRain | 1, 0.1);
+   target += normal_lpdf(bRain | 1.2, 0.25);
    // bMelt ~ normal(1, 0.5);
-   target += normal_lpdf(bMelt | 1, 0.1);
+   target += normal_lpdf(bMelt | 1.2, 0.25);
    // bQ ~ normal(0.5, 0.25);
-   target += normal_lpdf(bQ | 0.5, 0.05);
+   target += normal_lpdf(bQ | 0.6, 0.1);
    target += normal_lpdf(sigma | obs_sigma, obs_sigma / 4);
    // sigma ~ std_normal();
 
