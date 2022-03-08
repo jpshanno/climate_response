@@ -1,8 +1,16 @@
 ####### WORK WITH ONLY TREATED SITES TO AVOID UNEVEN GROUP SIZES
 
-### Likelihood should probably go back to dnorm with obs sd
-### Need to think about matching scale of ll for likelihood and prior
-### Need to get proposal function better tuned
+# It looks like the step size is being set much smaller on the chains that end
+# up not mixing. I think the issue is that the warm-up period is leading to
+# poor step sizes for some of the chains. Need to determine how to either set
+# some minimum, or explore how init values relate to final step size. It may be
+# that init values to close to the final parameters are leading to small step
+# sizes? I'd have to check to be sure
+
+# Getting multi-modal estimates of invididual sigma values. Likely have to
+# contrain sigma (not desirable) or update the weights (better path). It's still
+# too high of a likelihood to fit a mean model and just have terrible errors any
+# time the water level is not hovering around max
 
 source("code/load_project.R")
 tar_load(training_data)
@@ -54,12 +62,13 @@ esy_params <- matrix(
     1.3711603, 9.79628207399244, 1.31799862570157, 0.00835140512795191,
     1.4753461, 9.92020216902697, 2.40233114598982, 0.0103268508715977,
     1.0764391, 9.56079966326987, 1.17368355521875, 0.00762101076778987,
-    0.2738756, 9.64372934079638, 2.0767145808409, 0.0127361070535151),
+    0.2738756, 9.64372934079638, 2.0767145808409, 0.0127361070535151
+  ),
   byrow = TRUE,
   ncol = 4
 )
 
-obs_sds <- con_dat[, .(v = sd(diff(wl_initial_cm), na.rm = TRUE)), by = .(site)][["v"]]
+obs_sigma <- con_dat[order(site), .(v = median(abs(diff(wl_initial_cm)), na.rm = TRUE)), by = .(site)][["v"]]
 
 stan_data <- list(
   D = 365L,
@@ -71,7 +80,7 @@ stan_data <- list(
   maxWL = create_data_matrix(con_dat, "max_wl")[, 1],
   y = create_data_matrix(con_dat, "filled_wl"),
   esyParams = esy_params,
-  ySD = obs_sds
+  sigma = obs_sigma
 )
 
 init_values <- function(pooling) {
@@ -83,11 +92,11 @@ init_values <- function(pooling) {
       bMelt = runif(1, 0.9, 1.1),
       bQ = runif(1, 0.4, 0.7)
     )
-    x$sigma <- switch(pooling,
-      "full" = 1,
-      "partial" = rep(1, 8),
-      "none" = rep(1, 8)
-    )
+    # x$sigma <- switch(pooling,
+    #   "full" = 0.1,
+    #   "partial" = rep(0.01, 8),
+    #   "none" = rep(0.01, 8)
+    # )
     x
   }
   replicate(generate_values(pooling), n = 4, simplify = FALSE)
@@ -96,32 +105,56 @@ init_values <- function(pooling) {
 
 mod <- cmdstan_model(
   stan_file = "code/scratch/wetland_model.stan",
+  dir = "/tmp",
   include_paths = file.path(getwd(), "code/scratch/"),
   force_recompile = TRUE
   )
+
 fit <- mod$sample(
   data = stan_data,
   seed = 1234567,
   chains = 4,
   parallel_chains = 4,
-  adapt_delta = 0.95,
-  max_treedepth = 11,
-  iter_warmup = 100,
-  iter_sampling = 100,
+  adapt_delta = 0.90,
+  # max_treedepth = 10,
+  iter_warmup = 500,
+  iter_sampling = 500,
   refresh = 50,
-  save_warmup = TRUE,
-  init = init_values
+  save_warmup = TRUE#,
+  # init = init_values("full")
 )
 
+# saveRDS(fit, "/Users/jpshanno/phd/climate_response/tmp/fit_20220304.rds")
+# list.files(
+#     "/var/folders/h_/8p62bvmn4b73006tnwkgfrlc0000gn/T/",
+#     recursive = TRUE,
+#     pattern = "wetland_model-202203032325",
+#     full.names=TRUE
+#   ) %>%
+#   file.copy(file.path("/Users/jpshanno/phd/climate_response/tmp", basename(.)))
+
 fit$summary()
-mcmc_hist(fit$draws(c("bPET", "bQ", "bMelt", "bRain"), inc_warmup = TRUE))
+mcmc_hist(fit$draws(c("bPET", "bRain", "bMelt", "bQ"), inc_warmup = TRUE))
+
+matrix(
+  c(
+    1, 0, 0, 0,
+    0.243, 0.8, 0, 0,
+    0.287, 0.226, 0.392, 0,
+    0.129, 0.201, 0.424, 0.544
+  ),
+  ncol = 4,
+  byrow = TRUE
+)
+
+
 
 fit_mcmc <- as_mcmc.list(fit)
 
 # color_scheme_set("mix-blue-pink")
 mcmc_trace(
   fit_mcmc,
-  pars = c("bPET", "bQ", "bMelt", "bRain"),
+  pars = c("params[1]", "params[2]", "params[3]", "params[4]"),
   n_warmup = 500,
   facet_args = list(nrow = 2, labeller = label_parsed)
   )
@@ -131,12 +164,13 @@ draws <- map(
   ~list.files(
     "/var/folders/h_/8p62bvmn4b73006tnwkgfrlc0000gn/T/",
     recursive = TRUE,
-    pattern = "wetland_model-202203032157",
+    pattern = "wetland_model-202203032325",
     full.names=TRUE
   )[.x] %>%
   readr::read_csv(skip = 45)
 )
-par(mfrow = c(2,2)); map(draws, ~plot(.x$accept_stat__, type = "l")); par(mfrow = c(1,1))
+
+par(mfrow = c(2,2)); walk(draws, ~plot(log10(.x$stepsize__), type = "l")); par(mfrow = c(1,1))
 
 # Hierarchical Model
 mod_hc <- cmdstan_model(
