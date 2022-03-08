@@ -50,6 +50,25 @@ create_data_matrix <- function(data, var) {
   res
 }
 
+init_values <- function(pooling) {
+  set.seed(8675309)
+  generate_values <- function(pooling) {
+    x <- list(
+      bPET = runif(1, 0.9, 1.1),
+      bRain = runif(1, 0.9, 1.1),
+      bMelt = runif(1, 0.9, 1.1),
+      bQ = runif(1, 0.4, 0.7)
+    )
+    # x$sigma <- switch(pooling,
+    #   "full" = 0.1,
+    #   "partial" = rep(0.01, 8),
+    #   "none" = rep(0.01, 8)
+    # )
+    x
+  }
+  replicate(generate_values(pooling), n = 4, simplify = FALSE)
+}
+
 con_dat[, wghts := create_weights(wl_initial_cm, max_wl), by = .(site)]
 con_dat[, filled_wl := nafill(wl_initial_cm ,"const", -9999)]
 # esy_functions[sort(unique(con_dat$site))]$pred_fun
@@ -83,26 +102,6 @@ stan_data <- list(
   esyParams = esy_params,
   obs_sigma = obs_sigma
 )
-
-init_values <- function(pooling) {
-  set.seed(8675309)
-  generate_values <- function(pooling) {
-    x <- list(
-      bPET = runif(1, 0.9, 1.1),
-      bRain = runif(1, 0.9, 1.1),
-      bMelt = runif(1, 0.9, 1.1),
-      bQ = runif(1, 0.4, 0.7)
-    )
-    # x$sigma <- switch(pooling,
-    #   "full" = 0.1,
-    #   "partial" = rep(0.01, 8),
-    #   "none" = rep(0.01, 8)
-    # )
-    x
-  }
-  replicate(generate_values(pooling), n = 4, simplify = FALSE)
-}
-
 
 mod <- cmdstan_model(
   stan_file = "code/scratch/wetland_model.stan",
@@ -191,9 +190,9 @@ test_site <- "151"
 dat <- con_dat[site == test_site]
 new_params <- list(
   MPET = 0.637,
-  MP = 0.448,
-  MM = 0.703,
-  MQ = 0.585,
+  MP = 0.384,
+  MM = 0.868,
+  MQ = 0.579,
   minESY = esy_functions[test_site][["min_esy"]],
   phiM = 0,
   phiP =0,
