@@ -9,7 +9,8 @@ tar_load(training_data)
 tar_load(testing_data)
 tar_load(treatment_sites)
 tar_load(esy_functions)
-training_data[["control"]][esy_functions, `:=`(max_wl = i.max_wl, funESY = i.pred_fun)]
+esy_functions[, min_esy := pred_fun[[1]](max_wl, -9999), by = "site"]
+training_data[["control"]][esy_functions, `:=`(max_wl = i.max_wl, funESY = i.pred_fun, minESY = i.min_esy)]
 con_dat <- training_data[["control"]][site %in% treatment_sites]
 
 # https://kevintshoemaker.github.io/NRES-746/LECTURE7.html#Myxomatosis_revisited_(again)
@@ -20,12 +21,17 @@ ll_function <- function(params) {
           f = con_dat$site
         )
 
-        mean(
+        sum(
           purrr::map_dbl(
           .x = split_data,
           .f = ~{
             site_params <-
-              c(params, list(maxWL = unique(.x$max_wl), funESY = .x$funESY[[1]]))
+              c(params,
+                list(
+                  maxWL = unique(.x$max_wl),
+                  funESY = .x$funESY[[1]]
+                )
+              )
 
             wl_hat <-
               wetland_model(data = .x, site_params)$wl_hat
@@ -49,9 +55,10 @@ ll_function <- function(params) {
 
             sum(
               wghts[!is.na(resids)] *
-              dt(
+              dnorm(
                 resids[!is.na(resids)],
-                df = sum(!is.na(.x$wl_initial_cm)),
+                mean = 0,
+                sd = obs_sd,
                 log = TRUE
               )
             )
@@ -60,93 +67,98 @@ ll_function <- function(params) {
         )
       }
 
-start_values <- c(
-  MPET = 1,
-  MP = 1.5,
-  MM = 1,
-  MQ = 0.5,
-  minESY = 1,
-  phiM = 0.9,
-  phiP = 0.5
-)
-
-prior_ll <- function(params) {
-    mpet_prior <- dt(params[["MPET"]], df = sum(!is.na(con_dat$wl_initial_cm)), log = TRUE)
-    mp_prior <- dt(params[["MP"]], df = sum(!is.na(con_dat$wl_initial_cm)), log = TRUE)
-    mm_prior <- dt(params[["MM"]], df = sum(!is.na(con_dat$wl_initial_cm)), log = TRUE)
-    mq_prior <- dt(params[["MQ"]], df = sum(!is.na(con_dat$wl_initial_cm)), log = TRUE)
-    esy_prior <- dt(params[["minESY"]], df = sum(!is.na(con_dat$wl_initial_cm)), log = TRUE)
-    phim_prior <- dt(params[["phiM"]], df = sum(!is.na(con_dat$wl_initial_cm)), log = TRUE)
-    phip_prior <- dt(params[["phiP"]], df = sum(!is.na(con_dat$wl_initial_cm)), log = TRUE)
-
-    length(unique(con_dat$site)) *
-      (mpet_prior +
-      mp_prior +
-      mm_prior +
-      mq_prior +
-      esy_prior +
-      phim_prior +
-      phip_prior)
+prior_ll <- function(params, start_values) {
+  mvtnorm::dmvnorm(
+    x = params,
+    mean = start_values,
+    sigma = 0.5  * start_values * diag(length(params)),
+    log = TRUE
+  )
 }
 
-PosteriorRatio2 <- function(old_guess, new_guess) {
+PosteriorRatio2 <- function(old_guess, new_guess, start_values) {
   oldLogLik <- ll_function(old_guess)   # compute likelihood and prior density at old guess
-  oldLogPrior <- prior_ll(old_guess)
+  oldLogPrior <- prior_ll(old_guess, start_values)
   newLogLik <- ll_function(new_guess)             # compute likelihood and prior density at new guess
-  newLogPrior <- prior_ll(new_guess)
-  return(exp((newLogLik+newLogPrior)-(oldLogLik+oldLogPrior)))          # compute ratio of weighted likelihoods
+  newLogPrior <- prior_ll(new_guess, start_values)
+  exp((newLogLik+newLogPrior)-(oldLogLik+oldLogPrior))          # compute ratio of weighted likelihoods
 }
 
-proposal_function <- function(oldguess) {
+proposal_function <- function(oldguess, sigma_scale) {
   # This function is built from Florian's post on implementing MCMC
   res <- oldguess + rep(-100, length(oldguess))
 
   # Ensure that we only return positive new guesses
   while(any(res < .Machine$double.neg.eps)) {
-    res <- oldguess + rnorm(length(oldguess), mean = 0, sd = 0.01)
+    jumps <- mvtnorm::rmvnorm(
+      n = 1,
+      mean = rep(0, length(oldguess)),
+      sigma = sigma_scale * diag(length(oldguess))
+    )
+    res <- oldguess + jumps
   }
+  res <- res[1,]
+  names(res) <- names(oldguess)
   res
 }
 
-sample_mcmc <- function(chain_length, start_values, warmup) {
-  old_guess <- start_values
+sample_mcmc <- function(chain_length, start_values, warmup, adapt_rate) {
+
+  # Set-up
   guesses <- matrix(0, nrow = chain_length, ncol = length(start_values))
+  sigma_scale <- acceptance_rate <- numeric(length(chain_length))
   colnames(guesses) <- names(start_values)
+
+  # Define Initial Conditions
+  old_guess <- start_values
   guesses[1, ] <- start_values
   counter <- 2
+  pb <- txtProgressBar(max = chain_length)
+  proposals <- 1
+  sigma_scale[c(1, 2)] <- c(NA_real_, 0.0001)
+  acceptance_rate[1] <- NA_real_
+
+  # Loop through chain length saving accepted proposals
   while(counter <= chain_length) {
-    new_guess <- proposal_function(old_guess)
-    post.rat <- PosteriorRatio2(old_guess, new_guess)
+    # Get a new guess from a proposed jump
+    new_guess <- proposal_function(old_guess, sigma_scale[counter])
+    # Get the ration between liklihood and prior likelihood
+    post.rat <- PosteriorRatio2(old_guess, new_guess, start_values)
+    # Get the probability of acceptance (max of 1)
     prob.accept <- min(1, post.rat)
+    # Get a random probability between 0 and 1
     rand <- runif(1)
+    # Increment number of proposals
+    proposals <- proposals + 1
+    # Check if probability of acceptance is greater than the random number
     if(rand <= prob.accept) {
+      # Store new guess as old guess
       old_guess <- new_guess
+      # Store new guess in accepted guesses (draws)
       guesses[counter, ] <- new_guess
-      counter = counter + 1
+      # Get acceptance rate of proposals
+      acceptance_rate[counter] <- (counter - 1) / proposals
+      # Tune towards 30% acceptance rate by adjusting jump size
+      sigma_scale[counter + 1] <- dplyr::case_when(
+        acceptance_rate[counter] > 0.4 ~ sigma_scale[counter] * (1 + adapt_rate),
+        acceptance_rate[counter] < 0.2 ~ sigma_scale[counter] * (1 - adapt_rate),
+        TRUE ~ sigma_scale[counter]
+      )
+      # Increment counter
+      counter <- counter + 1
+      setTxtProgressBar(pb, counter)
     }
   }
-  guesses[(warmup+1):chain_length,]
+  # Return results
+  list(
+    warmup = ifelse(warmup == 0, numeric(), guesses[1:warmup,]),
+    draws = guesses[(warmup+1):chain_length,],
+    acceptance_rate = acceptance_rate,
+    sigma_scale = sigma_scale
+  )
 }
 
-chain <- sample_mcmc(10000, start_values, 1000)
-
-colMeans(chain[-c(1:500),])
-apply(chain[-c(1:500), ], 2, median)
-
-for(i in seq_len(ncol(chain))) {
-  plot(chain[, i], type = 'l', main = colnames(chain)[i])
-}
-for(i in seq_len(ncol(chain))) {
-  plot(density(chain[, i]), main = colnames(chain)[i])
-}
-
-
-
-
-
-
-library(BayesianTools)
-point_priors <- c(
+init_values <- c(
   MPET = 1,
   MP = 1.5,
   MM = 1,
@@ -155,100 +167,70 @@ point_priors <- c(
   phiM = 0.9,
   phiP = 0.5
 )
-b_setup <- createBayesianSetup(
-  ll_function,
-  prior = createUniformPrior(
-    lower = c(
-      MPET = 0, 
-      MP = 0, 
-      MM = 0, 
-      MQ = 0, 
-      minESY = 0, 
-      phiM = 0, 
-      phiP = 0
-    ),
-    upper = c(
-      MPET = 10,
-      MP = 10,
-      MM = 10,
-      MQ = 1-.Machine$double.neg.eps,
-      minESY = 1,
-      phiM = 1-.Machine$double.neg.eps,
-      phiP = 1-.Machine$double.neg.eps
-    ),
-    best = point_priors
+
+chain <- sample_mcmc(200, init_values, 0, 0.001)
+
+colMeans(chain$draws)
+apply(chain$draws, 2, median)
+
+par(mfrow = c(4, 2))
+for(i in seq_len(ncol(chain$draws))) {
+  plot(chain$draws[, i], type = 'l', main = colnames(chain$draws)[i])
+}
+
+for(i in seq_len(ncol(chain$draws))) {
+  plot(density(chain$draws[, i]), main = colnames(chain$draws)[i])
+}
+par(mfrow = c(1, 1))
+pairs(chain$draws)
+
+plot(chain$acceptance_rate, type = 'l')
+plot(chain$sigma_scale, type = 'l')
+
+future::plan(future::multicore, workers = 3)
+chains <- furrr::future_map(
+  list(
+    chain_1 = init_values, # set_names(runif(length(start_values)), names(start_values)),
+    chain_2 = init_values, # set_names(runif(length(start_values)), names(start_values)),
+    chain_3 = init_values # set_names(runif(length(start_values)), names(start_values))
   ),
-  names = names(point_priors)
-)
-
-runMCMC(b_setup, sampler = "Metropolis")
-
-
-
-control_population_optim <-
-  optim(
-    par = list(
-      MPET = 1,
-      MP = 1.5,
-      MM = 1,
-      MQ = 0.5,
-      minESY = 1,
-      phiM = 0.9,
-      phiP = 0.5
+  ~ sample_mcmc(
+      chain_length = 500,
+      start_values = .x,
+      warmup = 100,
+      adapt_rate = 0.001
     ),
-    control = list(
-      fnscale = 1,
-      maxit = 2000
-    ),
-    fn =
-      function(params) {
-
-        split_data <- split(
-          training_data[["control"]],
-          f = training_data[["control"]]$site
-        )
-
-        # future::plan(future::multicore, workers = 4)
-        sum(
-          purrr::map_dbl(
-          .x = split_data,
-          .f = ~{
-            site_params <-
-              c(params, list(maxWL = unique(.x$max_wl), funESY = .x$funESY[[1]]))
-
-            wl_hat <-
-              wetland_model(data = .x, site_params)$wl_hat
-
-            resids <-
-              (wl_hat - .x$wl_initial_cm)
-
-            # Initial weights are equal
-            init_weight <- 1 / sum(is.na(.x$wl_initial_cm))
-
-            # Weights increase asymmetrically as water levels drop
-            wghts <- pmax(init_weight, init_weight * (site_params$maxWL - .x$wl_initial_cm))
-
-            # Weights are squared
-            wghts <- wghts^2
-            wghts[is.na(wghts)] <- init_weight^2
-
-            obs_se <-
-              sd(diff(.x$wl_initial_cm), na.rm = TRUE) / sum(!is.na(.x$wl_initial_cm))
-
-            -sum(
-              wghts[!is.na(resids)] * dnorm(resids[!is.na(resids)],
-                mean = 0,
-                sd = obs_se,
-                log = TRUE
-              )
-              )
-          }
-        )
-        )
-        # future::plan(future::sequential)
-
-      }
+  .options = furrr::furrr_options(seed = TRUE)
 )
+future::plan(future::sequential)
+
+saveRDS(chains, "~/phd/climate_response/tmp/chains.rds")
+
+map(chains, ~colMeans(.x$draws))
+map(chains, ~apply(.x$draws, 2, median))
+draws <- map_dfr(chains, ~as.data.table(.x$draws)[, .draw := 1:nrow(.SD)], .id = "chain") %>%
+  tidyr::pivot_longer(cols = -c(chain, .draw)) %>%
+  as.data.table()
+
+ggplot(draws) +
+  aes(x = .draw, y = value, color = chain) +
+  geom_line() +
+  facet_wrap(~name, scales = "free")
+
+# 7998 is the largest number less than 8000 and divisible by 3
+sample_frame <-
+  data.table(
+    chain = rep(c("chain_1", "chain_2", "chain_3"), each = 7998/3),
+    .draw = sample(8000, size = 7998)
+  )
+
+thinned <- draws[sample_frame, on = c("chain", ".draw")]
+ggplot(thinned) +
+  aes(x = .draw, y = value, color = chain) +
+  geom_line() +
+  facet_wrap(~name, scales = "free")
+
+
 
 training_data[["control"]][,
   population_wl_hat :=
