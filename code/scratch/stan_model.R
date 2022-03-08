@@ -1,16 +1,7 @@
 ####### WORK WITH ONLY TREATED SITES TO AVOID UNEVEN GROUP SIZES
 
-# It looks like the step size is being set much smaller on the chains that end
-# up not mixing. I think the issue is that the warm-up period is leading to
-# poor step sizes for some of the chains. Need to determine how to either set
-# some minimum, or explore how init values relate to final step size. It may be
-# that init values to close to the final parameters are leading to small step
-# sizes? I'd have to check to be sure
-
-# Getting multi-modal estimates of invididual sigma values. Likely have to
-# contrain sigma (not desirable) or update the weights (better path). It's still
-# too high of a likelihood to fit a mean model and just have terrible errors any
-# time the water level is not hovering around max
+# Try to allow rain on days even when PET > P, perhaps it will give more days
+# for fitting
 
 source("code/load_project.R")
 tar_load(training_data)
@@ -28,7 +19,7 @@ library(bayesplot)
 
 # Weights increase asymmetrically as water levels drop
 create_weights <- function(x, scale) {
-  init_weight <- 1 / 365
+  init_weight <- 1 / sum(!is.na(x))
   wghts <- pmax(init_weight, init_weight * (scale - x))
   # Weights are squared
   wghts <- wghts^2
@@ -157,13 +148,13 @@ draws <- map(
 
 par(mfrow = c(2,2)); iwalk(draws, ~plot(log10(.x$stepsize__), type = "l", main = .y)); par(mfrow = c(1,1))
 
-test_site <- "009"
+test_site <- "053"
 dat <- con_dat[site == test_site]
 new_params <- list(
-  MPET = 0.958,
-  MP = 0.854,
-  MM = 0.832,
-  MQ = 0.644,
+  MPET = 1.07,
+  MP = 1.22,
+  MM = 1.06,
+  MQ = 0.674,
   minESY = esy_functions[test_site][["min_esy"]],
   phiM = 0,
   phiP =0,
