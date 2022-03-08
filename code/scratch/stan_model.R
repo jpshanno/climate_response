@@ -157,34 +157,6 @@ draws <- map(
 
 par(mfrow = c(2,2)); iwalk(draws, ~plot(log10(.x$stepsize__), type = "l", main = .y)); par(mfrow = c(1,1))
 
-# Hierarchical Model
-mod_hc <- cmdstan_model(
-  stan_file = "code/scratch/wetland_model_hierarchical.stan",
-  include_paths = file.path(getwd(), "code/scratch/"),
-  force_recompile = TRUE
-  )
-fit_hc <-  mod_hc$sample(
-  data = stan_data,
-  seed = 1234567,
-  chains = 4,
-  parallel_chains = 4,
-  adapt_delta = 0.9,
-  max_treedepth = 10,
-  iter_warmup = 100,
-  iter_sampling = 100,
-  refresh = 50
-)
-
-fit_hc$summary()
-mcmc_hist(fit_hc$draws(c("bPET", "bRain", "bMelt", "bQ")))
-
-fit_mcmc_hc <- as_mcmc.list(fit_hc)
-
-# color_scheme_set("mix-blue-pink")
-mcmc_trace(fit_mcmc_hc,  pars = c("bPETPop", "bRainPop", "bMeltPop", "bQPop"), n_warmup = 1000,
-                facet_args = list(nrow = 2, labeller = label_parsed))
-
-
 test_site <- "009"
 dat <- con_dat[site == test_site]
 new_params <- list(
