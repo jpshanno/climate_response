@@ -33,7 +33,6 @@ create_weights <- function(x, scale) {
   # Weights are squared
   wghts <- wghts^2
   wghts[is.na(x)] <- 0
-  # Weights are not scaled to 1, messes with test fits
   wghts <- wghts / sum(wghts)
   assertthat::assert_that(assertthat::noNA(wghts))
   wghts
@@ -186,13 +185,13 @@ mcmc_trace(fit_mcmc_hc,  pars = c("bPETPop", "bRainPop", "bMeltPop", "bQPop"), n
                 facet_args = list(nrow = 2, labeller = label_parsed))
 
 
-test_site <- "151"
+test_site <- "009"
 dat <- con_dat[site == test_site]
 new_params <- list(
-  MPET = 0.637,
-  MP = 0.384,
-  MM = 0.868,
-  MQ = 0.579,
+  MPET = 0.958,
+  MP = 0.854,
+  MM = 0.832,
+  MQ = 0.644,
   minESY = esy_functions[test_site][["min_esy"]],
   phiM = 0,
   phiP =0,
@@ -202,3 +201,4 @@ new_params <- list(
 test <- wetland_model(dat, new_params)
 plot(dat$wl_initial_cm, type = "l")
 lines(test$wl_hat, col = 'red', lty = "dashed")
+
