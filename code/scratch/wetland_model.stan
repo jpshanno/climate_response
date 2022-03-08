@@ -85,13 +85,14 @@ data {
    matrix[K,D] y; // PET
    matrix[K,4] esyParams; // minESY, esyA, esyB, esyC
    vector[K] maxWL;
-   vector[K] sigma; // SD of daily water level change by site
+   vector[K] obs_sigma; // mean of daily water level change by site
 }
 parameters {
    real<lower = 0, upper = 2> bPET;
    real<lower = 0, upper = 2> bRain;
    real<lower = 0, upper = 2> bMelt;
    real<lower = 0, upper = 2> bQ;
+   real<lower = 0> sigma;
    // vector<lower = 0, upper = 2>[4] params;
    // cholesky_factor_corr[4] Sigma;
 }
@@ -105,6 +106,7 @@ model {
    target += normal_lpdf(bMelt | 1, 0.1);
    // bQ ~ normal(0.5, 0.25);
    target += normal_lpdf(bQ | 0.5, 0.05);
+   target += normal_lpdf(sigma | obs_sigma, obs_sigma / 4);
    // sigma ~ std_normal();
 
    // Sigma ~ lkj_corr_cholesky(0.5);
@@ -121,7 +123,7 @@ model {
    for(k in 1:K) {
       yHat[k] = wetlandModel(D, maxWL[k], y[k], melt[k], bMelt, pet[k], bPET, rain[k], bRain, bQ, esyParams[k,1], esyParams[k,2], esyParams[k,3], esyParams[k,4]);
       for(i in 1:D){
-         target +=  normal_lpdf(y[k,i] | yHat[k,i], sigma[k]) * wghts[k,i];
+         target +=  normal_lpdf(y[k,i] | yHat[k,i], sigma) * wghts[k,i];
       }
    }
 }

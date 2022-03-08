@@ -34,6 +34,7 @@ create_weights <- function(x, scale) {
   wghts <- wghts^2
   wghts[is.na(x)] <- 0
   # Weights are not scaled to 1, messes with test fits
+  wghts <- wghts / sum(wghts)
   assertthat::assert_that(assertthat::noNA(wghts))
   wghts
 }
@@ -55,14 +56,14 @@ con_dat[, filled_wl := nafill(wl_initial_cm ,"const", -9999)]
 # esy_functions[sort(unique(con_dat$site))]$min_esy
 esy_params <- matrix(
   c(
-    0.9440797, 9.68796681237216, 0.963832093292945, 0.011490387703557,
-    1.2087133, 9.6930777345254, 2.10532835889272, 0.0157893963100476,
-    1.1956961, 9.35343568266112, 1.62678535681258, 0.00984811084065675,
-    1.1942750, 8.85796577611301, 2.0742188380092, 0.0148425995465377,
-    1.3711603, 9.79628207399244, 1.31799862570157, 0.00835140512795191,
-    1.4753461, 9.92020216902697, 2.40233114598982, 0.0103268508715977,
-    1.0764391, 9.56079966326987, 1.17368355521875, 0.00762101076778987,
-    0.2738756, 9.64372934079638, 2.0767145808409, 0.0127361070535151
+      0.9440797, 9.68796681237216, 0.963832093292945, 0.011490387703557
+    , 1.2087133, 9.6930777345254, 2.10532835889272, 0.0157893963100476
+    , 1.1956961, 9.35343568266112, 1.62678535681258, 0.00984811084065675
+    , 1.1942750, 8.85796577611301, 2.0742188380092, 0.0148425995465377
+    , 1.3711603, 9.79628207399244, 1.31799862570157, 0.00835140512795191
+    , 1.4753461, 9.92020216902697, 2.40233114598982, 0.0103268508715977
+    , 1.0764391, 9.56079966326987, 1.17368355521875, 0.00762101076778987
+    , 0.2738756, 9.64372934079638, 2.0767145808409, 0.0127361070535151
   ),
   byrow = TRUE,
   ncol = 4
@@ -80,7 +81,7 @@ stan_data <- list(
   maxWL = create_data_matrix(con_dat, "max_wl")[, 1],
   y = create_data_matrix(con_dat, "filled_wl"),
   esyParams = esy_params,
-  sigma = obs_sigma
+  obs_sigma = obs_sigma
 )
 
 init_values <- function(pooling) {
@@ -115,12 +116,14 @@ fit <- mod$sample(
   seed = 1234567,
   chains = 4,
   parallel_chains = 4,
-  adapt_delta = 0.90,
+  adapt_delta = 0.70,
+  # step_size = 0.0223,
   # max_treedepth = 10,
   iter_warmup = 500,
-  iter_sampling = 500,
+  iter_sampling = 100,
   refresh = 50,
-  save_warmup = TRUE#,
+  save_warmup = TRUE,
+  init = 0
   # init = init_values("full")
 )
 
@@ -134,7 +137,7 @@ fit <- mod$sample(
 #   file.copy(file.path("/Users/jpshanno/phd/climate_response/tmp", basename(.)))
 
 fit$summary()
-mcmc_hist(fit$draws(c("bPET", "bRain", "bMelt", "bQ"), inc_warmup = TRUE))
+mcmc_hist(fit$draws(c("bPET", "bRain", "bMelt", "bQ", "sigma"), inc_warmup = TRUE))
 
 matrix(
   c(
@@ -154,7 +157,7 @@ fit_mcmc <- as_mcmc.list(fit)
 # color_scheme_set("mix-blue-pink")
 mcmc_trace(
   fit_mcmc,
-  pars = c("params[1]", "params[2]", "params[3]", "params[4]"),
+  pars = c("bPET", "bRain", "bMelt", "bQ"),
   n_warmup = 500,
   facet_args = list(nrow = 2, labeller = label_parsed)
   )
@@ -164,13 +167,14 @@ draws <- map(
   ~list.files(
     "/var/folders/h_/8p62bvmn4b73006tnwkgfrlc0000gn/T/",
     recursive = TRUE,
-    pattern = "wetland_model-202203032325",
+    pattern = "wetland_model-202203072326",
     full.names=TRUE
   )[.x] %>%
-  readr::read_csv(skip = 45)
+  readr::read_csv(skip = 45) %>%
+  dplyr::filter(dplyr::if_all(.fn = ~!is.na(.x)))
 )
 
-par(mfrow = c(2,2)); walk(draws, ~plot(log10(.x$stepsize__), type = "l")); par(mfrow = c(1,1))
+par(mfrow = c(2,2)); iwalk(draws, ~plot(log10(.x$stepsize__), type = "l", main = .y)); par(mfrow = c(1,1))
 
 # Hierarchical Model
 mod_hc <- cmdstan_model(
