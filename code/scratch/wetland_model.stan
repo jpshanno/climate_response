@@ -43,17 +43,15 @@ functions {
             // PET or P times Esy
             // Use net input to determine if water level increases or decreases
             // Assuming AET is negligible on days where P >= PET
-            if((rain[t] + pet[t]) <= 0){
             // Water level drawdown = PET2, if P2 <= PET2 then it can be assumed to be
             // less than interception (not necessarily true, but works as a
             // simplifying assumption)
             petHat[t] = bPET * pet[t] * gradient[t];
                   // pet_fun(wl_hat[t-1], maxWL, future.forest.change) * (MPET * PET[t]) * gradient[t]
             wlHat[t] = wlHat[t-1] + petHat[t];
-            } else {
             pHat[t] = bRain * rain[t] * gradient[t];
             wlHat[t] = wlHat[t-1] + pHat[t];
-            }
+            
 
             // Snowmelt
             mHat[t] = bMelt * melt[t] * gradient[t];
