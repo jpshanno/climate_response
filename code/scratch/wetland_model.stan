@@ -106,7 +106,7 @@ model {
    target += normal_lpdf(bMelt | 1, 0.25);
    // bQ ~ normal(0.5, 0.25);
    target += normal_lpdf(bQ | 0.6, 0.1);
-   target += normal_lpdf(sigma | obs_sigma, obs_sigma / 4);
+   target += std_normal_lpdf(sigma);
    // sigma ~ std_normal();
 
    // Sigma ~ lkj_corr_cholesky(0.5);
