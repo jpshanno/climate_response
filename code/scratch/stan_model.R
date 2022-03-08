@@ -106,8 +106,8 @@ fit <- mod$sample(
   chains = 4,
   parallel_chains = 4,
   adapt_delta = 0.70,
-  iter_warmup = 500,
-  iter_sampling = 100,
+  iter_warmup = 1000,
+  iter_sampling = 1000,
   refresh = 50,
   save_warmup = TRUE,
   init = 0
