@@ -204,19 +204,19 @@ mcmc_trace(fit_mcmc_hc,  pars = c("bPETPop", "bRainPop", "bMeltPop", "bQPop"), n
                 facet_args = list(nrow = 2, labeller = label_parsed))
 
 
-
+test_site <- "151"
+dat <- con_dat[site == test_site]
 new_params <- list(
-  MPET = 1.36,
-  MP = 1.48,
-  MM = 1.04,
-  MQ = 0.516,
-  minESY = esy_functions[site][["min_esy"]],
+  MPET = 1.56,
+  MP = 1.83,
+  MM = 2,
+  MQ = 0.61,
+  minESY = esy_functions[test_site][["min_esy"]],
   phiM = 0,
   phiP =0,
   maxWL = unique(dat$max_wl),
-  funESY = esy_functions[site, pred_fun]
+  funESY = esy_functions[test_site, pred_fun]
 )
 test <- wetland_model(dat, new_params)
-test
 plot(dat$wl_initial_cm, type = "l")
 lines(test$wl_hat, col = 'red', lty = "dashed")
