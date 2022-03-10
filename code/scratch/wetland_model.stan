@@ -91,20 +91,36 @@ parameters {
    real<lower = 0> bMelt;
    real<lower = 0> bQ;
    real<lower = 0> sigma;
+   matrix<lower = 0>[K, 4] tau_u;
+   matrix[K, 4] z_u;
    // vector<lower = 0, upper = 2>[4] params;
    // cholesky_factor_corr[4] Sigma;
 }
+transformed parameters {
+   // hierarchical implementation taken from:
+   // https://vasishth.github.io/bayescogsci/book/sec-hierstan.html
+   matrix[K, 4] u;
+   for(k in 1:K){
+      for(p in 1:4) {
+         u[k, p] = z_u[k, p] * tau_u[k, p];
+      }
+   }
+}
 model {
    matrix[K,D] yHat;
-   // bPET ~ normal(1, 0.5);
+   // Population Estimates
    target += normal_lpdf(bPET | 1, 1);
-   // bRain ~ normal(1.5, 0.75);
    target += normal_lpdf(bRain | 2, 1);
-   // bMelt ~ normal(1, 0.5);
    target += normal_lpdf(bMelt | 1, 1);
-   // bQ ~ normal(0.5, 0.25);
    target += normal_lpdf(bQ | 0.6, 0.25);
    target += std_normal_lpdf(sigma);
+
+   // Group Effects
+   for(p in 1:4) {
+      target += std_normal_lpdf(tau_u[, p]);
+   }
+   target += normal_lpdf(to_vector(z_u) | 0, 0.25);
+
    // sigma ~ std_normal();
 
    // Sigma ~ lkj_corr_cholesky(0.5);
@@ -119,7 +135,7 @@ model {
    // bQ = params[4];
 
    for(k in 1:K) {
-      yHat[k] = wetlandModel(D, maxWL[k], y[k], melt[k], bMelt, pet[k], bPET, rain[k], bRain, bQ, esyParams[k,1], esyParams[k,2], esyParams[k,3], esyParams[k,4]);
+      yHat[k] = wetlandModel(D, maxWL[k], y[k], melt[k], bMelt + u[k,1], pet[k], bPET + u[k,2], rain[k], bRain + u[k,3], bQ + u[k,4], esyParams[k,1], esyParams[k,2], esyParams[k,3], esyParams[k,4]);
       for(i in 1:D){
          target +=  normal_lpdf(y[k,i] | yHat[k,i], sigma) * wghts[k,i];
       }
