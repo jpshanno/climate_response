@@ -1,7 +1,7 @@
 ####### WORK WITH ONLY TREATED SITES TO AVOID UNEVEN GROUP SIZES
 
-# Try to allow rain on days even when PET > P, perhaps it will give more days
-# for fitting
+# TODO: adjust weights to weight more heavily for days above max_wl
+# TODO: set lower values to 1 not 0
 
 source("code/load_project.R")
 tar_load(training_data)
@@ -19,8 +19,8 @@ library(bayesplot)
 
 # Weights increase asymmetrically as water levels drop
 create_weights <- function(x, scale) {
-  init_weight <- 1 / sum(!is.na(x))
-  wghts <- pmax(init_weight, init_weight * (scale - x))
+  init_weight <- 1 / 365
+  wghts <- pmax(init_weight, init_weight * abs(scale - x))
   # Weights are squared
   wghts <- wghts^2
   wghts[is.na(x)] <- 0
@@ -109,9 +109,10 @@ fit <- mod$sample(
   seed = 1234567,
   chains = 4,
   parallel_chains = 4,
-  adapt_delta = 0.95,
-  iter_warmup = 100,
-  iter_sampling = 100,
+  adapt_delta = 0.98,
+  max_treedepth = 11,
+  iter_warmup = 1000,
+  iter_sampling = 1000,
   refresh = 50,
   save_warmup = TRUE,
   init = init_values
@@ -127,15 +128,14 @@ fit <- mod$sample(
 #   file.copy(file.path("/Users/jpshanno/phd/climate_response/tmp", basename(.)))
 
 fit$summary() %>% dplyr::mutate(dplyr::across(.cols = c(mean:q95), .fn = log)) %>% print(n = nrow(.))
-mcmc_hist(fit$draws(c("bPET", "bRain", "bMelt", "bQ", "sigma"), inc_warmup = TRUE))
+mcmc_hist(fit$draws(c("bPop")), inc_warmup = TRUE)
 
 fit_mcmc <- as_mcmc.list(fit)
 # color_scheme_set("mix-blue-pink")
 mcmc_trace(
   fit_mcmc,
-  pars = c("bPET", "bRain", "bMelt", "bQ"),
+  pars = c("bPop[1]"),
   n_warmup = 500,
-  facet_args = list(nrow = 2, labeller = label_parsed)
   )
 
 draws <- map(
