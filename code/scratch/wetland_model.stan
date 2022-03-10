@@ -87,7 +87,7 @@ data {
 }
 parameters {
    vector<lower = 0>[4] bPop;
-   matrix<lower = 0>[K, 4] bGroup;
+   matrix[K, 4] bGroup;
    real<lower = 0> sigma;
    vector<lower = 0>[4] tau;
 }
