@@ -40,23 +40,27 @@ create_data_matrix <- function(data, var) {
   res
 }
 
-init_values <- function(pooling) {
-  set.seed(8675309)
-  generate_values <- function(pooling) {
-    x <- list(
-      bPET = runif(1, 0.9, 1.1),
-      bRain = runif(1, 0.9, 1.1),
-      bMelt = runif(1, 0.9, 1.1),
-      bQ = runif(1, 0.4, 0.7)
-    )
-    # x$sigma <- switch(pooling,
-    #   "full" = 0.1,
-    #   "partial" = rep(0.01, 8),
-    #   "none" = rep(0.01, 8)
-    # )
-    x
+generate_init_params <- function(){
+     c(
+        runif(1, 0.9, 1.1),
+        runif(1, 0.9, 1.1),
+        runif(1, 0.9, 1.1),
+        runif(1, 0.4, 0.7)
+      )
   }
-  replicate(generate_values(pooling), n = 4, simplify = FALSE)
+
+generate_values <- function() {
+    list(
+      bPop = generate_init_params(),
+      bGroup = t(replicate(n = 8, generate_init_params())),
+      sigma = 1,
+      tau = runif(4, 0.1, 0.3)
+    )
+  }
+
+init_values <- function(chain_id) {
+  set.seed(8675309 + chain_id)
+  generate_values()
 }
 
 con_dat[, wghts := create_weights(wl_initial_cm, max_wl), by = .(site)]
@@ -105,12 +109,12 @@ fit <- mod$sample(
   seed = 1234567,
   chains = 4,
   parallel_chains = 4,
-  adapt_delta = 0.70,
-  iter_warmup = 1000,
-  iter_sampling = 1000,
+  adapt_delta = 0.95,
+  iter_warmup = 100,
+  iter_sampling = 100,
   refresh = 50,
   save_warmup = TRUE,
-  init = 0
+  init = init_values
 )
 
 # saveRDS(fit, "/Users/jpshanno/phd/climate_response/tmp/fit_20220304.rds")
@@ -122,7 +126,7 @@ fit <- mod$sample(
 #   ) %>%
 #   file.copy(file.path("/Users/jpshanno/phd/climate_response/tmp", basename(.)))
 
-fit$summary()
+fit$summary() %>% print(n = nrow(.))
 mcmc_hist(fit$draws(c("bPET", "bRain", "bMelt", "bQ", "sigma"), inc_warmup = TRUE))
 
 fit_mcmc <- as_mcmc.list(fit)
