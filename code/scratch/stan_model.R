@@ -126,7 +126,7 @@ fit <- mod$sample(
 #   ) %>%
 #   file.copy(file.path("/Users/jpshanno/phd/climate_response/tmp", basename(.)))
 
-fit$summary() %>% print(n = nrow(.))
+fit$summary() %>% dplyr::mutate(dplyr::across(.cols = c(mean:q95), .fn = log)) %>% print(n = nrow(.))
 mcmc_hist(fit$draws(c("bPET", "bRain", "bMelt", "bQ", "sigma"), inc_warmup = TRUE))
 
 fit_mcmc <- as_mcmc.list(fit)
@@ -152,13 +152,14 @@ draws <- map(
 
 par(mfrow = c(2,2)); iwalk(draws, ~plot(log10(.x$stepsize__), type = "l", main = .y)); par(mfrow = c(1,1))
 
+fit$summary() %>% dplyr::filter(grepl("\\[7,", .$variable)) %>% dplyr::mutate(dplyr::across(.cols = c(mean:q95), .fns = log))
 test_site <- "151"
 dat <- testing_data[site == test_site][water_year == min(water_year)]
 new_params <- list(
-  MPET = 1.07,
-  MP = 1.22,
-  MM = 1.06,
-  MQ = 0.674,
+  MPET = 1.49,
+  MP = 2.43,
+  MM = 0.802,
+  MQ = 2.08,
   minESY = esy_functions[test_site][["min_esy"]],
   phiM = 0,
   phiP =0,
