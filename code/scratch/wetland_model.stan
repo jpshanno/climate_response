@@ -86,56 +86,31 @@ data {
    vector[K] obs_sigma; // mean of daily water level change by site
 }
 parameters {
-   real<lower = 0> bPET;
-   real<lower = 0> bRain;
-   real<lower = 0> bMelt;
-   real<lower = 0> bQ;
+   vector<lower = 0>[4] bPop;
+   matrix[K, 4] bGroup;
    real<lower = 0> sigma;
-   matrix<lower = 0>[K, 4] tau_u;
-   matrix[K, 4] z_u;
-   // vector<lower = 0, upper = 2>[4] params;
-   // cholesky_factor_corr[4] Sigma;
-}
-transformed parameters {
-   // hierarchical implementation taken from:
-   // https://vasishth.github.io/bayescogsci/book/sec-hierstan.html
-   matrix[K, 4] u;
-   for(k in 1:K){
-      for(p in 1:4) {
-         u[k, p] = z_u[k, p] * tau_u[k, p];
-      }
-   }
+   vector<lower = 0>[4] tau;
 }
 model {
    matrix[K,D] yHat;
+
    // Population Estimates
-   target += normal_lpdf(bPET | 1, 1);
-   target += normal_lpdf(bRain | 2, 1);
-   target += normal_lpdf(bMelt | 1, 1);
-   target += normal_lpdf(bQ | 0.6, 0.25);
+   target += normal_lpdf(bPop[1] | 1, 1);
+   target += normal_lpdf(bPop[2] | 2, 1);
+   target += normal_lpdf(bPop[3] | 1, 1);
+   target += normal_lpdf(bPop[4] | 0.6, 0.25);
    target += std_normal_lpdf(sigma);
 
    // Group Effects
    for(p in 1:4) {
-      target += std_normal_lpdf(tau_u[, p]);
+      target += normal_lpdf(tau[p] | 0, 0.5);
    }
-   target += normal_lpdf(to_vector(z_u) | 0, 0.25);
-
-   // sigma ~ std_normal();
-
-   // Sigma ~ lkj_corr_cholesky(0.5);
-   // params ~ multi_normal_cholesky([1, 1.5, 1, 0.5], Sigma);
-   // real bPET;
-   // real bRain;
-   // real bMelt;
-   // real bQ;
-   // bPET = params[1];
-   // bRain = params[2];
-   // bMelt = params[3];
-   // bQ = params[4];
 
    for(k in 1:K) {
-      yHat[k] = wetlandModel(D, maxWL[k], y[k], melt[k], bMelt + u[k,1], pet[k], bPET + u[k,2], rain[k], bRain + u[k,3], bQ + u[k,4], esyParams[k,1], esyParams[k,2], esyParams[k,3], esyParams[k,4]);
+      for(p in 1:4) {
+         target += lognormal_lpdf(bGroup[k, p] | bPop[p], tau[p]);
+      }
+      yHat[k] = wetlandModel(D, maxWL[k], y[k], melt[k], bGroup[k, 1], pet[k], bGroup[k, 2], rain[k], bGroup[k, 3], bGroup[k, 4], esyParams[k,1], esyParams[k,2], esyParams[k,3], esyParams[k,4]);
       for(i in 1:D){
          target +=  normal_lpdf(y[k,i] | yHat[k,i], sigma) * wghts[k,i];
       }
