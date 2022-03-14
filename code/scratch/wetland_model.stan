@@ -86,10 +86,10 @@ data {
    vector[K] obs_sigma; // mean of daily water level change by site
 }
 parameters {
-   vector<lower = 0>[4] bPop;
-   matrix[K, 4] bGroup;
+   row_vector<lower = 0>[4] bPop;
+   row_vector<lower = 0>[4] tau;
+   matrix<offset = rep_matrix(bPop, K), multiplier = rep_matrix(tau, K)>[K, 4] bGroup;
    real<lower = 0> sigma;
-   vector<lower = 0>[4] tau;
 }
 model {
    matrix[K,D] yHat;
