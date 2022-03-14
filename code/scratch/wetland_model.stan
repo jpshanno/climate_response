@@ -95,10 +95,10 @@ model {
    matrix[K,D] yHat;
 
    // Population Estimates
-   target += lognormal_lpdf(bPop[1] | 1, 1);
-   target += lognormal_lpdf(bPop[2] | 2, 1);
-   target += lognormal_lpdf(bPop[3] | 1, 1);
-   target += lognormal_lpdf(bPop[4] | 0.6, 0.25);
+   target += gamma_lpdf(bPop[1] | 10, 10);
+   target += gamma_lpdf(bPop[2] | 10, 10);
+   target += gamma_lpdf(bPop[3] | 10, 10);
+   target += gamma_lpdf(bPop[4] | 5, 10);
    target += std_normal_lpdf(sigma);
 
    // Group Effects
