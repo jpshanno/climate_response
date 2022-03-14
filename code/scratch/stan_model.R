@@ -97,6 +97,19 @@ stan_data <- list(
   obs_sigma = obs_sigma
 )
 
+# Priors -----------------------------------------------------------------------
+dist <- distributional::generate(distributional::dist_gamma(10, 20), 10000)[[1]]
+plot(density(dist))
+ggdist::mean_hdci(dist, .width = 0.9)
+ggdist::median_hdci(dist, .width = 0.9)
+
+
+gdist <- distributional::generate(distributional::dist_normal(0, 0.05), 10000)[[1]]
+plot(density(gdist))
+ggdist::mean_hdci(gdist, .width = 0.9)
+ggdist::median_hdci(gdist, .width = 0.9)
+
+
 mod <- cmdstan_model(
   stan_file = "code/scratch/wetland_model.stan",
   dir = "/tmp",
