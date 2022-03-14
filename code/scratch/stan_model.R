@@ -163,21 +163,50 @@ draws <- map(
 
 par(mfrow = c(2,2)); iwalk(draws, ~plot(log10(.x$stepsize__), type = "l", main = .y)); par(mfrow = c(1,1))
 
-fit$summary() %>% dplyr::filter(grepl("\\[7,", .$variable)) %>% dplyr::mutate(dplyr::across(.cols = c(mean:q95), .fns = log))
-test_site <- "151"
-dat <- testing_data[site == test_site][water_year == min(water_year)]
-new_params <- list(
-  MPET = 1.49,
-  MP = 2.43,
-  MM = 0.802,
-  MQ = 2.08,
-  minESY = esy_functions[test_site][["min_esy"]],
-  phiM = 0,
-  phiP =0,
-  maxWL = esy_functions[test_site, max_wl],
-  funESY = esy_functions[test_site, pred_fun]
-)
-test <- wetland_model(dat, new_params)
-plot(dat$wl_initial_cm, type = "l")
-lines(test$wl_hat, col = 'red', lty = "dashed")
 
+plot_test_site <- function(site_id) {
+  idx <- which(c("009", "053", "077", "119", "139", "140", "151", "156") == site_id)
+  test_params <- fit$summary() %>% dplyr::filter(grepl(glue::glue("\\[{idx},"), .$variable)) %>% dplyr::pull(median)
+  print(test_params)
+  test_site <- unique(con_dat$site)[idx]
+  dat <- testing_data[site == test_site][water_year == min(water_year)]
+  new_params <- list(
+    MPET = test_params[1],
+    MP = test_params[2],
+    MM = test_params[3],
+    MQ = test_params[4],
+    minESY = esy_functions[test_site][["min_esy"]],
+    phiM = 0,
+    phiP =0,
+    maxWL = esy_functions[test_site, max_wl],
+    funESY = esy_functions[test_site, pred_fun]
+  )
+  test <- wetland_model(dat, new_params)
+  plot(dat$wl_initial_cm, type = "l")
+  lines(test$wl_hat, col = 'red', lty = "dashed")
+}
+plot_test_site("151")
+plot_test_site("077")
+
+plot_train_site <- function(site_id) {
+  idx <- which(c("009", "053", "077", "119", "139", "140", "151", "156") == site_id)
+  test_params <- fit$summary() %>% dplyr::filter(grepl(glue::glue("\\[{idx},"), .$variable)) %>% dplyr::pull(median)
+  print(test_params)
+  test_site <- unique(con_dat$site)[idx]
+  dat <- con_dat[site == test_site][water_year == min(water_year)]
+  new_params <- list(
+    MPET = test_params[1],
+    MP = test_params[2],
+    MM = test_params[3],
+    MQ = test_params[4],
+    minESY = esy_functions[test_site][["min_esy"]],
+    phiM = 0,
+    phiP =0,
+    maxWL = esy_functions[test_site, max_wl],
+    funESY = esy_functions[test_site, pred_fun]
+  )
+  test <- wetland_model(dat, new_params)
+  plot(dat$wl_initial_cm, type = "l")
+  lines(test$wl_hat, col = 'red', lty = "dashed")
+}
+plot_train_site("151")
