@@ -108,7 +108,7 @@ model {
 
    for(k in 1:K) {
       for(p in 1:4) {
-         target += lognormal_lpdf(bGroup[k, p] | bPop[p], tau[p]);
+         target += normal_lpdf(bGroup[k, p] | bPop[p], tau[p]);
       }
       yHat[k] = wetlandModel(D, maxWL[k], y[k], melt[k], bGroup[k, 1], pet[k], bGroup[k, 2], rain[k], bGroup[k, 3], bGroup[k, 4], esyParams[k,1], esyParams[k,2], esyParams[k,3], esyParams[k,4]);
       for(i in 1:D){
