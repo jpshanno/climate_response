@@ -113,7 +113,6 @@ ggdist::median_hdci(gdist, .width = 0.9)
 mod <- cmdstan_model(
   stan_file = "code/scratch/wetland_model.stan",
   dir = "/tmp",
-  include_paths = file.path(getwd(), "code/scratch/"),
   force_recompile = TRUE
   )
 
@@ -122,33 +121,32 @@ fit <- mod$sample(
   seed = 1234567,
   chains = 4,
   parallel_chains = 4,
-  adapt_delta = 0.98,
-  max_treedepth = 11,
+  adapt_delta = 0.8,
+  # max_treedepth = 11,
   iter_warmup = 1000,
   iter_sampling = 1000,
   refresh = 50,
   save_warmup = TRUE,
-  init = init_values
+  init = 0
 )
-
+  
 # saveRDS(fit, "/Users/jpshanno/phd/climate_response/tmp/fit_20220304.rds")
 # list.files(
 #     "/var/folders/h_/8p62bvmn4b73006tnwkgfrlc0000gn/T/",
 #     recursive = TRUE,
-#     pattern = "wetland_model-202203032325",
+#     pattern = "wetland_model-202203132138",
 #     full.names=TRUE
 #   ) %>%
 #   file.copy(file.path("/Users/jpshanno/phd/climate_response/tmp", basename(.)))
 
-fit$summary() %>% dplyr::mutate(dplyr::across(.cols = c(mean:q95), .fn = log)) %>% print(n = nrow(.))
-mcmc_hist(fit$draws(c("bPop")), inc_warmup = TRUE)
+fit$summary() %>% dplyr::select(variable, mean, median, rhat) %>% print(n = nrow(.))
+mcmc_hist(fit$draws(c("bGroup[3,1]", "bGroup[3,2]", "bGroup[3,3]", "bGroup[3,4]")), inc_warmup = TRUE)
 
 fit_mcmc <- as_mcmc.list(fit)
-# color_scheme_set("mix-blue-pink")
+color_scheme_set("mix-blue-pink")
 mcmc_trace(
   fit_mcmc,
-  pars = c("bPop[1]"),
-  n_warmup = 500,
+  pars = glue::glue("bPop[{p}]", p = 1:4)
   )
 
 draws <- map(
