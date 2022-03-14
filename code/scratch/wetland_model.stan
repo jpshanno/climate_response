@@ -103,7 +103,7 @@ model {
 
    // Group Effects
    for(p in 1:4) {
-      target += normal_lpdf(tau[p] | 0, 0.5);
+      target += normal_lpdf(tau[p] | 0, 0.05);
    }
 
    for(k in 1:K) {
