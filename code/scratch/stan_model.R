@@ -1,7 +1,6 @@
 ####### WORK WITH ONLY TREATED SITES TO AVOID UNEVEN GROUP SIZES
 
 # TODO: adjust weights to weight more heavily for days above max_wl
-# TODO: set lower values to 1 not 0
 
 source("code/load_project.R")
 tar_load(training_data)
@@ -40,21 +39,25 @@ create_data_matrix <- function(data, var) {
   res
 }
 
-generate_init_params <- function(){
-     c(
-        runif(1, 0.9, 1.1),
-        runif(1, 0.9, 1.1),
-        runif(1, 0.9, 1.1),
-        runif(1, 0.4, 0.7)
-      )
+generate_init_params <- function() {
+  matrix(
+    c(
+      runif(1, 0.9, 1.1),
+      runif(1, 0.9, 1.1),
+      runif(1, 0.9, 1.1),
+      runif(1, 0.4, 0.7)
+    ),
+    nrow = 1
+  )
   }
 
 generate_values <- function() {
+    init_params <- generate_init_params()
+    init_tau <- matrix(runif(4, 0.01, 0.15), ncol = 4)
     list(
-      bPop = generate_init_params(),
-      bGroup = t(replicate(n = 8, generate_init_params())),
-      sigma = 1,
-      tau = runif(4, 0.1, 0.3)
+      bPop = init_params,
+      tau = init_tau,
+      sigma = 1
     )
   }
 
@@ -121,7 +124,7 @@ fit <- mod$sample(
   seed = 1234567,
   chains = 4,
   parallel_chains = 4,
-  adapt_delta = 0.8,
+  adapt_delta = 0.99,
   # max_treedepth = 11,
   iter_warmup = 1000,
   iter_sampling = 1000,
