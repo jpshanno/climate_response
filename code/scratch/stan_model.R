@@ -20,7 +20,7 @@ library(bayesplot)
 # Weights increase asymmetrically as water levels drop
 create_weights <- function(x, scale) {
   init_weight <- 1 / 365
-  wghts <- pmax(init_weight, init_weight * abs(scale - x))
+  wghts <- pmax(init_weight, init_weight * (scale - x))
   # Weights are squared
   wghts <- wghts^2
   wghts[is.na(x)] <- 0
