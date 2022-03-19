@@ -109,14 +109,14 @@ model {
 
    // Population Estimates
    target += gamma_lpdf(bPop[1] | 10, 10);
-   target += gamma_lpdf(bPop[2] | 15, 10);
-   target += gamma_lpdf(bPop[3] | 15, 10);
+   target += gamma_lpdf(bPop[2] | 11, 10);
+   target += gamma_lpdf(bPop[3] | 11, 10);
    target += gamma_lpdf(bPop[4] | 3, 4);
    target += std_normal_lpdf(sigma);
 
    // Group Effects
    for(p in 1:4) {
-      target += normal_lpdf(tau[p] | 0, 0.01);
+      target += normal_lpdf(tau[p] | 0, 0.05);
    }
 
    for(k in 1:K) {
