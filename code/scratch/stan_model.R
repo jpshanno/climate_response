@@ -1,7 +1,7 @@
 ####### WORK WITH ONLY TREATED SITES TO AVOID UNEVEN GROUP SIZES
 
 # TODO: adjust weights to weight more heavily for days above max_wl
-
+# TODO: get init working
 source("code/load_project.R")
 tar_load(training_data)
 tar_load(testing_data)
@@ -18,10 +18,10 @@ library(bayesplot)
 
 # Weights increase asymmetrically as water levels drop
 create_weights <- function(x, scale) {
-  init_weight <- 1 / 365
+  init_weight <- 1 / !is.na(x)
   wghts <- pmax(init_weight, init_weight * (scale - x))
   # Weights are squared
-  wghts <- wghts^2
+  # wghts <- wghts^2
   wghts[is.na(x)] <- 0
   wghts <- wghts / sum(wghts)
   assertthat::assert_that(assertthat::noNA(wghts))
@@ -42,9 +42,7 @@ create_data_matrix <- function(data, var) {
 generate_init_params <- function() {
   matrix(
     c(
-      runif(1, 0.9, 1.1),
-      runif(1, 0.9, 1.1),
-      runif(1, 0.9, 1.1),
+      runif(3, 0.9, 1.1),
       runif(1, 0.4, 0.7)
     ),
     nrow = 1
@@ -56,6 +54,7 @@ generate_values <- function() {
     init_tau <- matrix(runif(4, 0.01, 0.15), ncol = 4)
     list(
       bPop = init_params,
+      bGroup = replicate(8, generate_init_params()),
       tau = init_tau,
       sigma = 1
     )
@@ -101,7 +100,7 @@ stan_data <- list(
 )
 
 # Priors -----------------------------------------------------------------------
-dist <- distributional::generate(distributional::dist_gamma(10, 20), 10000)[[1]]
+dist <- distributional::generate(distributional::dist_gamma(3, 4), 10000)[[1]]
 plot(density(dist))
 ggdist::mean_hdci(dist, .width = 0.9)
 ggdist::median_hdci(dist, .width = 0.9)
@@ -119,12 +118,14 @@ mod <- cmdstan_model(
   force_recompile = TRUE
   )
 
+# Tightening priors and increasing adapt_delta reduces divergences (see last
+# commit)
 fit <- mod$sample(
   data = stan_data,
   seed = 1234567,
   chains = 4,
   parallel_chains = 4,
-  adapt_delta = 0.99,
+  adapt_delta = 0.8,
   # max_treedepth = 11,
   iter_warmup = 1000,
   iter_sampling = 1000,
@@ -132,15 +133,6 @@ fit <- mod$sample(
   save_warmup = TRUE,
   init = 0
 )
-  
-# saveRDS(fit, "/Users/jpshanno/phd/climate_response/tmp/fit_20220304.rds")
-# list.files(
-#     "/var/folders/h_/8p62bvmn4b73006tnwkgfrlc0000gn/T/",
-#     recursive = TRUE,
-#     pattern = "wetland_model-202203132138",
-#     full.names=TRUE
-#   ) %>%
-#   file.copy(file.path("/Users/jpshanno/phd/climate_response/tmp", basename(.)))
 
 fit$summary() %>% dplyr::select(variable, mean, median, rhat) %>% print(n = nrow(.))
 mcmc_hist(fit$draws(c("bGroup[3,1]", "bGroup[3,2]", "bGroup[3,3]", "bGroup[3,4]")), inc_warmup = TRUE)
@@ -167,12 +159,16 @@ draws <- map(
 par(mfrow = c(2,2)); iwalk(draws, ~plot(log10(.x$stepsize__), type = "l", main = .y)); par(mfrow = c(1,1))
 
 
-plot_test_site <- function(site_id) {
+plot_test_site <- function(site_id, pop_level = FALSE) {
   idx <- which(c("009", "053", "077", "119", "139", "140", "151", "156") == site_id)
-  test_params <- fit$summary() %>% dplyr::filter(grepl(glue::glue("\\[{idx},"), .$variable)) %>% dplyr::pull(median)
-  print(test_params)
+  if(pop_level) {
+    test_params <- fit$summary() %>% dplyr::filter(grepl("bPop\\[[1-4]{1}\\]", .$variable)) %>% dplyr::pull(median)
+  } else {
+    test_params <- fit$summary() %>% dplyr::filter(grepl(glue::glue("\\[{idx},"), .$variable)) %>% dplyr::pull(median)
+  }
+  print(c(site_id, test_params))
   test_site <- unique(con_dat$site)[idx]
-  dat <- testing_data[site == test_site][water_year == min(water_year)]
+  dat <- testing_data[site == test_site][, c(.SD, list(n_records = !is.na(wl_initial_cm))), by = .(water_year)][n_records > 0][water_year == min(water_year)]
   new_params <- list(
     MPET = test_params[1],
     MP = test_params[2],
@@ -185,14 +181,19 @@ plot_test_site <- function(site_id) {
     funESY = esy_functions[test_site, pred_fun]
   )
   test <- wetland_model(dat, new_params)
-  plot(dat$wl_initial_cm, type = "l")
+  plot(dat$wl_initial_cm, type = "l", main = site_id)
   lines(test$wl_hat, col = 'red', lty = "dashed")
 }
-plot_test_site("151")
-plot_test_site("077")
+par(mfrow = c(2, 4)); purrr::walk(unique(con_dat$site), ~plot_test_site(.x)); par(mfrow = c(1,1))
+par(mfrow = c(2, 4)); purrr::walk(unique(con_dat$site), ~plot_test_site(.x, TRUE)); par(mfrow = c(1,1))
 
-plot_train_site <- function(site_id) {
+plot_train_site <- function(site_id, pop_level = FALSE) {
   idx <- which(c("009", "053", "077", "119", "139", "140", "151", "156") == site_id)
+  if(pop_level) {
+    test_params <- fit$summary() %>% dplyr::filter(grepl("bPop\\[[1-4]{1}\\]", .$variable)) %>% dplyr::pull(median)
+  } else {
+    test_params <- fit$summary() %>% dplyr::filter(grepl(glue::glue("\\[{idx},"), .$variable)) %>% dplyr::pull(median)
+  }
   test_params <- fit$summary() %>% dplyr::filter(grepl(glue::glue("\\[{idx},"), .$variable)) %>% dplyr::pull(median)
   print(test_params)
   test_site <- unique(con_dat$site)[idx]
@@ -212,4 +213,5 @@ plot_train_site <- function(site_id) {
   plot(dat$wl_initial_cm, type = "l")
   lines(test$wl_hat, col = 'red', lty = "dashed")
 }
-plot_train_site("151")
+par(mfrow = c(2, 4)); purrr::walk(unique(con_dat$site), ~plot_train_site(.x)); par(mfrow = c(1,1))
+par(mfrow = c(2, 4)); purrr::walk(unique(con_dat$site), ~plot_train_site(.x, TRUE)); par(mfrow = c(1,1))
