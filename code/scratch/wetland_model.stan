@@ -3,7 +3,7 @@ functions {
       return esyA - (esyA - esyB) * exp(esyC * wl);
    }
 
-   row_vector wetlandModel(int D, real maxWL, row_vector obsWL, row_vector melt, real bMelt, row_vector pet, real bPET, row_vector rain, real bRain, real bQ, real minESY, real esyA, real esyB, real esyC){
+   row_vector wetlandModel(int D, real maxWL, row_vector obsWL, row_vector pet, real bPET, row_vector rain, real bRain, row_vector melt, real bMelt, real bQ, real minESY, real esyA, real esyB, real esyC){
       /*
       if(is.na(future.forest.change)){
             pet_fun <- 
@@ -86,7 +86,7 @@ data {
    vector[K] obs_sigma; // mean of daily water level change by site
 }
 parameters {
-   row_vector<lower = 0>[4] bPop;
+   row_vector<lower = 0>[4] bPop; // PET, Rain, Melt, Q
    row_vector<lower = 0>[4] tau;
    matrix<offset = rep_matrix(bPop, K), multiplier = rep_matrix(tau, K)>[K, 4] bGroup;
    real<lower = 0> sigma;
@@ -96,14 +96,14 @@ model {
 
    // Population Estimates
    target += gamma_lpdf(bPop[1] | 10, 10);
-   target += gamma_lpdf(bPop[2] | 10, 10);
-   target += gamma_lpdf(bPop[3] | 10, 10);
-   target += gamma_lpdf(bPop[4] | 5, 10);
+   target += gamma_lpdf(bPop[2] | 15, 10);
+   target += gamma_lpdf(bPop[3] | 15, 10);
+   target += gamma_lpdf(bPop[4] | 3, 4);
    target += std_normal_lpdf(sigma);
 
    // Group Effects
    for(p in 1:4) {
-      target += normal_lpdf(tau[p] | 0, 0.05);
+      target += normal_lpdf(tau[p] | 0, 0.01);
    }
 
    for(k in 1:K) {
