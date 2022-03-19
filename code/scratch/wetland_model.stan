@@ -3,7 +3,20 @@ functions {
       return esyA - (esyA - esyB) * exp(esyC * wl);
    }
 
-   row_vector wetlandModel(int D, real maxWL, row_vector obsWL, row_vector pet, real bPET, row_vector rain, real bRain, row_vector melt, real bMelt, real bQ, real minESY, real esyA, real esyB, real esyC){
+   row_vector wetlandModel(
+     real bPET,
+     real bRain,
+     real bMelt,
+     real bQ,
+     row_vector pet,
+     row_vector rain,
+     row_vector melt,
+     int D,
+     real maxWL,
+     real minESY,
+     real esyA,
+     real esyB,
+     real esyC){
       /*
       if(is.na(future.forest.change)){
             pet_fun <- 
@@ -110,7 +123,20 @@ model {
       for(p in 1:4) {
          target += normal_lpdf(bGroup[k, p] | bPop[p], tau[p]);
       }
-      yHat[k] = wetlandModel(D, maxWL[k], y[k], melt[k], bGroup[k, 1], pet[k], bGroup[k, 2], rain[k], bGroup[k, 3], bGroup[k, 4], esyParams[k,1], esyParams[k,2], esyParams[k,3], esyParams[k,4]);
+      yHat[k] = wetlandModel(
+        bGroup[k, 1],
+        bGroup[k, 2],
+        bGroup[k, 3],
+        bGroup[k, 4],
+        pet[k],
+        rain[k],
+        melt[k],
+        D,
+        maxWL[k],
+        esyParams[k, 1],
+        esyParams[k, 2],
+        esyParams[k, 3],
+        esyParams[k, 4]);
       for(i in 1:D){
          target +=  normal_lpdf(y[k,i] | yHat[k,i], sigma) * wghts[k,i];
       }

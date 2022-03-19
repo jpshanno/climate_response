@@ -125,7 +125,7 @@ fit <- mod$sample(
   seed = 1234567,
   chains = 4,
   parallel_chains = 4,
-  adapt_delta = 0.8,
+  adapt_delta = 0.9,
   # max_treedepth = 11,
   iter_warmup = 1000,
   iter_sampling = 1000,
