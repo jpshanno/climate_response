@@ -137,14 +137,15 @@ fit <- mod$sample(
 )
 
 fit$summary() %>% dplyr::select(variable, mean, median, rhat) %>% print(n = nrow(.))
+mcmc_dens(fit$draws(c("bPop[1]", "bPop[2]", "bPop[3]", "bPop[4]"))) +
+  geom_density(
+    color = 'red',
+    linetype = 'dashed',
+    aes(x = distributional::generate(distributional::dist_gamma(10, 10), 16000)[[1]]))
+
+mcmc_hist(fit$draws(c("bGroup[2,1]", "bGroup[2,2]", "bGroup[2,3]", "bGroup[2,4]")), inc_warmup = TRUE)
 mcmc_hist(fit$draws(c("bGroup[3,1]", "bGroup[3,2]", "bGroup[3,3]", "bGroup[3,4]")), inc_warmup = TRUE)
 
-fit_mcmc <- as_mcmc.list(fit)
-color_scheme_set("mix-blue-pink")
-mcmc_trace(
-  fit_mcmc,
-  pars = glue::glue("bPop[{p}]", p = 1:4)
-  )
 
 # draws <- map(
 #   seq_len(4),
