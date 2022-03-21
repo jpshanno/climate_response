@@ -3,7 +3,20 @@ functions {
       return esyA - (esyA - esyB) * exp(esyC * wl);
    }
 
-   row_vector wetlandModel(int D, real maxWL, row_vector obsWL, row_vector melt, real bMelt, row_vector pet, real bPET, row_vector rain, real bRain, real bQ, real minESY, real esyA, real esyB, real esyC){
+   row_vector wetlandModel(
+     real bPET,
+     real bRain,
+     real bMelt,
+     real bQ,
+     row_vector pet,
+     row_vector rain,
+     row_vector melt,
+     int D,
+     real maxWL,
+     real minESY,
+     real esyA,
+     real esyB,
+     real esyC){
       /*
       if(is.na(future.forest.change)){
             pet_fun <- 
@@ -86,40 +99,44 @@ data {
    vector[K] obs_sigma; // mean of daily water level change by site
 }
 parameters {
-   real<lower = 0> bPET;
-   real<lower = 0> bRain;
-   real<lower = 0> bMelt;
-   real<lower = 0> bQ;
+   row_vector<lower = 0>[4] bPop; // PET, Rain, Melt, Q
+   row_vector<lower = 0>[4] tau;
+   matrix<offset = rep_matrix(bPop, K), multiplier = rep_matrix(tau, K)>[K, 4] bGroup;
    real<lower = 0> sigma;
-   // vector<lower = 0, upper = 2>[4] params;
-   // cholesky_factor_corr[4] Sigma;
 }
 model {
    matrix[K,D] yHat;
-   // bPET ~ normal(1, 0.5);
-   target += normal_lpdf(bPET | 1, 1);
-   // bRain ~ normal(1.5, 0.75);
-   target += normal_lpdf(bRain | 2, 1);
-   // bMelt ~ normal(1, 0.5);
-   target += normal_lpdf(bMelt | 1, 1);
-   // bQ ~ normal(0.5, 0.25);
-   target += normal_lpdf(bQ | 0.6, 0.25);
-   target += std_normal_lpdf(sigma);
-   // sigma ~ std_normal();
 
-   // Sigma ~ lkj_corr_cholesky(0.5);
-   // params ~ multi_normal_cholesky([1, 1.5, 1, 0.5], Sigma);
-   // real bPET;
-   // real bRain;
-   // real bMelt;
-   // real bQ;
-   // bPET = params[1];
-   // bRain = params[2];
-   // bMelt = params[3];
-   // bQ = params[4];
+   // Population Estimates
+   target += gamma_lpdf(bPop[1] | 10, 10);
+   target += gamma_lpdf(bPop[2] | 11, 10);
+   target += gamma_lpdf(bPop[3] | 11, 10);
+   target += gamma_lpdf(bPop[4] | 3, 4);
+   target += std_normal_lpdf(sigma);
+
+   // Group Effects
+   for(p in 1:4) {
+      target += normal_lpdf(tau[p] | 0, 0.05);
+   }
 
    for(k in 1:K) {
-      yHat[k] = wetlandModel(D, maxWL[k], y[k], melt[k], bMelt, pet[k], bPET, rain[k], bRain, bQ, esyParams[k,1], esyParams[k,2], esyParams[k,3], esyParams[k,4]);
+      for(p in 1:4) {
+         target += normal_lpdf(bGroup[k, p] | bPop[p], tau[p]);
+      }
+      yHat[k] = wetlandModel(
+        bGroup[k, 1],
+        bGroup[k, 2],
+        bGroup[k, 3],
+        bGroup[k, 4],
+        pet[k],
+        rain[k],
+        melt[k],
+        D,
+        maxWL[k],
+        esyParams[k, 1],
+        esyParams[k, 2],
+        esyParams[k, 3],
+        esyParams[k, 4]);
       for(i in 1:D){
          target +=  normal_lpdf(y[k,i] | yHat[k,i], sigma) * wghts[k,i];
       }

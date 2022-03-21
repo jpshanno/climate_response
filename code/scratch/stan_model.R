@@ -1,8 +1,9 @@
 ####### WORK WITH ONLY TREATED SITES TO AVOID UNEVEN GROUP SIZES
 
-# Try to allow rain on days even when PET > P, perhaps it will give more days
-# for fitting
 
+# TODO: Loosen priors
+# TODO: Squash divergent transitions
+# TODO: get init working
 source("code/load_project.R")
 tar_load(training_data)
 tar_load(testing_data)
@@ -19,10 +20,10 @@ library(bayesplot)
 
 # Weights increase asymmetrically as water levels drop
 create_weights <- function(x, scale) {
-  init_weight <- 1 / sum(!is.na(x))
+  init_weight <- 1 / !is.na(x)
   wghts <- pmax(init_weight, init_weight * (scale - x))
   # Weights are squared
-  wghts <- wghts^2
+  # wghts <- wghts^2
   wghts[is.na(x)] <- 0
   wghts <- wghts / sum(wghts)
   assertthat::assert_that(assertthat::noNA(wghts))
@@ -40,23 +41,30 @@ create_data_matrix <- function(data, var) {
   res
 }
 
-init_values <- function(pooling) {
-  set.seed(8675309)
-  generate_values <- function(pooling) {
-    x <- list(
-      bPET = runif(1, 0.9, 1.1),
-      bRain = runif(1, 0.9, 1.1),
-      bMelt = runif(1, 0.9, 1.1),
-      bQ = runif(1, 0.4, 0.7)
-    )
-    # x$sigma <- switch(pooling,
-    #   "full" = 0.1,
-    #   "partial" = rep(0.01, 8),
-    #   "none" = rep(0.01, 8)
-    # )
-    x
+generate_init_params <- function() {
+  matrix(
+    c(
+      runif(3, 0.9, 1.1),
+      runif(1, 0.4, 0.7)
+    ),
+    nrow = 1
+  )
   }
-  replicate(generate_values(pooling), n = 4, simplify = FALSE)
+
+generate_values <- function() {
+    init_params <- generate_init_params()
+    init_tau <- matrix(runif(4, 0.01, 0.15), ncol = 4)
+    list(
+      bPop = init_params,
+      bGroup = replicate(8, generate_init_params()),
+      tau = init_tau,
+      sigma = 1
+    )
+  }
+
+init_values <- function(chain_id) {
+  set.seed(8675309 + chain_id)
+  generate_values()
 }
 
 con_dat[, wghts := create_weights(wl_initial_cm, max_wl), by = .(site)]
@@ -93,19 +101,34 @@ stan_data <- list(
   obs_sigma = obs_sigma
 )
 
+# Priors -----------------------------------------------------------------------
+dist <- distributional::generate(distributional::dist_gamma(3, 4), 10000)[[1]]
+plot(density(dist))
+ggdist::mean_hdci(dist, .width = 0.9)
+ggdist::median_hdci(dist, .width = 0.9)
+
+
+gdist <- distributional::generate(distributional::dist_normal(0, 0.05), 10000)[[1]]
+plot(density(gdist))
+ggdist::mean_hdci(gdist, .width = 0.9)
+ggdist::median_hdci(gdist, .width = 0.9)
+
+
 mod <- cmdstan_model(
   stan_file = "code/scratch/wetland_model.stan",
   dir = "/tmp",
-  include_paths = file.path(getwd(), "code/scratch/"),
   force_recompile = TRUE
   )
 
+# Tightening priors and increasing adapt_delta reduces divergences (see last
+# commit)
 fit <- mod$sample(
   data = stan_data,
   seed = 1234567,
   chains = 4,
   parallel_chains = 4,
-  adapt_delta = 0.70,
+  adapt_delta = 0.95,
+  # max_treedepth = 11,
   iter_warmup = 1000,
   iter_sampling = 1000,
   refresh = 50,
@@ -113,55 +136,83 @@ fit <- mod$sample(
   init = 0
 )
 
-# saveRDS(fit, "/Users/jpshanno/phd/climate_response/tmp/fit_20220304.rds")
-# list.files(
-#     "/var/folders/h_/8p62bvmn4b73006tnwkgfrlc0000gn/T/",
-#     recursive = TRUE,
-#     pattern = "wetland_model-202203032325",
-#     full.names=TRUE
-#   ) %>%
-#   file.copy(file.path("/Users/jpshanno/phd/climate_response/tmp", basename(.)))
-
-fit$summary()
-mcmc_hist(fit$draws(c("bPET", "bRain", "bMelt", "bQ", "sigma"), inc_warmup = TRUE))
+fit$summary() %>% dplyr::select(variable, mean, median, rhat) %>% print(n = nrow(.))
+mcmc_hist(fit$draws(c("bGroup[3,1]", "bGroup[3,2]", "bGroup[3,3]", "bGroup[3,4]")), inc_warmup = TRUE)
 
 fit_mcmc <- as_mcmc.list(fit)
-# color_scheme_set("mix-blue-pink")
+color_scheme_set("mix-blue-pink")
 mcmc_trace(
   fit_mcmc,
-  pars = c("bPET", "bRain", "bMelt", "bQ"),
-  n_warmup = 500,
-  facet_args = list(nrow = 2, labeller = label_parsed)
+  pars = glue::glue("bPop[{p}]", p = 1:4)
   )
 
-draws <- map(
-  seq_len(4),
-  ~list.files(
-    "/var/folders/h_/8p62bvmn4b73006tnwkgfrlc0000gn/T/",
-    recursive = TRUE,
-    pattern = "wetland_model-202203072326",
-    full.names=TRUE
-  )[.x] %>%
-  readr::read_csv(skip = 45) %>%
-  dplyr::filter(dplyr::if_all(.fn = ~!is.na(.x)))
-)
+# draws <- map(
+#   seq_len(4),
+#   ~list.files(
+#     "/var/folders/h_/8p62bvmn4b73006tnwkgfrlc0000gn/T/",
+#     recursive = TRUE,
+#     pattern = "wetland_model-202203072326",
+#     full.names=TRUE
+#   )[.x] %>%
+#   readr::read_csv(skip = 45) %>%
+#   dplyr::filter(dplyr::if_all(.fn = ~!is.na(.x)))
+# )
 
-par(mfrow = c(2,2)); iwalk(draws, ~plot(log10(.x$stepsize__), type = "l", main = .y)); par(mfrow = c(1,1))
+# par(mfrow = c(2,2)); iwalk(draws, ~plot(log10(.x$stepsize__), type = "l", main = .y)); par(mfrow = c(1,1))
 
-test_site <- "151"
-dat <- testing_data[site == test_site][water_year == min(water_year)]
-new_params <- list(
-  MPET = 1.07,
-  MP = 1.22,
-  MM = 1.06,
-  MQ = 0.674,
-  minESY = esy_functions[test_site][["min_esy"]],
-  phiM = 0,
-  phiP =0,
-  maxWL = esy_functions[test_site, max_wl],
-  funESY = esy_functions[test_site, pred_fun]
-)
-test <- wetland_model(dat, new_params)
-plot(dat$wl_initial_cm, type = "l")
-lines(test$wl_hat, col = 'red', lty = "dashed")
 
+plot_test_site <- function(site_id, pop_level = FALSE) {
+  idx <- which(c("009", "053", "077", "119", "139", "140", "151", "156") == site_id)
+  if(pop_level) {
+    test_params <- fit$summary() %>% dplyr::filter(grepl("bPop\\[[1-4]{1}\\]", .$variable)) %>% dplyr::pull(median)
+  } else {
+    test_params <- fit$summary() %>% dplyr::filter(grepl(glue::glue("\\[{idx},"), .$variable)) %>% dplyr::pull(median)
+  }
+  print(c(site_id, test_params))
+  test_site <- unique(con_dat$site)[idx]
+  dat <- testing_data[site == test_site][, c(.SD, list(n_records = !is.na(wl_initial_cm))), by = .(water_year)][n_records > 0][water_year == min(water_year)]
+  new_params <- list(
+    MPET = test_params[1],
+    MP = test_params[2],
+    MM = test_params[3],
+    MQ = test_params[4],
+    minESY = esy_functions[test_site][["min_esy"]],
+    phiM = 0,
+    phiP =0,
+    maxWL = esy_functions[test_site, max_wl],
+    funESY = esy_functions[test_site, pred_fun]
+  )
+  test <- wetland_model(dat, new_params)
+  plot(dat$wl_initial_cm, type = "l", main = site_id)
+  lines(test$wl_hat, col = 'red', lty = "dashed")
+}
+par(mfrow = c(2, 4)); purrr::walk(unique(con_dat$site), ~plot_test_site(.x)); par(mfrow = c(1,1))
+par(mfrow = c(2, 4)); purrr::walk(unique(con_dat$site), ~plot_test_site(.x, TRUE)); par(mfrow = c(1,1))
+
+plot_train_site <- function(site_id, pop_level = FALSE) {
+  idx <- which(c("009", "053", "077", "119", "139", "140", "151", "156") == site_id)
+  if(pop_level) {
+    test_params <- fit$summary() %>% dplyr::filter(grepl("bPop\\[[1-4]{1}\\]", .$variable)) %>% dplyr::pull(median)
+  } else {
+    test_params <- fit$summary() %>% dplyr::filter(grepl(glue::glue("\\[{idx},"), .$variable)) %>% dplyr::pull(median)
+    print(test_params)
+  }
+  test_site <- unique(con_dat$site)[idx]
+  dat <- con_dat[site == test_site][water_year == min(water_year)]
+  new_params <- list(
+    MPET = test_params[1],
+    MP = test_params[2],
+    MM = test_params[3],
+    MQ = test_params[4],
+    minESY = esy_functions[test_site][["min_esy"]],
+    phiM = 0,
+    phiP =0,
+    maxWL = esy_functions[test_site, max_wl],
+    funESY = esy_functions[test_site, pred_fun]
+  )
+  test <- wetland_model(dat, new_params)
+  plot(dat$wl_initial_cm, type = "l")
+  lines(test$wl_hat, col = 'red', lty = "dashed")
+}
+par(mfrow = c(2, 4)); purrr::walk(unique(con_dat$site), ~plot_train_site(.x)); par(mfrow = c(1,1))
+par(mfrow = c(2, 4)); purrr::walk(unique(con_dat$site), ~plot_train_site(.x, TRUE)); par(mfrow = c(1,1))
