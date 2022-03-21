@@ -1,6 +1,8 @@
 ####### WORK WITH ONLY TREATED SITES TO AVOID UNEVEN GROUP SIZES
 
-# TODO: adjust weights to weight more heavily for days above max_wl
+
+# TODO: Loosen priors
+# TODO: Squash divergent transitions
 # TODO: get init working
 source("code/load_project.R")
 tar_load(training_data)
@@ -125,7 +127,7 @@ fit <- mod$sample(
   seed = 1234567,
   chains = 4,
   parallel_chains = 4,
-  adapt_delta = 0.9,
+  adapt_delta = 0.95,
   # max_treedepth = 11,
   iter_warmup = 1000,
   iter_sampling = 1000,
@@ -144,19 +146,19 @@ mcmc_trace(
   pars = glue::glue("bPop[{p}]", p = 1:4)
   )
 
-draws <- map(
-  seq_len(4),
-  ~list.files(
-    "/var/folders/h_/8p62bvmn4b73006tnwkgfrlc0000gn/T/",
-    recursive = TRUE,
-    pattern = "wetland_model-202203072326",
-    full.names=TRUE
-  )[.x] %>%
-  readr::read_csv(skip = 45) %>%
-  dplyr::filter(dplyr::if_all(.fn = ~!is.na(.x)))
-)
+# draws <- map(
+#   seq_len(4),
+#   ~list.files(
+#     "/var/folders/h_/8p62bvmn4b73006tnwkgfrlc0000gn/T/",
+#     recursive = TRUE,
+#     pattern = "wetland_model-202203072326",
+#     full.names=TRUE
+#   )[.x] %>%
+#   readr::read_csv(skip = 45) %>%
+#   dplyr::filter(dplyr::if_all(.fn = ~!is.na(.x)))
+# )
 
-par(mfrow = c(2,2)); iwalk(draws, ~plot(log10(.x$stepsize__), type = "l", main = .y)); par(mfrow = c(1,1))
+# par(mfrow = c(2,2)); iwalk(draws, ~plot(log10(.x$stepsize__), type = "l", main = .y)); par(mfrow = c(1,1))
 
 
 plot_test_site <- function(site_id, pop_level = FALSE) {
@@ -193,9 +195,8 @@ plot_train_site <- function(site_id, pop_level = FALSE) {
     test_params <- fit$summary() %>% dplyr::filter(grepl("bPop\\[[1-4]{1}\\]", .$variable)) %>% dplyr::pull(median)
   } else {
     test_params <- fit$summary() %>% dplyr::filter(grepl(glue::glue("\\[{idx},"), .$variable)) %>% dplyr::pull(median)
+    print(test_params)
   }
-  test_params <- fit$summary() %>% dplyr::filter(grepl(glue::glue("\\[{idx},"), .$variable)) %>% dplyr::pull(median)
-  print(test_params)
   test_site <- unique(con_dat$site)[idx]
   dat <- con_dat[site == test_site][water_year == min(water_year)]
   new_params <- list(
