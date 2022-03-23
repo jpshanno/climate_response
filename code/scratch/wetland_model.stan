@@ -47,11 +47,11 @@ functions {
 
             // Esy
             // Calculate gradient of drawdown 
-            if(wlHat[t-1] > maxWL) {
-            gradient[t] = minESY;
-            } else {
-            gradient[t] = predEsy(wlHat[t-1], esyA, esyB, esyC);
-            }
+            // if(wlHat[t-1] > maxWL) {
+            // gradient[t] = minESY;
+            // } else {
+            gradient[t] = fmax(predEsy(wlHat[t-1], esyA, esyB, esyC), minESY);
+            // }
 
             // PET or P times Esy
             // Use net input to determine if water level increases or decreases
