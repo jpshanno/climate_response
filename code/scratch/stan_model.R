@@ -102,10 +102,12 @@ stan_data <- list(
 )
 
 # Priors -----------------------------------------------------------------------
-dist <- distributional::generate(distributional::dist_gamma(3, 4), 10000)[[1]]
-plot(density(dist))
+dist <- distributional::generate(distributional::dist_gamma(1, 4), 10000)[[1]]
+ex_dist <- distributional::generate(distributional::dist_exponential(5), 10000)[[1]]
 ggdist::mean_hdci(dist, .width = 0.9)
 ggdist::median_hdci(dist, .width = 0.9)
+plot(density(dist))
+lines(density(ex_dist), col = "red")
 
 
 gdist <- distributional::generate(distributional::dist_normal(0, 0.05), 10000)[[1]]
@@ -178,26 +180,28 @@ plot_test_site <- function(site_id, pop_level = FALSE) {
     test_params <- fit$summary() %>% dplyr::filter(grepl(glue::glue("\\[{idx},"), .$variable)) %>% dplyr::pull(mean)
   }
   print(c(site_id, test_params))
-  test_site <- unique(con_dat$site)[idx]
-  dat <- testing_data[site == test_site][, c(.SD, list(n_records = !is.na(wl_initial_cm))), by = .(water_year)][n_records > 0][water_year == sample(water_year, 1)]
+  dat <- testing_data[site == site_id & site_status == "Control"][, c(.SD, list(n_records = !is.na(wl_initial_cm))), by = .(water_year)][n_records > 0]
+  if(nrow(dat) == 0) return(NULL)
+  dat <- dat[water_year == sample(water_year, 1)]
   new_params <- list(
     MPET = test_params[1],
     MP = test_params[2],
     MM = test_params[3],
     MQ = test_params[4],
-    minESY = esy_functions[test_site][["min_esy"]],
+    minESY = esy_functions[site_id][["min_esy"]],
     phiP = test_params[5],
     phiM =test_params[6],
-    maxWL = esy_functions[test_site, max_wl],
-    funESY = esy_functions[test_site, pred_fun]
+    maxWL = esy_functions[site_id, max_wl],
+    funESY = esy_functions[site_id, pred_fun]
   )
   test <- wetland_model(dat, new_params)
   ylim <- c(min(c(test$wl_hat, dat$wl_initial_cm)), max(c(test$wl_hat, dat$wl_initial_cm)))
   plot(dat$wl_initial_cm, type = "l", main = site_id, ylim = ylim)
   lines(test$wl_hat, col = 'red', lty = "dashed")
 }
-par(mfrow = c(2, 4)); purrr::walk(unique(con_dat$site), ~plot_test_site(.x)); par(mfrow = c(1,1))
-par(mfrow = c(2, 4)); purrr::walk(unique(con_dat$site), ~plot_test_site(.x, TRUE)); par(mfrow = c(1,1))
+sites_to_test <- intersect(testing_data[site_status == "Control"]$site, con_dat$site)
+par(mfrow = c(2, 4)); purrr::walk(sites_to_test, ~plot_test_site(.x)); par(mfrow = c(1,1))
+par(mfrow = c(2, 4)); purrr::walk(sites_to_test, ~plot_test_site(.x, TRUE)); par(mfrow = c(1,1))
 
 plot_train_site <- function(site_id, pop_level = FALSE) {
   idx <- which(c("009", "053", "077", "119", "139", "140", "151", "156") == site_id)
