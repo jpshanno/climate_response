@@ -8,6 +8,8 @@ functions {
      real bRain,
      real bMelt,
      real bQ,
+     real phiRain,
+     real phiMelt,
      row_vector pet,
      row_vector rain,
      row_vector melt,
@@ -29,10 +31,10 @@ functions {
       }
       */
       
-      // P <- as.numeric(filter(data$rain_cm, filter = phiP, method = "rec", sides = 1))
-      // M <- as.numeric(filter(data$melt_cm, filter = phiM, method = "rec", sides = 1))
       // Create empty vectors
       row_vector[D] wlHat;
+      vector[D] Rain; // rain[t] + rain[t-1] * phiRain
+      vector[D] Melt; // melt[t] + melt[t-1] * phiMelt
       vector[D] gradient;
       vector[D] qHat;
       vector[D] mHat;
@@ -44,7 +46,8 @@ functions {
       
       // Loop through weather data
       for(t in 2:D){
-
+            Rain[t] = rain[t] + rain[t-1] * phiRain;
+            Melt[t] = melt[t] + melt[t-1] * phiMelt;
             // Esy
             // Calculate gradient of drawdown 
             // if(wlHat[t-1] > maxWL) {
@@ -62,12 +65,12 @@ functions {
             petHat[t] = bPET * pet[t] * gradient[t];
                   // pet_fun(wl_hat[t-1], maxWL, future.forest.change) * (MPET * PET[t]) * gradient[t]
             wlHat[t] = wlHat[t-1] + petHat[t];
-            pHat[t] = bRain * rain[t] * gradient[t];
+            pHat[t] = bRain * Rain[t] * gradient[t];
             wlHat[t] = wlHat[t-1] + pHat[t];
             
 
             // Snowmelt
-            mHat[t] = bMelt * melt[t] * gradient[t];
+            mHat[t] = bMelt * Melt[t] * gradient[t];
             wlHat[t] = wlHat[t] + mHat[t];
 
             // Streamflow
@@ -99,9 +102,9 @@ data {
    vector[K] obs_sigma; // mean of daily water level change by site
 }
 parameters {
-   row_vector<lower = 0>[4] bPop; // PET, Rain, Melt, Q
-   row_vector<lower = 0>[4] tau;
-   matrix<offset = rep_matrix(bPop, K), multiplier = rep_matrix(tau, K)>[K, 4] bGroup;
+   row_vector<lower = 0>[6] bPop; // PET, Rain, Melt, Q, phiRain, phiMelt
+   row_vector<lower = 0>[6] tau;
+   matrix<offset = rep_matrix(bPop, K), multiplier = rep_matrix(tau, K)>[K, 6] bGroup;
    real<lower = 0> sigma;
 }
 model {
@@ -112,15 +115,17 @@ model {
    target += gamma_lpdf(bPop[2] | 11, 10);
    target += gamma_lpdf(bPop[3] | 11, 10);
    target += gamma_lpdf(bPop[4] | 3, 4);
+   target += exponential_lpdf(bPop[5] | 10);
+   target += exponential_lpdf(bPop[6] | 10);
    target += std_normal_lpdf(sigma);
 
    // Group Effects
-   for(p in 1:4) {
+   for(p in 1:6) {
       target += normal_lpdf(tau[p] | 0, 0.05);
    }
 
    for(k in 1:K) {
-      for(p in 1:4) {
+      for(p in 1:6) {
          target += normal_lpdf(bGroup[k, p] | bPop[p], tau[p]);
       }
       yHat[k] = wetlandModel(
@@ -128,6 +133,8 @@ model {
         bGroup[k, 2],
         bGroup[k, 3],
         bGroup[k, 4],
+        bGroup[k, 5],
+        bGroup[k, 6],
         pet[k],
         rain[k],
         melt[k],
