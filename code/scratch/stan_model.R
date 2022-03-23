@@ -137,15 +137,23 @@ fit <- mod$sample(
 )
 
 fit$summary() %>% dplyr::select(variable, mean, median, rhat) %>% print(n = nrow(.))
-mcmc_dens(fit$draws(c("bPop[1]", "bPop[2]", "bPop[3]", "bPop[4]"))) +
+mcmc_dens(fit$draws(c("bPop[1]", "bPop[2]", "bPop[3]"))) +
   geom_density(
     color = 'red',
     linetype = 'dashed',
-    aes(x = distributional::generate(distributional::dist_gamma(10, 10), 16000)[[1]]))
+    aes(x = distributional::generate(distributional::dist_gamma(10, 10), 12000)[[1]]))
 
-mcmc_hist(fit$draws(c("bGroup[2,1]", "bGroup[2,2]", "bGroup[2,3]", "bGroup[2,4]")), inc_warmup = TRUE)
-mcmc_hist(fit$draws(c("bGroup[3,1]", "bGroup[3,2]", "bGroup[3,3]", "bGroup[3,4]")), inc_warmup = TRUE)
+mcmc_dens(fit$draws(c("bPop[4]"))) +
+  geom_density(
+    color = 'red',
+    linetype = 'dashed',
+    aes(x = distributional::generate(distributional::dist_gamma(1, 4), 4000)[[1]]))
 
+mcmc_dens(fit$draws(c("bPop[5]", "bPop[6]"))) +
+  geom_density(
+    color = 'red',
+    linetype = 'dashed',
+    aes(x = distributional::generate(distributional::dist_exponential(10), 8000)[[1]]))
 
 # draws <- map(
 #   seq_len(4),
@@ -165,26 +173,27 @@ mcmc_hist(fit$draws(c("bGroup[3,1]", "bGroup[3,2]", "bGroup[3,3]", "bGroup[3,4]"
 plot_test_site <- function(site_id, pop_level = FALSE) {
   idx <- which(c("009", "053", "077", "119", "139", "140", "151", "156") == site_id)
   if(pop_level) {
-    test_params <- fit$summary() %>% dplyr::filter(grepl("bPop\\[[1-4]{1}\\]", .$variable)) %>% dplyr::pull(median)
+    test_params <- fit$summary() %>% dplyr::filter(grepl("bPop\\[[0-9]{1}\\]", .$variable)) %>% dplyr::pull(mean)
   } else {
-    test_params <- fit$summary() %>% dplyr::filter(grepl(glue::glue("\\[{idx},"), .$variable)) %>% dplyr::pull(median)
+    test_params <- fit$summary() %>% dplyr::filter(grepl(glue::glue("\\[{idx},"), .$variable)) %>% dplyr::pull(mean)
   }
   print(c(site_id, test_params))
   test_site <- unique(con_dat$site)[idx]
-  dat <- testing_data[site == test_site][, c(.SD, list(n_records = !is.na(wl_initial_cm))), by = .(water_year)][n_records > 0][water_year == min(water_year)]
+  dat <- testing_data[site == test_site][, c(.SD, list(n_records = !is.na(wl_initial_cm))), by = .(water_year)][n_records > 0][water_year == sample(water_year, 1)]
   new_params <- list(
     MPET = test_params[1],
     MP = test_params[2],
     MM = test_params[3],
     MQ = test_params[4],
     minESY = esy_functions[test_site][["min_esy"]],
-    phiM = 0,
-    phiP =0,
+    phiP = test_params[5],
+    phiM =test_params[6],
     maxWL = esy_functions[test_site, max_wl],
     funESY = esy_functions[test_site, pred_fun]
   )
   test <- wetland_model(dat, new_params)
-  plot(dat$wl_initial_cm, type = "l", main = site_id)
+  ylim <- c(min(c(test$wl_hat, dat$wl_initial_cm)), max(c(test$wl_hat, dat$wl_initial_cm)))
+  plot(dat$wl_initial_cm, type = "l", main = site_id, ylim = ylim)
   lines(test$wl_hat, col = 'red', lty = "dashed")
 }
 par(mfrow = c(2, 4)); purrr::walk(unique(con_dat$site), ~plot_test_site(.x)); par(mfrow = c(1,1))
@@ -193,9 +202,9 @@ par(mfrow = c(2, 4)); purrr::walk(unique(con_dat$site), ~plot_test_site(.x, TRUE
 plot_train_site <- function(site_id, pop_level = FALSE) {
   idx <- which(c("009", "053", "077", "119", "139", "140", "151", "156") == site_id)
   if(pop_level) {
-    test_params <- fit$summary() %>% dplyr::filter(grepl("bPop\\[[1-4]{1}\\]", .$variable)) %>% dplyr::pull(median)
+    test_params <- fit$summary() %>% dplyr::filter(grepl("bPop\\[[1-9]{1}\\]", .$variable)) %>% dplyr::pull(mean)
   } else {
-    test_params <- fit$summary() %>% dplyr::filter(grepl(glue::glue("\\[{idx},"), .$variable)) %>% dplyr::pull(median)
+    test_params <- fit$summary() %>% dplyr::filter(grepl(glue::glue("\\[{idx},"), .$variable)) %>% dplyr::pull(mean)
     print(test_params)
   }
   test_site <- unique(con_dat$site)[idx]
@@ -206,13 +215,17 @@ plot_train_site <- function(site_id, pop_level = FALSE) {
     MM = test_params[3],
     MQ = test_params[4],
     minESY = esy_functions[test_site][["min_esy"]],
-    phiM = 0,
-    phiP =0,
+    phiP = test_params[5],
+    phiM = test_params[6],
     maxWL = esy_functions[test_site, max_wl],
     funESY = esy_functions[test_site, pred_fun]
   )
   test <- wetland_model(dat, new_params)
-  plot(dat$wl_initial_cm, type = "l")
+  ylim <- c(
+    min(c(test$wl_hat, dat$wl_initial_cm), na.rm = TRUE),
+    max(c(test$wl_hat, dat$wl_initial_cm), na.rm = TRUE)
+  )
+  plot(dat$wl_initial_cm, type = "l", ylim = ylim)
   lines(test$wl_hat, col = 'red', lty = "dashed")
 }
 par(mfrow = c(2, 4)); purrr::walk(unique(con_dat$site), ~plot_train_site(.x)); par(mfrow = c(1,1))
