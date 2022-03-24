@@ -18,7 +18,9 @@ functions {
      real minESY,
      real esyA,
      real esyB,
-     real esyC){
+     real esyC,
+     real esyint,
+     real esyslope){
       /*
       if(is.na(future.forest.change)){
             pet_fun <- 
@@ -53,7 +55,8 @@ functions {
             // if(wlHat[t-1] > maxWL) {
             // gradient[t] = minESY;
             // } else {
-            gradient[t] = fmax(predEsy(wlHat[t-1], esyA, esyB, esyC), minESY);
+            gradient[t] = fmax(esyint - esyslope * wlHat[t-1], minESY);
+            // gradient[t] = fmax(predEsy(wlHat[t-1], esyA, esyB, esyC), minESY);
             // }
 
             // PET or P times Esy
@@ -97,7 +100,7 @@ data {
    matrix[K,D] melt;
    matrix[K,D] wghts;
    matrix[K,D] y; // PET
-   matrix[K,4] esyParams; // minESY, esyA, esyB, esyC
+   matrix[K,6] esyParams; // minESY, esyA, esyB, esyC
    vector[K] maxWL;
    vector[K] obs_sigma; // mean of daily water level change by site
 }
@@ -143,7 +146,9 @@ model {
         esyParams[k, 1],
         esyParams[k, 2],
         esyParams[k, 3],
-        esyParams[k, 4]);
+        esyParams[k, 4],
+        esyParams[k, 5],
+        esyParams[k, 6]);
       for(i in 1:D){
          target +=  normal_lpdf(y[k,i] | yHat[k,i], sigma) * wghts[k,i];
       }
