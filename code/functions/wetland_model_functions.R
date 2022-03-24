@@ -77,7 +77,19 @@ build_esy_functions <-
     
     drawdown[, ytd_water_balance := cumsum(rain_cm + pet_cm + melt_cm),
              by = .(site, water_year)]
-    
+    # New potential Esy model:
+    # TODO: figure out why 053 water balance is so different from the other
+    # sites. The shape is right, but there's a huge shift into positive water
+    # balances
+    # mod <- brm(bf(wl_initial_cm ~ a - (a - b) * exp(-c * ytd_water_balance), a + b + c ~ 1 + (1 | site), nl = TRUE), data = drawdown[site!="053"], cores = 4, warmup = 500, iter = 600)
+    # deriv = (a - b) * (exp(-c * x) * c)
+    # Alternatively could so some sort of mixture of two models (a curve and 
+    # a linear model), or more simply two linear models. A steep model for low
+    # water levels and a shallow model for high water levels. Then have a mixing
+    # parameter alpha that ranges from 0-1 around some inflection point.
+    # drawdown ~ alpha * high_esy + (1 - alpha) * low_esy
+    # emperical_esy = deriv(drawdown_mod)
+    brm
     drawdown[, 
              c("drawdown_emp", "esy_emp",
                "esy_x_intercept") := {
@@ -96,7 +108,7 @@ build_esy_functions <-
                  
                },
              by = .(site)]
-    
+    # split(drawdown, f = drawdown$site) %>% purrr::map_dfr(~coef(lm((34.77 - 12.894) * (exp(-0.059 * ytd_water_balance) * 0.059) ~ wl_initial_cm, data = .x)), .id = "site") 
     esy_form <- 
       bf(esy_emp ~ a - (a - b) * exp (c * wl_initial_cm),
          a + b + c ~ 0 + site,
