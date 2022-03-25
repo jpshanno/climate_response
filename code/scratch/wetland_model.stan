@@ -55,7 +55,7 @@ functions {
             // if(wlHat[t-1] > maxWL) {
             // gradient[t] = minESY;
             // } else {
-            gradient[t] = fmax(esyint - esyslope * wlHat[t-1], minESY);
+            gradient[t] = fmax(esyint - esyslope * wlHat[t-1], 0);
             // gradient[t] = fmax(predEsy(wlHat[t-1], esyA, esyB, esyC), minESY);
             // }
 
