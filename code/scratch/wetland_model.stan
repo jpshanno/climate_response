@@ -105,39 +105,61 @@ data {
    vector[K] obs_sigma; // mean of daily water level change by site
 }
 parameters {
-   row_vector<lower = 0>[6] bPop; // PET, Rain, Melt, Q, phiRain, phiMelt
-   row_vector<lower = 0>[6] tau;
-   matrix<offset = rep_matrix(bPop, K), multiplier = rep_matrix(tau, K)>[K, 6] bGroup;
+   real<lower = 0> bPET;
+   real<lower = 0> bRain;
+   real<lower = 0> bMelt;
+   real<lower = 0> bQ;
+   real<lower = 0> phiRain;
+   real<lower = 0> phiMelt;
+   real<lower = 0> taubPET;
+   real<lower = 0> taubRain;
+   real<lower = 0> taubMelt;
+   real<lower = 0> taubQ;
+   real<lower = 0> tauphiRain;
+   real<lower = 0> tauphiMelt;
+   row_vector<offset = bPET, multiplier = taubPET>[K] gPET;
+   row_vector<offset = bRain, multiplier = taubRain>[K] gRain;
+   row_vector<offset = bMelt, multiplier = taubMelt>[K] gMelt;
+   row_vector<offset = bQ, multiplier = taubQ>[K] gQ;
+   row_vector<offset = phiRain, multiplier = tauphiRain>[K] gphiRain;
+   row_vector<offset = phiMelt, multiplier = tauphiMelt>[K] gphiMelt;
    real<lower = 0> sigma;
 }
 model {
    matrix[K,D] yHat;
 
    // Population Estimates
-   target += gamma_lpdf(bPop[1] | 10, 10);
-   target += gamma_lpdf(bPop[2] | 11, 10);
-   target += gamma_lpdf(bPop[3] | 11, 10);
-   target += gamma_lpdf(bPop[4] | 3, 4);
-   target += exponential_lpdf(bPop[5] | 10);
-   target += exponential_lpdf(bPop[6] | 10);
+   target += gamma_lpdf(bPET | 10, 10);
+   target += gamma_lpdf(bRain | 11, 10);
+   target += gamma_lpdf(bMelt | 11, 10);
+   target += gamma_lpdf(bQ | 3, 4);
+   target += exponential_lpdf(phiRain | 10);
+   target += exponential_lpdf(phiMelt | 10);
    target += std_normal_lpdf(sigma);
 
-   // Group Effects
-   for(p in 1:6) {
-      target += normal_lpdf(tau[p] | 0, 0.05);
-   }
-
+   // Standard Deviation of Group Effects around Population Effects
+   target += normal_lpdf(taubPET | 0, 0.05);
+   target += normal_lpdf(taubRain | 0, 0.05);
+   target += normal_lpdf(taubMelt | 0, 0.05);
+   target += normal_lpdf(taubQ | 0, 0.05);
+   target += normal_lpdf(tauphiRain | 0, 0.05);
+   target += normal_lpdf(tauphiMelt | 0, 0.05);
+   
    for(k in 1:K) {
-      for(p in 1:6) {
-         target += normal_lpdf(bGroup[k, p] | bPop[p], tau[p]);
-      }
+      target += normal_lpdf(gPET[k] | bPET, taubPET);
+      target += normal_lpdf(gRain[k] | bRain, taubRain);
+      target += normal_lpdf(gMelt[k] | bMelt, taubMelt);
+      target += normal_lpdf(gQ[k] | bQ, taubQ);
+      target += normal_lpdf(gphiRain[k] | phiRain, tauphiRain);
+      target += normal_lpdf(gphiMelt[k] | phiMelt, tauphiMelt);
+
       yHat[k] = wetlandModel(
-        bGroup[k, 1],
-        bGroup[k, 2],
-        bGroup[k, 3],
-        bGroup[k, 4],
-        bGroup[k, 5],
-        bGroup[k, 6],
+        gPET[k],
+        gRain[k],
+        gMelt[k],
+        gQ[k],
+        gphiRain[k],
+        gphiMelt[k],
         pet[k],
         rain[k],
         melt[k],
