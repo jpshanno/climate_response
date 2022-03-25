@@ -175,9 +175,9 @@ mcmc_dens(fit$draws(c("bPop[5]", "bPop[6]"))) +
 plot_test_site <- function(site_id, pop_level = FALSE) {
   idx <- which(c("009", "053", "077", "119", "139", "140", "151", "156") == site_id)
   if(pop_level) {
-    test_params <- fit$summary() %>% dplyr::filter(grepl("bPop\\[[0-9]{1}\\]", .$variable)) %>% dplyr::pull(mean)
+    test_params <- fit$summary() %>% dplyr::filter(grepl("^[bp]", .$variable)) %>% dplyr::pull(mean)
   } else {
-    test_params <- fit$summary() %>% dplyr::filter(grepl(glue::glue("\\[{idx},"), .$variable)) %>% dplyr::pull(mean)
+    test_params <- fit$summary() %>% dplyr::filter(grepl(glue::glue("\\[{idx}\\]"), .$variable)) %>% dplyr::pull(mean)
   }
   print(c(site_id, test_params))
   dat <- testing_data[site == site_id & site_status == "Control"][, c(.SD, list(n_records = !is.na(wl_initial_cm))), by = .(water_year)][n_records > 0]
@@ -206,10 +206,9 @@ par(mfrow = c(2, 4)); purrr::walk(sites_to_test, ~plot_test_site(.x, TRUE)); par
 plot_train_site <- function(site_id, pop_level = FALSE) {
   idx <- which(c("009", "053", "077", "119", "139", "140", "151", "156") == site_id)
   if(pop_level) {
-    test_params <- fit$summary() %>% dplyr::filter(grepl("bPop\\[[1-9]{1}\\]", .$variable)) %>% dplyr::pull(mean)
+    test_params <- fit$summary() %>% dplyr::filter(grepl("^[bp]", .$variable)) %>% dplyr::pull(mean)
   } else {
-    test_params <- fit$summary() %>% dplyr::filter(grepl(glue::glue("\\[{idx},"), .$variable)) %>% dplyr::pull(mean)
-    print(test_params)
+    test_params <- fit$summary() %>% dplyr::filter(grepl(glue::glue("\\[{idx}\\]"), .$variable)) %>% dplyr::pull(mean)
   }
   test_site <- unique(con_dat$site)[idx]
   dat <- con_dat[site == test_site][water_year == min(water_year)]
