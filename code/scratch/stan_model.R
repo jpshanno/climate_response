@@ -41,24 +41,27 @@ create_data_matrix <- function(data, var) {
   res
 }
 
-generate_init_params <- function() {
-  matrix(
-    c(
-      runif(3, 0.9, 1.1),
-      runif(1, 0.4, 0.7)
-    ),
-    nrow = 1
-  )
-  }
-
 generate_values <- function() {
-    init_params <- generate_init_params()
-    init_tau <- matrix(runif(4, 0.01, 0.15), ncol = 4)
     list(
-      bPop = init_params,
-      bGroup = replicate(8, generate_init_params()),
-      tau = init_tau,
-      sigma = 1
+      bPET = runif(1, 0.9, 1.1),
+      bRain = runif(1, 0.9, 1.1),
+      bMelt = runif(1, 0.9, 1.1),
+      bQ = runif(1, 0.4, 0.6),
+      phiRain = runif(1, 0.1, 0.2),
+      phiMelt = runif(1, 0.1, 0.2),
+      taubPET = runif(1, 0.01, 0.03),
+      taubRain = runif(1, 0.01, 0.03),
+      taubMelt = runif(1, 0.01, 0.03),
+      taubQ = runif(1, 0.01, 0.03),
+      tauphiRain = runif(1, 0.01, 0.03),
+      tauphiMelt = runif(1, 0.01, 0.03),
+      gPET = runif(1, 0.9, 1.1),
+      gRain = runif(1, 0.9, 1.1),
+      gMelt = runif(1, 0.9, 1.1),
+      gQ = runif(1, 0.9, 1.1),
+      gphiRain = runif(1, 0.9, 1.1),
+      gphiMelt = runif(1, 0.9, 1.1),
+      sigma = runif(1, 0, 1)
     )
   }
 
