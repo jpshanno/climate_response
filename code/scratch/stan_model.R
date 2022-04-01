@@ -104,6 +104,76 @@ stan_data <- list(
   obs_sigma = obs_sigma
 )
 
+wl_model <- function(
+    bPET,
+    bRain,
+    bMelt,
+    bQ,
+    phiRain,
+    phiMelt,
+    pet,
+    rain,
+    melt,
+    D,
+    maxWL,
+    esyint,
+    esyslope,
+    minObsWL
+){
+  wlHat <- numeric(D)
+  Rain <- numeric(D)
+  Melt <- numeric(D)
+  gradient <- numeric(D)
+  qHat <- numeric(D)
+  mHat <- numeric(D)
+  pHat <- numeric(D)
+  petHat <- numeric(D)
+      
+      # Initialize model at full water level
+      wlHat[1] <- maxWL
+      
+      # Loop through weather data
+      for(t in 2:D){
+            Rain[t] <- rain[t] + rain[t-1] * phiRain
+            Melt[t] <- melt[t] + melt[t-1] * phiMelt
+            wlHat[t] <- wlHat[t - 1]
+            # Esy
+            # Calculate gradient of drawdown 
+            gradient[t] <- pmax(esyint - esyslope * wlHat[t-1], 1)
+            
+            # PET or P times Esy
+            # Use net input to determine if water level increases or decreases
+            # Assuming AET is negligible on days where P >= PET
+            # Water level drawdown = PET2, if P2 <= PET2 then it can be assumed to be
+            # less than interception (not necessarily true, but works as a
+            # simplifying assumption)
+            petHat[t] <- bPET * pet[t] * gradient[t]
+                  # pet_fun(wl_hat[t-1], maxWL, future.forest.change) * (MPET * PET[t]) * gradient[t]
+            wlHat[t] <- wlHat[t] + petHat[t] * (-pet[t] > rain[t])
+            pHat[t] <- bRain * Rain[t] * gradient[t]
+            wlHat[t] <- wlHat[t] + pHat[t] * (-pet[t] <= rain[t])
+            
+
+            # Snowmelt
+            mHat[t] <- bMelt * Melt[t] * gradient[t]
+            wlHat[t] <- wlHat[t] + mHat[t]
+
+            # Streamflow
+            # If WL is above spill point threshold then lose some to streamflow. 
+            # This could probably be improved using the morphology models to determine
+            # streamflow
+            if(wlHat[t-1] > maxWL){
+            qHat[t] <- bQ * (wlHat[t-1] - maxWL)
+            if(qHat[t] > wlHat[t] - maxWL){
+                  qHat[t] <- wlHat[t] - maxWL
+            }
+            wlHat[t] <- wlHat[t] - qHat[t]
+            }
+
+      }
+    wlHat
+   }
+
 # Priors -----------------------------------------------------------------------
 dist <- distributional::generate(distributional::dist_gamma(1, 4), 10000)[[1]]
 ex_dist <- distributional::generate(distributional::dist_exponential(5), 10000)[[1]]
