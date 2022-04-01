@@ -81,7 +81,15 @@ build_esy_functions <-
     # TODO: figure out why 053 water balance is so different from the other
     # sites. The shape is right, but there's a huge shift into positive water
     # balances
-    # mod <- brm(bf(wl_initial_cm ~ a - (a - b) * exp(-c * ytd_water_balance), a + b + c ~ 1 + (1 | site), nl = TRUE), data = drawdown[site!="053"], cores = 4, warmup = 500, iter = 600)
+    # con_dat <- training_data[["control"]][site %in% treatment_sites]
+    # data <- con_dat
+    # drawdown <- 
+    #     data[, 
+    #         .SD[which(format(sample_date, "%m%d") == "0401"):which.min(wl_initial_cm)],
+    #         by = .(site)]
+    # drawdown[, ytd_water_balance := cumsum(rain_cm + pet_cm + melt_cm),
+    #          by = .(site, water_year)]
+    # mod <- brm(bf(wl_initial_cm ~ a - (a - b) * exp(-c * ytd_water_balance), a + b + c ~ 1 + (1 | site), nl = TRUE), data = drawdown[site!="053"], cores = 4, warmup = 500, iter = 600, init = 0)
     # deriv = (a - b) * (exp(-c * x) * c)
     # Alternatively could so some sort of mixture of two models (a curve and 
     # a linear model), or more simply two linear models. A steep model for low
