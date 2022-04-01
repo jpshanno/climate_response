@@ -175,7 +175,7 @@ wl_model <- function(
    }
 
 # Priors -----------------------------------------------------------------------
-dist <- distributional::generate(distributional::dist_gamma(1, 4), 10000)[[1]]
+dist <- distributional::generate(distributional::dist_gamma(0.5, 10), 10000)[[1]]
 ex_dist <- distributional::generate(distributional::dist_exponential(5), 10000)[[1]]
 ggdist::mean_hdci(dist, .width = 0.9)
 ggdist::median_hdci(dist, .width = 0.9)
@@ -202,8 +202,7 @@ fit <- mod$sample(
   seed = 1234567,
   chains = 4,
   parallel_chains = 4,
-  adapt_delta = 0.99,
-  # max_treedepth = 11,
+  adapt_delta = 0.9,
   iter_warmup = 200,
   iter_sampling = 200,
   refresh = 50,
@@ -244,65 +243,70 @@ mcmc_dens(fit$draws(c("bphiRain", "bphiMelt"))) +
 
 # par(mfrow = c(2,2)); iwalk(draws, ~plot(log10(.x$stepsize__), type = "l", main = .y)); par(mfrow = c(1,1))
 
+plot_train_site <- function(site_id, pop_level = FALSE) {
+  idx <- which(c("009", "053", "077", "119", "139", "140", "151", "156") == site_id)
+  if(pop_level) {
+    test_params <- fit$summary() %>% dplyr::filter(grepl("^[bp]", .$variable)) %>% {set_names(.$mean, .$variable)}
+  } else {
+    test_params <- fit$summary() %>% dplyr::filter(grepl(glue::glue("\\[{idx}\\]"), .$variable)) %>% {set_names(.$mean, stringr::str_replace(.$variable, "(g([a-zA-Z]{1,})\\[[0-9]{1,}\\])", "b\\2"))}
+  }
+  test_site <- unique(con_dat$site)[idx]
+  dat <- con_dat[site == test_site][water_year == min(water_year)]
+  wl_hat <- wl_model(
+    bPET = test_params[["bPET"]],
+    bRain = test_params[["bRain"]],
+    bMelt = test_params[["bMelt"]],
+    bQ = test_params[["bQ"]],
+    phiRain = test_params[["bphiRain"]],
+    phiMelt = test_params[["bphiMelt"]],
+    pet = dat$pet_cm,
+    rain = dat$rain_cm,
+    melt = dat$melt_cm,
+    D = nrow(dat),
+    maxWL = esy_functions[site_id, max_wl],
+    esyint = test_params[["bEsyInt"]],
+    esyslope = test_params[["bEsySlope"]],
+    minObsWL = min(dat$wl_initial_cm, na.rm = TRUE)
+  )
+  ylim <- c(min(c(wl_hat, dat$wl_initial_cm), na.rm = TRUE), max(c(wl_hat, dat$wl_initial_cm), na.rm = TRUE))
+  plot(dat$wl_initial_cm, type = "l", main = site_id, ylim = ylim)
+  lines(wl_hat, col = 'red', lty = "dashed")
+}
 
 plot_test_site <- function(site_id, pop_level = FALSE) {
   idx <- which(c("009", "053", "077", "119", "139", "140", "151", "156") == site_id)
   if(pop_level) {
-    test_params <- fit$summary() %>% dplyr::filter(grepl("^[bp]", .$variable)) %>% dplyr::pull(mean)
+    test_params <- fit$summary() %>% dplyr::filter(grepl("^[bp]", .$variable)) %>% {set_names(.$mean, .$variable)}
   } else {
-    test_params <- fit$summary() %>% dplyr::filter(grepl(glue::glue("\\[{idx}\\]"), .$variable)) %>% dplyr::pull(mean)
+    test_params <- fit$summary() %>% dplyr::filter(grepl(glue::glue("\\[{idx}\\]"), .$variable)) %>% {set_names(.$mean, stringr::str_replace(.$variable, "(g([a-zA-Z]{1,})\\[[0-9]{1,}\\])", "b\\2"))}
   }
   print(c(site_id, test_params))
   dat <- testing_data[site == site_id & site_status == "Control"][, c(.SD, list(n_records = !is.na(wl_initial_cm))), by = .(water_year)][n_records > 0]
   if(nrow(dat) == 0) return(NULL)
   dat <- dat[water_year == sample(water_year, 1)]
-  new_params <- list(
-    MPET = test_params[1],
-    MP = test_params[2],
-    MM = test_params[3],
-    MQ = test_params[4],
-    minESY = esy_functions[site_id][["min_esy"]],
-    phiP = test_params[5],
-    phiM =test_params[6],
+  wl_hat <- wl_model(
+    bPET = test_params[["bPET"]],
+    bRain = test_params[["bRain"]],
+    bMelt = test_params[["bMelt"]],
+    bQ = test_params[["bQ"]],
+    phiRain = test_params[["bphiRain"]],
+    phiMelt = test_params[["bphiMelt"]],
+    pet = dat$pet_cm,
+    rain = dat$rain_cm,
+    melt = dat$melt_cm,
+    D = nrow(dat),
     maxWL = esy_functions[site_id, max_wl],
-    funESY = esy_functions[site_id, pred_fun]
+    esyint = test_params[["bEsyInt"]],
+    esyslope = test_params[["bEsySlope"]],
+    minObsWL = min(dat$wl_initial_cm, na.rm = TRUE)
   )
-  test <- wetland_model(dat, new_params)
-  ylim <- c(min(c(test$wl_hat, dat$wl_initial_cm)), max(c(test$wl_hat, dat$wl_initial_cm)))
+  ylim <- c(min(c(wl_hat, dat$wl_initial_cm)), max(c(wl_hat, dat$wl_initial_cm)))
   plot(dat$wl_initial_cm, type = "l", main = site_id, ylim = ylim)
-  lines(test$wl_hat, col = 'red', lty = "dashed")
+  lines(wl_hat, col = 'red', lty = "dashed")
 }
+
+par(mfrow = c(2, 4)); purrr::walk(unique(con_dat$site), ~plot_train_site(.x)); par(mfrow = c(1,1))
+par(mfrow = c(2, 4)); purrr::walk(unique(con_dat$site), ~plot_train_site(.x, TRUE)); par(mfrow = c(1,1))
 sites_to_test <- intersect(testing_data[site_status == "Control"]$site, con_dat$site)
 par(mfrow = c(2, 4)); purrr::walk(sites_to_test, ~plot_test_site(.x)); par(mfrow = c(1,1))
 par(mfrow = c(2, 4)); purrr::walk(sites_to_test, ~plot_test_site(.x, TRUE)); par(mfrow = c(1,1))
-
-plot_train_site <- function(site_id, pop_level = FALSE) {
-  idx <- which(c("009", "053", "077", "119", "139", "140", "151", "156") == site_id)
-  if(pop_level) {
-    test_params <- fit$summary() %>% dplyr::filter(grepl("^[bp]", .$variable)) %>% dplyr::pull(mean)
-  } else {
-    test_params <- fit$summary() %>% dplyr::filter(grepl(glue::glue("\\[{idx}\\]"), .$variable)) %>% dplyr::pull(mean)
-  }
-  test_site <- unique(con_dat$site)[idx]
-  dat <- con_dat[site == test_site][water_year == min(water_year)]
-  new_params <- list(
-    MPET = test_params[1],
-    MP = test_params[2],
-    MM = test_params[3],
-    MQ = test_params[4],
-    minESY = esy_functions[test_site][["min_esy"]],
-    phiP = test_params[5],
-    phiM = test_params[6],
-    maxWL = esy_functions[test_site, max_wl],
-    funESY = esy_functions[test_site, pred_fun]
-  )
-  test <- wetland_model(dat, new_params)
-  ylim <- c(
-    min(c(test$wl_hat, dat$wl_initial_cm), na.rm = TRUE),
-    max(c(test$wl_hat, dat$wl_initial_cm), na.rm = TRUE)
-  )
-  plot(dat$wl_initial_cm, type = "l", ylim = ylim)
-  lines(test$wl_hat, col = 'red', lty = "dashed")
-}
-par(mfrow = c(2, 4)); purrr::walk(unique(con_dat$site), ~plot_train_site(.x)); par(mfrow = c(1,1))
-par(mfrow = c(2, 4)); purrr::walk(unique(con_dat$site), ~plot_train_site(.x, TRUE)); par(mfrow = c(1,1))
