@@ -212,23 +212,23 @@ fit <- mod$sample(
 )
 
 fit$summary() %>% dplyr::select(variable, mean, median, rhat) %>% print(n = nrow(.))
-mcmc_dens(fit$draws(c("bPop[1]", "bPop[2]", "bPop[3]"))) +
+mcmc_dens(fit$draws(c("bPET", "bRain", "bMelt"))) +
   geom_density(
     color = 'red',
     linetype = 'dashed',
-    aes(x = distributional::generate(distributional::dist_gamma(10, 10), 12000)[[1]]))
+    aes(x = distributional::generate(distributional::dist_gamma(10, 10), 2400)[[1]]))
 
-mcmc_dens(fit$draws(c("bPop[4]"))) +
+mcmc_dens(fit$draws(c("bQ"))) +
   geom_density(
     color = 'red',
     linetype = 'dashed',
-    aes(x = distributional::generate(distributional::dist_gamma(1, 4), 4000)[[1]]))
+    aes(x = distributional::generate(distributional::dist_gamma(1, 4), 800)[[1]]))
 
-mcmc_dens(fit$draws(c("bPop[5]", "bPop[6]"))) +
+mcmc_dens(fit$draws(c("bphiRain", "bphiMelt"))) +
   geom_density(
     color = 'red',
     linetype = 'dashed',
-    aes(x = distributional::generate(distributional::dist_exponential(10), 8000)[[1]]))
+    aes(x = distributional::generate(distributional::dist_exponential(10), 1600)[[1]]))
 
 # draws <- map(
 #   seq_len(4),
