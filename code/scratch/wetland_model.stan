@@ -51,7 +51,7 @@ functions {
             wlHat[t] = wlHat[t - 1];
             // Esy
             // Calculate gradient of drawdown 
-            gradient[t] = fmax(esyint - esyslope * wlHat[t-1], 1);
+            gradient[t] = fmax(esyint - esyslope * wlHat[t], 1);
             
             // PET or P times Esy
             // Use net input to determine if water level increases or decreases
