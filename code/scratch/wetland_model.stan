@@ -29,7 +29,7 @@ functions {
      real maxWL,
      real esyint,
      real esyslope,
-     real minObsWL){
+     real esymin){
             
       // Create empty vectors
       row_vector[D] wlHat;
@@ -51,7 +51,7 @@ functions {
             wlHat[t] = wlHat[t - 1];
             // Esy
             // Calculate gradient of drawdown 
-            gradient[t] = fmax(esyint - esyslope * wlHat[t], 1);
+            gradient[t] = fmax(esyint - esyslope * wlHat[t], esymin);
             
             // PET or P times Esy
             // Use net input to determine if water level increases or decreases
@@ -61,9 +61,9 @@ functions {
             // simplifying assumption)
             petHat[t] = bPET * pet[t] * gradient[t];
                   // pet_fun(wl_hat[t-1], maxWL, future.forest.change) * (MPET * PET[t]) * gradient[t]
-            wlHat[t] = wlHat[t] + petHat[t] * (pet[t] > rain[t]);
+            wlHat[t] = wlHat[t] + petHat[t];
             pHat[t] = bRain * Rain[t] * gradient[t];
-            wlHat[t] = wlHat[t] + pHat[t] * (pet[t] <= rain[t]);
+            wlHat[t] = wlHat[t] + pHat[t];
             
 
             // Snowmelt
@@ -108,24 +108,26 @@ parameters {
    real<lower = 0> bphiMelt;
    real<lower = 0> bEsyInt;
    real<lower = 0> bEsySlope;
+   real<lower = 0> bEsyMin;
    real<lower = 0> taubPET;
    real<lower = 0> taubRain;
    real<lower = 0> taubMelt;
    real<lower = 0> taubQ;
    real<lower = 0> tauphiRain;
    real<lower = 0> tauphiMelt;
-   real<lower = 0> tauEsyInt;
-   real<lower = 0> tauEsySlope;
+   real<lower = 0> taubEsyInt;
+   real<lower = 0> taubEsySlope;
+   real<lower = 0> taubEsyMin;
    row_vector<offset = bPET, multiplier = taubPET>[K] gPET;
    row_vector<offset = bRain, multiplier = taubRain>[K] gRain;
    row_vector<offset = bMelt, multiplier = taubMelt>[K] gMelt;
    row_vector<offset = bQ, multiplier = taubQ>[K] gQ;
    row_vector<offset = bphiRain, multiplier = tauphiRain>[K] gphiRain;
    row_vector<offset = bphiMelt, multiplier = tauphiMelt>[K] gphiMelt;
-   row_vector<offset = bEsyInt, multiplier = tauEsyInt>[K] gEsyInt;
-   row_vector<offset = bEsySlope, multiplier = tauEsySlope>[K] gEsySlope;
+   row_vector<offset = bEsyInt, multiplier = taubEsyInt>[K] gEsyInt;
+   row_vector<offset = bEsySlope, multiplier = taubEsySlope>[K] gEsySlope;
+   row_vector<offset = bEsyMin, multiplier = taubEsyMin>[K] gEsyMin;
    real<lower = 0> sigma;
-   real<lower = 0> sigmaEsy;
 }
 model {
    matrix[K,D] yHat;
@@ -140,8 +142,8 @@ model {
    target += exponential_lpdf(bphiMelt | 10);
    target += normal_lpdf(bEsyInt | 2, 1);
    target += gamma_lpdf(bEsySlope | 0.5, 10);
+   target += std_normal_lpdf(bEsyMin);
    target += std_normal_lpdf(sigma);
-   target += std_normal_lpdf(sigmaEsy);
 
    // Standard Deviation of Group Effects around Population Effects
    target += normal_lpdf(taubPET | 0, 0.05);
@@ -150,8 +152,9 @@ model {
    target += normal_lpdf(taubQ | 0, 0.05);
    target += normal_lpdf(tauphiRain | 0, 0.05);
    target += normal_lpdf(tauphiMelt | 0, 0.05);
-   target += std_normal_lpdf(tauEsyInt);
-   target += normal_lpdf(tauEsySlope | 0, 0.05);
+   target += std_normal_lpdf(taubEsyInt);
+   target += normal_lpdf(taubEsySlope | 0, 0.005);
+   target += normal_lpdf(taubEsyMin | 0, 0.05);
    
    for(k in 1:K) {
       target += normal_lpdf(gPET[k] | bPET, taubPET);
@@ -160,12 +163,13 @@ model {
       target += normal_lpdf(gQ[k] | bQ, taubQ);
       target += normal_lpdf(gphiRain[k] | bphiRain, tauphiRain);
       target += normal_lpdf(gphiMelt[k] | bphiMelt, tauphiMelt);
-      target += normal_lpdf(gEsyInt[k] | bEsyInt, tauEsyInt);
-      target += normal_lpdf(gEsySlope[k] | bEsySlope, tauEsySlope);
+      target += normal_lpdf(gEsyInt[k] | bEsyInt, taubEsyInt);
+      target += normal_lpdf(gEsySlope[k] | bEsySlope, taubEsySlope);
+      target += normal_lpdf(gEsyMin[k] | bEsyMin, taubEsyMin);
       // vector[N[k]] esyHat;
       // esyHat = fitEsy(waterBalance, y, gasympA[k], gasympB[k], gasympC[k]);
       // target += normal_lpdf()
-      minObsWL = max(y[k, ]);
+
       yHat[k] = wetlandModel(
         gPET[k],
         gRain[k],
@@ -180,7 +184,10 @@ model {
         maxWL[k],
         gEsyInt[k],
         gEsySlope[k],
-        minObsWL);
+        gEsyMin[k]
+      //   esyParams[k, 5],
+      //   esyParams[k, 6]
+        );
       for(i in 1:D){
          target +=  normal_lpdf(y[k,i] | yHat[k,i], sigma) * wghts[k,i];
       }

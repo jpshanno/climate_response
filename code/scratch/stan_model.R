@@ -21,7 +21,7 @@ library(bayesplot)
 # Weights increase asymmetrically as water levels drop
 create_weights <- function(x, scale) {
   init_weight <- 1 / !is.na(x)
-  wghts <- pmax(init_weight, init_weight * abs(scale - x))
+  wghts <- pmax(init_weight, init_weight * (scale - x))
   # Weights are squared
   wghts <- wghts^2
   wghts[is.na(x)] <- 0
@@ -85,14 +85,14 @@ con_dat[, filled_wl := nafill(wl_initial_cm ,"const", -9999)]
 # esy_functions[sort(unique(con_dat$site))]$min_esy
 esy_params <- matrix(
   c(
-      0.9440797, 9.68796681237216, 0.963832093292945, 0.011490387703557, 1.78, -0.0660
-    , 1.2087133, 9.6930777345254, 2.10532835889272, 0.0157893963100476, 0.653, -0.0915
-    , 1.1956961, 9.35343568266112, 1.62678535681258, 0.00984811084065675, 2.29, -0.0724
-    , 1.1942750, 8.85796577611301, 2.0742188380092, 0.0148425995465377, 2.32, -0.0427
-    , 1.3711603, 9.79628207399244, 1.31799862570157, 0.00835140512795191, 1.93, -0.0635
-    , 1.4753461, 9.92020216902697, 2.40233114598982, 0.0103268508715977, 2.32, -0.0518
-    , 1.0764391, 9.56079966326987, 1.17368355521875, 0.00762101076778987, 2.04, -0.0871
-    , 0.2738756, 9.64372934079638, 2.0767145808409, 0.0127361070535151, 3.03, -0.0720
+      0.9440797, 9.68796681237216, 0.963832093292945, 0.011490387703557, 1.78, 0.0660
+    , 1.2087133, 9.6930777345254, 2.10532835889272, 0.0157893963100476, 0.653, 0.0915
+    , 1.1956961, 9.35343568266112, 1.62678535681258, 0.00984811084065675, 2.29, 0.0724
+    , 1.1942750, 8.85796577611301, 2.0742188380092, 0.0148425995465377, 2.32, 0.0427
+    , 1.3711603, 9.79628207399244, 1.31799862570157, 0.00835140512795191, 1.93, 0.0635
+    , 1.4753461, 9.92020216902697, 2.40233114598982, 0.0103268508715977, 2.32, 0.0518
+    , 1.0764391, 9.56079966326987, 1.17368355521875, 0.00762101076778987, 2.04, 0.0871
+    , 0.2738756, 9.64372934079638, 2.0767145808409, 0.0127361070535151, 3.03, 0.0720
   ),
   byrow = TRUE,
   ncol = 6
@@ -127,7 +127,7 @@ wl_model <- function(
     maxWL,
     esyint,
     esyslope,
-    minObsWL
+    esymin
 ){
   wlHat <- numeric(D)
   Rain <- numeric(D)
@@ -148,7 +148,7 @@ wl_model <- function(
             wlHat[t] <- wlHat[t - 1]
             # Esy
             # Calculate gradient of drawdown 
-            gradient[t] <- pmax(esyint - esyslope * wlHat[t-1], 1)
+            gradient[t] <- pmax(esyint - esyslope * wlHat[t], esymin)
             
             # PET or P times Esy
             # Use net input to determine if water level increases or decreases
@@ -158,9 +158,9 @@ wl_model <- function(
             # simplifying assumption)
             petHat[t] <- bPET * pet[t] * gradient[t]
                   # pet_fun(wl_hat[t-1], maxWL, future.forest.change) * (MPET * PET[t]) * gradient[t]
-            wlHat[t] <- wlHat[t] + petHat[t] * (-pet[t] > rain[t])
+            wlHat[t] <- wlHat[t] + petHat[t]
             pHat[t] <- bRain * Rain[t] * gradient[t]
-            wlHat[t] <- wlHat[t] + pHat[t] * (-pet[t] <= rain[t])
+            wlHat[t] <- wlHat[t] + pHat[t]
             
 
             # Snowmelt
@@ -211,7 +211,7 @@ fit <- mod$sample(
   seed = 1234567,
   chains = 4,
   parallel_chains = 4,
-  adapt_delta = 0.9,
+  adapt_delta = 0.6,
   iter_warmup = 200,
   iter_sampling = 200,
   refresh = 50,
@@ -219,6 +219,7 @@ fit <- mod$sample(
   init = init_values
 )
 
+fit$summary() %>% print(n = nrow(.))
 fit$summary() %>% dplyr::select(variable, mean, median, rhat) %>% print(n = nrow(.))
 mcmc_dens(fit$draws(c("bPET", "bRain", "bMelt"))) +
   geom_density(
@@ -275,7 +276,7 @@ plot_train_site <- function(site_id, pop_level = FALSE) {
     maxWL = esy_functions[site_id, max_wl],
     esyint = test_params[["bEsyInt"]],
     esyslope = test_params[["bEsySlope"]],
-    minObsWL = min(dat$wl_initial_cm, na.rm = TRUE)
+    esymin = test_params[["bEsyMin"]]
   )
   ylim <- c(min(c(wl_hat, dat$wl_initial_cm), na.rm = TRUE), max(c(wl_hat, dat$wl_initial_cm), na.rm = TRUE))
   plot(dat$wl_initial_cm, type = "l", main = site_id, ylim = ylim)
@@ -307,7 +308,7 @@ plot_test_site <- function(site_id, pop_level = FALSE) {
     maxWL = esy_functions[site_id, max_wl],
     esyint = test_params[["bEsyInt"]],
     esyslope = test_params[["bEsySlope"]],
-    minObsWL = min(dat$wl_initial_cm, na.rm = TRUE)
+    esymin = test_params[["bEsyMin"]]
   )
   ylim <- c(min(c(wl_hat, dat$wl_initial_cm)), max(c(wl_hat, dat$wl_initial_cm)))
   plot(dat$wl_initial_cm, type = "l", main = site_id, ylim = ylim)
