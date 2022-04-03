@@ -47,20 +47,29 @@ generate_values <- function() {
       bRain = runif(1, 0.9, 1.1),
       bMelt = runif(1, 0.9, 1.1),
       bQ = runif(1, 0.4, 0.6),
-      phiRain = runif(1, 0.1, 0.2),
-      phiMelt = runif(1, 0.1, 0.2),
+      bphiRain = runif(1, 0.1, 0.2),
+      bphiMelt = runif(1, 0.1, 0.2),
+      bEsyInt = runif(1, 1, 2),
+      bEsySlope = runif(1, 0, 0.1),
+      bEsyMin = runif(1, 0, 1),
       taubPET = runif(1, 0.01, 0.03),
       taubRain = runif(1, 0.01, 0.03),
       taubMelt = runif(1, 0.01, 0.03),
       taubQ = runif(1, 0.01, 0.03),
       tauphiRain = runif(1, 0.01, 0.03),
       tauphiMelt = runif(1, 0.01, 0.03),
-      gPET = runif(1, 0.9, 1.1),
-      gRain = runif(1, 0.9, 1.1),
-      gMelt = runif(1, 0.9, 1.1),
-      gQ = runif(1, 0.9, 1.1),
-      gphiRain = runif(1, 0.9, 1.1),
-      gphiMelt = runif(1, 0.9, 1.1),
+      taubEsyInt = runif(1, 0.01, 0.03),
+      taubEsySlope = runif(1, 0.01, 0.03),
+      taubEsyMin = runif(1, 0.01, 0.03),
+      gPET = runif(8, 0.9, 1.1),
+      gRain = runif(8, 0.9, 1.1),
+      gMelt = runif(8, 0.9, 1.1),
+      gQ = runif(8, 0.9, 1.1),
+      gphiRain = runif(8, 0.9, 1.1),
+      gphiMelt = runif(8, 0.9, 1.1),
+      gEsyInt = runif(8, 1, 2),
+      gEsySlope = runif(8, 0, 0.1),
+      gEsyMin = runif(8, 0, 1),
       sigma = runif(1, 0, 1)
     )
   }
@@ -207,7 +216,7 @@ fit <- mod$sample(
   iter_sampling = 200,
   refresh = 50,
   save_warmup = TRUE,
-  init = 0
+  init = init_values
 )
 
 fit$summary() %>% dplyr::select(variable, mean, median, rhat) %>% print(n = nrow(.))
