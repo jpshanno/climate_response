@@ -139,9 +139,9 @@ model {
    matrix[K,D] yHat;
    
    // Population Estimates
-   tau ~ std_normal();
+   tau ~ gamma(1, 10);
    Omega ~ lkj_corr(0.5);
-   bTilde ~ gamma(20, 20);
+   bTilde ~ gamma(10, 10);
    z ~ multi_normal([0,0]', quad_form_diag(Omega, tau));
    // target += gamma_lpdf(bPET | 10, 10);
    // target += gamma_lpdf(bRain | 11, 10);
