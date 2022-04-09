@@ -59,7 +59,7 @@ functions {
             petHat[t] = bPET * pet[t] * gradient[t] * (-pet[t] > rain[t]);
                   // pet_fun(wl_hat[t-1], maxWL, future.forest.change) * (MPET * PET[t]) * gradient[t]
             wlHat[t] = wlHat[t] + petHat[t];
-            pHat[t] = bRain * rain[t] * gradient[t] * (-pet[t] <= rain[t]);;
+            pHat[t] = bRain * rain[t] * gradient[t] * (-pet[t] <= rain[t]);
             wlHat[t] = wlHat[t] + pHat[t];
             
 
@@ -97,11 +97,10 @@ data {
    // vector[K] obs_sigma; // mean of daily water level change by site
 }
 parameters {
-   // vector[2] z;
-   // vector<lower = 0>[2] bTilde;
-   vector<lower = 0>[2] bParams;
-   // vector<lower=0>[2] tau;
-   cholesky_factor_corr[2] L_Omega;
+   vector<lower = 0>[2] z;
+   real<lower = 0> bTilde;
+   vector<lower=0>[2] tau;
+   corr_matrix[2] Omega;
    // real<lower = 0> bPET;
    // real<lower = 0> bRain;
    // real<lower = 0> bMelt;
@@ -132,20 +131,18 @@ parameters {
    real<lower = 0> omega;
    real<upper = 0> alpha;
 }
-// transformed parameters{
-//    vector<lower = 0>[2] bParams;
-//    bParams = bTilde + diag_pre_multiply(tau, L_Omega) * z;
-// }
+transformed parameters{
+   vector<lower = 0>[2] bParams;
+   bParams = bTilde + z;
+}
 model {
    matrix[K,D] yHat;
-   vector[2] mu = [0,0]';
+   
    // Population Estimates
-   // tau ~ gamma(1, 10);
-   L_Omega ~ lkj_corr_cholesky(0.5);
-   // z ~ normal(0, 0.1);
-   // bTilde ~ gamma(10, 10);
-   bParams ~ multi_normal_cholesky(mu, L_Omega);
-   // bParams ~ multi_normal(bTilde, quad_form_diag(Omega, tau));
+   tau ~ std_normal();
+   Omega ~ lkj_corr(0.5);
+   bTilde ~ gamma(20, 20);
+   z ~ multi_normal([0,0]', quad_form_diag(Omega, tau));
    // target += gamma_lpdf(bPET | 10, 10);
    // target += gamma_lpdf(bRain | 11, 10);
    // target += gamma_lpdf(bMelt | 11, 10);
@@ -201,7 +198,3 @@ model {
       }
    }
 }
-generated quantities{
- corr_matrix[2] Omega = L_Omega * L_Omega';
-}
-
