@@ -1,9 +1,10 @@
 ####### WORK WITH ONLY TREATED SITES TO AVOID UNEVEN GROUP SIZES
 
 
-# TODO: Loosen priors
-# TODO: get init working
-# TODO: Consider heavier weighting (cubic)
+# TODO: Limit rain inputs to only periods when rain is greater than PET
+# TODO: compare symmetric and asymmetric weights
+# TODO: limit number of params by setting melt params equal to rain params
+# TODO: Try same starting params for all chains
 source("code/load_project.R")
 tar_load(training_data)
 tar_load(testing_data)
@@ -21,11 +22,11 @@ library(bayesplot)
 # Weights increase asymmetrically as water levels drop
 create_weights <- function(x, scale) {
   init_weight <- 1 / !is.na(x)
-  wghts <- pmax(init_weight, init_weight * (scale - x))
+  wghts <- pmax(init_weight, init_weight * abs(scale - x))
   # Weights are squared
   wghts <- wghts^2
   wghts[is.na(x)] <- 0
-  wghts <- wghts / sum(wghts)
+  # wghts <- wghts / sum(wghts)
   assertthat::assert_that(assertthat::noNA(wghts))
   wghts
 }
@@ -45,32 +46,33 @@ generate_values <- function() {
     list(
       bPET = runif(1, 0.9, 1.1),
       bRain = runif(1, 0.9, 1.1),
-      bMelt = runif(1, 0.9, 1.1),
+      # bMelt = runif(1, 0.9, 1.1),
       bQ = runif(1, 0.4, 0.6),
-      bphiRain = runif(1, 0.1, 0.2),
-      bphiMelt = runif(1, 0.1, 0.2),
+      # bphiRain = runif(1, 0.1, 0.2),
+      # bphiMelt = runif(1, 0.1, 0.2),
       bEsyInt = runif(1, 1, 2),
       bEsySlope = runif(1, 0, 0.1),
       bEsyMin = runif(1, 0, 1),
-      taubPET = runif(1, 0.01, 0.03),
-      taubRain = runif(1, 0.01, 0.03),
-      taubMelt = runif(1, 0.01, 0.03),
-      taubQ = runif(1, 0.01, 0.03),
-      tauphiRain = runif(1, 0.01, 0.03),
-      tauphiMelt = runif(1, 0.01, 0.03),
-      taubEsyInt = runif(1, 0.01, 0.03),
-      taubEsySlope = runif(1, 0.01, 0.03),
-      taubEsyMin = runif(1, 0.01, 0.03),
-      gPET = runif(8, 0.9, 1.1),
-      gRain = runif(8, 0.9, 1.1),
-      gMelt = runif(8, 0.9, 1.1),
-      gQ = runif(8, 0.9, 1.1),
-      gphiRain = runif(8, 0.9, 1.1),
-      gphiMelt = runif(8, 0.9, 1.1),
-      gEsyInt = runif(8, 1, 2),
-      gEsySlope = runif(8, 0, 0.1),
-      gEsyMin = runif(8, 0, 1),
-      sigma = runif(1, 0, 1)
+      # taubPET = runif(1, 0.01, 0.03),
+      # taubRain = runif(1, 0.01, 0.03),
+      # taubMelt = runif(1, 0.01, 0.03),
+      # taubQ = runif(1, 0.01, 0.03),
+      # tauphiRain = runif(1, 0.01, 0.03),
+      # tauphiMelt = runif(1, 0.01, 0.03),
+      # taubEsyInt = runif(1, 0.01, 0.03),
+      # taubEsySlope = runif(1, 0.01, 0.03),
+      # taubEsyMin = runif(1, 0.01, 0.03),
+      # gPET = runif(8, 0.9, 1.1),
+      # gRain = runif(8, 0.9, 1.1),
+      # gMelt = runif(8, 0.9, 1.1),
+      # gQ = runif(8, 0.9, 1.1),
+      # gphiRain = runif(8, 0.9, 1.1),
+      # gphiMelt = runif(8, 0.9, 1.1),
+      # gEsyInt = runif(8, 1, 2),
+      # gEsySlope = runif(8, 0, 0.1),
+      # gEsyMin = runif(8, 0, 1),
+      omega = runif(1, 0, 1),
+      alpha = runif(1, -1, 0)
     )
   }
 
@@ -107,19 +109,18 @@ stan_data <- list(
   rain = create_data_matrix(con_dat, "rain_cm"),
   melt = create_data_matrix(con_dat, "melt_cm"),
   wghts = create_data_matrix(con_dat, "wghts"),
-  maxWL = create_data_matrix(con_dat, "max_wl")[, 1],
   y = create_data_matrix(con_dat, "filled_wl"),
   esyParams = esy_params,
-  obs_sigma = obs_sigma
+  maxWL = create_data_matrix(con_dat, "max_wl")[, 1]
 )
 
 wl_model <- function(
-    bPET,
-    bRain,
-    bMelt,
-    bQ,
-    phiRain,
-    phiMelt,
+    # bPET,
+    # bRain,
+    # bMelt,
+    # bQ,
+    # phiRain,
+    # phiMelt,
     pet,
     rain,
     melt,
@@ -143,8 +144,8 @@ wl_model <- function(
       
       # Loop through weather data
       for(t in 2:D){
-            Rain[t] <- rain[t] + rain[t-1] * phiRain
-            Melt[t] <- melt[t] + melt[t-1] * phiMelt
+            # Rain[t] <- rain[t] + rain[t-1] * phiRain
+            # Melt[t] <- melt[t] + melt[t-1] * phiMelt
             wlHat[t] <- wlHat[t - 1]
             # Esy
             # Calculate gradient of drawdown 
@@ -156,35 +157,35 @@ wl_model <- function(
             # Water level drawdown = PET2, if P2 <= PET2 then it can be assumed to be
             # less than interception (not necessarily true, but works as a
             # simplifying assumption)
-            petHat[t] <- bPET * pet[t] * gradient[t]
+            petHat[t] <- pet[t] * gradient[t]
                   # pet_fun(wl_hat[t-1], maxWL, future.forest.change) * (MPET * PET[t]) * gradient[t]
             wlHat[t] <- wlHat[t] + petHat[t]
-            pHat[t] <- bRain * Rain[t] * gradient[t]
+            pHat[t] <- rain[t] * gradient[t]
             wlHat[t] <- wlHat[t] + pHat[t]
             
 
             # Snowmelt
-            mHat[t] <- bMelt * Melt[t] * gradient[t]
+            mHat[t] <- Melt[t] * gradient[t]
             wlHat[t] <- wlHat[t] + mHat[t]
 
             # Streamflow
             # If WL is above spill point threshold then lose some to streamflow. 
             # This could probably be improved using the morphology models to determine
             # streamflow
-            if(wlHat[t-1] > maxWL){
-            qHat[t] <- bQ * (wlHat[t-1] - maxWL)
-            if(qHat[t] > wlHat[t] - maxWL){
-                  qHat[t] <- wlHat[t] - maxWL
-            }
-            wlHat[t] <- wlHat[t] - qHat[t]
-            }
+            # if(wlHat[t-1] > maxWL){
+            # qHat[t] <- bQ * (wlHat[t-1] - maxWL)
+            # if(qHat[t] > wlHat[t] - maxWL){
+            #       qHat[t] <- wlHat[t] - maxWL
+            # }
+            # wlHat[t] <- wlHat[t] - qHat[t]
+            # }
 
       }
     wlHat
    }
 
 # Priors -----------------------------------------------------------------------
-dist <- distributional::generate(distributional::dist_gamma(0.5, 10), 10000)[[1]]
+dist <- distributional::generate(distributional::dist_gamma(1, 1), 10000)[[1]]
 ex_dist <- distributional::generate(distributional::dist_exponential(5), 10000)[[1]]
 ggdist::mean_hdci(dist, .width = 0.9)
 ggdist::median_hdci(dist, .width = 0.9)
@@ -206,26 +207,34 @@ mod <- cmdstan_model(
 
 # Tightening priors and increasing adapt_delta reduces divergences (see last
 # commit)
+# vals <- lapply(1:4, \(x){init_values(x)})
 fit <- mod$sample(
   data = stan_data,
   seed = 1234567,
-  chains = 4,
   parallel_chains = 4,
-  adapt_delta = 0.6,
-  iter_warmup = 200,
+  adapt_delta = 0.99,
+  iter_warmup = 1000,
   iter_sampling = 200,
-  refresh = 50,
+  refresh = 250,
   save_warmup = TRUE,
   init = init_values
 )
 
-fit$summary() %>% print(n = nrow(.))
-fit$summary() %>% dplyr::select(variable, mean, median, rhat) %>% print(n = nrow(.))
-mcmc_dens(fit$draws(c("bPET", "bRain", "bMelt"))) +
-  geom_density(
-    color = 'red',
-    linetype = 'dashed',
-    aes(x = distributional::generate(distributional::dist_gamma(10, 10), 2400)[[1]]))
+fit$summary()
+mcmc_trace(fit$draws(inc_warmup = FALSE))
+mcmc_dens(fit$draws(inc_warmup = FALSE))
+mcmc_trace(fit$draws(inc_warmup = FALSE))
+mcmc_trace(fit$draws(c("bTilde"), TRUE))
+mcmc_trace(fit$draws(c("bTilde[1]", "bTilde[2]"), TRUE))
+mcmc_trace(fit$draws(c("z[1]", "z[2]"), TRUE))
+mcmc_trace(fit$draws(c("tau[1]", "tau[2]"), TRUE))
+mcmc_pairs(fit$draws(c("bParams[1]", "bParams[2]"), TRUE))
+mcmc_pairs(fit$draws(c("bTilde[1]", "bTilde[2]"), TRUE))
+mcmc_pairs(fit$draws(c("z[1]", "z[2]"), TRUE))
+mcmc_pairs(fit$draws(c("bPET", "bEsyMin")))
+mcmc_dens(fit$draws(c("bPET", "bRain", "bMelt")))
+mcmc_dens(fit$draws(c("bParams[1]", "bParams[2]", "bTilde", "z[1]", "z[2]")))
+mcmc_hist(fit$draws(c("bParams[1]", "bParams[2]", "bTilde", "z[1]", "z[2]")))
 
 mcmc_dens(fit$draws(c("bQ"))) +
   geom_density(
@@ -263,12 +272,12 @@ plot_train_site <- function(site_id, pop_level = FALSE) {
   test_site <- unique(con_dat$site)[idx]
   dat <- con_dat[site == test_site][water_year == min(water_year)]
   wl_hat <- wl_model(
-    bPET = test_params[["bPET"]],
-    bRain = test_params[["bRain"]],
-    bMelt = test_params[["bMelt"]],
-    bQ = test_params[["bQ"]],
-    phiRain = test_params[["bphiRain"]],
-    phiMelt = test_params[["bphiMelt"]],
+    # bPET = test_params[["bPET"]],
+    # bRain = test_params[["bRain"]],
+    # bMelt = test_params[["bMelt"]],
+    # bQ = test_params[["bQ"]],
+    # phiRain = test_params[["bphiRain"]],
+    # phiMelt = test_params[["bphiMelt"]],
     pet = dat$pet_cm,
     rain = dat$rain_cm,
     melt = dat$melt_cm,
@@ -295,12 +304,12 @@ plot_test_site <- function(site_id, pop_level = FALSE) {
   if(nrow(dat) == 0) return(NULL)
   dat <- dat[water_year == sample(water_year, 1)]
   wl_hat <- wl_model(
-    bPET = test_params[["bPET"]],
-    bRain = test_params[["bRain"]],
-    bMelt = test_params[["bMelt"]],
-    bQ = test_params[["bQ"]],
-    phiRain = test_params[["bphiRain"]],
-    phiMelt = test_params[["bphiMelt"]],
+    # bPET = test_params[["bPET"]],
+    # bRain = test_params[["bRain"]],
+    # bMelt = test_params[["bMelt"]],
+    # bQ = test_params[["bQ"]],
+    # phiRain = test_params[["bphiRain"]],
+    # phiMelt = test_params[["bphiMelt"]],
     pet = dat$pet_cm,
     rain = dat$rain_cm,
     melt = dat$melt_cm,
