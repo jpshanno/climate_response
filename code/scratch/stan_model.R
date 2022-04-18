@@ -43,16 +43,41 @@ create_data_matrix <- function(data, var) {
 }
 
 generate_values <- function() {
+  bEsyMin <- distributional::generate(distributional::dist_gamma(6, 8), 1)[[1]]
+  bEsyInt <- 0
+  while(bEsyInt <= 0) {
+    bEsyInt <- rnorm(1, 4, 1)
+  }
+  bEsySlope <- distributional::generate(distributional::dist_gamma(2, 16), 1)[[1]]
+  tau <- distributional::generate(distributional::dist_gamma(1, 10), 1)[[1]]
+  Sigma <- matrix(c(1, tau, tau, 1), ncol = 2)
+  Omega <- matrix(c(1, 0, 0, 1), nrow = 2, ncol = 2)
+  z <- distributional::generate(
+    distributional::dist_multivariate_normal(
+      mu = list(c(0, 0)),
+      sigma = list(Sigma)
+    ),
+  1
+  )
+  z <- as.numeric(z[[1]])
     list(
-      bPET = runif(1, 0.9, 1.1),
-      bRain = runif(1, 0.9, 1.1),
+      # bPET = runif(1, 0.9, 1.1),
+      # bRain = runif(1, 0.9, 1.1),
       # bMelt = runif(1, 0.9, 1.1),
-      bQ = runif(1, 0.4, 0.6),
+      # bQ = runif(1, 0.4, 0.6),
       # bphiRain = runif(1, 0.1, 0.2),
       # bphiMelt = runif(1, 0.1, 0.2),
-      bEsyInt = runif(1, 1, 2),
-      bEsySlope = runif(1, 0, 0.1),
-      bEsyMin = runif(1, 0, 1),
+      # bEsyInt = runif(1, 1, 2),
+      # bEsySlope = runif(1, 0, 0.1),
+      bEsyMin = bEsyMin,
+      bEsyInt = bEsyInt,
+      bEsySlope = bEsySlope,
+      bEsyMax = distributional::generate(distributional::dist_gamma(20, 10), 1)[[1]],
+      # tau = array(tau),
+      # Omega = Omega,
+      # z = array(z),
+      # bEsyInt = array(bEsyIntTilde),
+      # bEsySlope = array(bEsySlopeTilde),
       # taubPET = runif(1, 0.01, 0.03),
       # taubRain = runif(1, 0.01, 0.03),
       # taubMelt = runif(1, 0.01, 0.03),
@@ -71,8 +96,9 @@ generate_values <- function() {
       # gEsyInt = runif(8, 1, 2),
       # gEsySlope = runif(8, 0, 0.1),
       # gEsyMin = runif(8, 0, 1),
-      omega = runif(1, 0, 1),
-      alpha = runif(1, -1, 0)
+      # omega = runif(1, 0, 1),
+      # alpha = runif(1, -1, 0)
+      sigma = array(runif(1, 0.9, 1.1))
     )
   }
 
@@ -128,7 +154,8 @@ wl_model <- function(
     maxWL,
     esyint,
     esyslope,
-    esymin
+    esymin,
+    esymax
 ){
   wlHat <- numeric(D)
   Rain <- numeric(D)
@@ -150,7 +177,7 @@ wl_model <- function(
             # Esy
             # Calculate gradient of drawdown 
             gradient[t] <- pmax(esyint - esyslope * wlHat[t], esymin)
-            
+            gradient[t] <- pmin(gradient[t], esymax)
             # PET or P times Esy
             # Use net input to determine if water level increases or decreases
             # Assuming AET is negligible on days where P >= PET
@@ -185,7 +212,7 @@ wl_model <- function(
    }
 
 # Priors -----------------------------------------------------------------------
-dist <- distributional::generate(distributional::dist_gamma(1, 1), 10000)[[1]]
+dist <- distributional::generate(distributional::dist_normal(1, 0.2), 10000)[[1]]
 ex_dist <- distributional::generate(distributional::dist_exponential(5), 10000)[[1]]
 ggdist::mean_hdci(dist, .width = 0.9)
 ggdist::median_hdci(dist, .width = 0.9)
@@ -207,46 +234,72 @@ mod <- cmdstan_model(
 
 # Tightening priors and increasing adapt_delta reduces divergences (see last
 # commit)
-# vals <- lapply(1:4, \(x){init_values(x)})
+vals <- lapply(1:4, \(x){init_values(x)})
 fit <- mod$sample(
   data = stan_data,
-  seed = 1234567,
+  # seed = 1234567,
   parallel_chains = 4,
   adapt_delta = 0.99,
-  iter_warmup = 1000,
+  iter_warmup = 600,
   iter_sampling = 200,
-  refresh = 250,
+  refresh = 200,
   save_warmup = TRUE,
   init = init_values
 )
 
+diag_dat <- map_dfr(fit$output_files(), ~read_cmdstan_csv(.x, format = "df") %>% keep(str_detect(names(.), "_diagnostics")) %>% reduce(dplyr::bind_rows, .id = "type") %>% tibble::as_tibble(), .id = "chain") %>% dplyr::mutate(.draw = ifelse(type == "2", .draw + 600, .draw))
+draws_dat <- map_dfr(fit$output_files(), ~read_cmdstan_csv(.x, format = "df") %>% keep(str_detect(names(.), "_draws")) %>% reduce(dplyr::bind_rows, .id = "type") %>% tibble::as_tibble(), .id = "chain") %>% dplyr::mutate(.draw = ifelse(type == "2", .draw + 600, .draw))
+ggplot(diag_dat) + aes(x = .draw, y = accept_stat__) + geom_line() + facet_wrap(~chain)
+ggplot(diag_dat) + aes(x = .draw, y = stepsize__) + geom_line() + facet_wrap(~chain) + scale_y_log10()
+ggplot(draws_dat) + aes(x = .draw, y = lp__) + geom_line() + facet_wrap(~chain)
+
 fit$summary()
-mcmc_trace(fit$draws(inc_warmup = FALSE))
-mcmc_dens(fit$draws(inc_warmup = FALSE))
-mcmc_trace(fit$draws(inc_warmup = FALSE))
-mcmc_trace(fit$draws(c("bTilde"), TRUE))
-mcmc_trace(fit$draws(c("bTilde[1]", "bTilde[2]"), TRUE))
-mcmc_trace(fit$draws(c("z[1]", "z[2]"), TRUE))
-mcmc_trace(fit$draws(c("tau[1]", "tau[2]"), TRUE))
-mcmc_pairs(fit$draws(c("bParams[1]", "bParams[2]"), TRUE))
-mcmc_pairs(fit$draws(c("bTilde[1]", "bTilde[2]"), TRUE))
-mcmc_pairs(fit$draws(c("z[1]", "z[2]"), TRUE))
-mcmc_pairs(fit$draws(c("bPET", "bEsyMin")))
-mcmc_dens(fit$draws(c("bPET", "bRain", "bMelt")))
-mcmc_dens(fit$draws(c("bParams[1]", "bParams[2]", "bTilde", "z[1]", "z[2]")))
-mcmc_hist(fit$draws(c("bParams[1]", "bParams[2]", "bTilde", "z[1]", "z[2]")))
+params <- str_subset(fit$summary()$variable, "lp__", negate = TRUE)
+n_total_draws <- nrow(fit$draws(c(params[1]), format = "df"))
+mcmc_trace(fit$draws(params, inc_warmup = FALSE))
+mcmc_dens(fit$draws(params, inc_warmup = FALSE))
+mcmc_hist(fit$draws(params, inc_warmup = FALSE))
 
-mcmc_dens(fit$draws(c("bQ"))) +
+mcmc_dens(fit$draws(c("bEsyInt"))) +
   geom_density(
     color = 'red',
     linetype = 'dashed',
-    aes(x = distributional::generate(distributional::dist_gamma(1, 4), 800)[[1]]))
+    aes(x = distributional::generate(
+      distributional::dist_normal(2, 1),
+      n_total_draws
+    )[[1]]
+  )
+  )
 
-mcmc_dens(fit$draws(c("bphiRain", "bphiMelt"))) +
+mcmc_dens(fit$draws(c("bEsySlope"))) +
   geom_density(
     color = 'red',
     linetype = 'dashed',
-    aes(x = distributional::generate(distributional::dist_exponential(10), 1600)[[1]]))
+    aes(x = distributional::generate(
+      distributional::dist_gamma(2, 16),
+      n_total_draws
+    )[[1]]
+  )
+)
+
+mcmc_dens(fit$draws(c("bEsyMax"))) +
+  geom_density(
+    color = 'red',
+    linetype = 'dashed',
+    aes(x = distributional::generate(
+      distributional::dist_gamma(20, 10),
+      n_total_draws
+    )[[1]]
+  )
+)
+
+mcmc_dens(fit$draws(c("sigma"))) +
+  geom_density(
+    color = 'red',
+    linetype = 'dashed',
+    aes(x = rnorm(n_total_draws, 0, 1))
+  )
+
 
 # draws <- map(
 #   seq_len(4),
@@ -262,6 +315,9 @@ mcmc_dens(fit$draws(c("bphiRain", "bphiMelt"))) +
 
 # par(mfrow = c(2,2)); iwalk(draws, ~plot(log10(.x$stepsize__), type = "l", main = .y)); par(mfrow = c(1,1))
 
+if(exists("wetlandModel")) {rm(wetlandModel)}
+rstan::expose_stan_functions(mod$stan_file())
+
 plot_train_site <- function(site_id, pop_level = FALSE) {
   idx <- which(c("009", "053", "077", "119", "139", "140", "151", "156") == site_id)
   if(pop_level) {
@@ -271,7 +327,7 @@ plot_train_site <- function(site_id, pop_level = FALSE) {
   }
   test_site <- unique(con_dat$site)[idx]
   dat <- con_dat[site == test_site][water_year == min(water_year)]
-  wl_hat <- wl_model(
+  wl_hat <- wetlandModel(
     # bPET = test_params[["bPET"]],
     # bRain = test_params[["bRain"]],
     # bMelt = test_params[["bMelt"]],
@@ -283,10 +339,10 @@ plot_train_site <- function(site_id, pop_level = FALSE) {
     melt = dat$melt_cm,
     D = nrow(dat),
     maxWL = esy_functions[site_id, max_wl],
-    esyint = test_params[["bEsyInt"]],
     esyslope = test_params[["bEsySlope"]],
+    esyint = test_params[["bEsyInt"]],
     esymin = test_params[["bEsyMin"]]
-  )
+  )[1,]
   ylim <- c(min(c(wl_hat, dat$wl_initial_cm), na.rm = TRUE), max(c(wl_hat, dat$wl_initial_cm), na.rm = TRUE))
   plot(dat$wl_initial_cm, type = "l", main = site_id, ylim = ylim)
   lines(wl_hat, col = 'red', lty = "dashed")
@@ -303,7 +359,7 @@ plot_test_site <- function(site_id, pop_level = FALSE) {
   dat <- testing_data[site == site_id & site_status == "Control"][, c(.SD, list(n_records = !is.na(wl_initial_cm))), by = .(water_year)][n_records > 0]
   if(nrow(dat) == 0) return(NULL)
   dat <- dat[water_year == sample(water_year, 1)]
-  wl_hat <- wl_model(
+  wl_hat <- wetlandModel(
     # bPET = test_params[["bPET"]],
     # bRain = test_params[["bRain"]],
     # bMelt = test_params[["bMelt"]],
@@ -315,17 +371,17 @@ plot_test_site <- function(site_id, pop_level = FALSE) {
     melt = dat$melt_cm,
     D = nrow(dat),
     maxWL = esy_functions[site_id, max_wl],
-    esyint = test_params[["bEsyInt"]],
     esyslope = test_params[["bEsySlope"]],
+    esyint = test_params[["bEsyInt"]],
     esymin = test_params[["bEsyMin"]]
-  )
+  )[1,]
   ylim <- c(min(c(wl_hat, dat$wl_initial_cm)), max(c(wl_hat, dat$wl_initial_cm)))
   plot(dat$wl_initial_cm, type = "l", main = site_id, ylim = ylim)
   lines(wl_hat, col = 'red', lty = "dashed")
 }
 
-par(mfrow = c(2, 4)); purrr::walk(unique(con_dat$site), ~plot_train_site(.x)); par(mfrow = c(1,1))
+# par(mfrow = c(2, 4)); purrr::walk(unique(con_dat$site), ~plot_train_site(.x)); par(mfrow = c(1,1))
 par(mfrow = c(2, 4)); purrr::walk(unique(con_dat$site), ~plot_train_site(.x, TRUE)); par(mfrow = c(1,1))
 sites_to_test <- intersect(testing_data[site_status == "Control"]$site, con_dat$site)
-par(mfrow = c(2, 4)); purrr::walk(sites_to_test, ~plot_test_site(.x)); par(mfrow = c(1,1))
+# par(mfrow = c(2, 4)); purrr::walk(sites_to_test, ~plot_test_site(.x)); par(mfrow = c(1,1))
 par(mfrow = c(2, 4)); purrr::walk(sites_to_test, ~plot_test_site(.x, TRUE)); par(mfrow = c(1,1))

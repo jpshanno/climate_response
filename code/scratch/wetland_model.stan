@@ -1,20 +1,5 @@
 functions {
 
-   // row_vector fitEsy(
-   //    row_vector waterBalance,
-   //    row_vector waterLevel,
-   //    real asympA,
-   //    real asympB,
-   //    real asympC
-   // ){
-   //    row_vector drawdown;
-   //    row_vector esyHat;
-   //    row_vector esyCoefs;
-   //    drawdown = a - (a - b) * exp(-c * waterBalance);
-   //    esyHat = (a - b) * (exp(-c * drawdown) * c);
-   //    return esyHat;
-   // }
-
    row_vector wetlandModel(
    //   real bPET,
    //   real bRain,
@@ -48,23 +33,23 @@ functions {
             wlHat[t] = wlHat[t - 1];
             // Esy
             // Calculate gradient of drawdown 
-            gradient[t] = fmax(esyint - esyslope * wlHat[t], esymin);
-            
+            gradient[t] = fmax(esyint - esyslope * (wlHat[t] / 100), esymin);
+            // gradient[t] = fmin(gradient[t], esymax);
             // PET or P times Esy
             // Use net input to determine if water level increases or decreases
             // Assuming AET is negligible on days where P >= PET
             // Water level drawdown = PET2, if P2 <= PET2 then it can be assumed to be
             // less than interception (not necessarily true, but works as a
             // simplifying assumption)
-            petHat[t] = pet[t] * gradient[t]; // * (-pet[t] > rain[t]);
+            petHat[t] = pet[t] * gradient[t];
                   // pet_fun(wl_hat[t-1], maxWL, future.forest.change) * (MPET * PET[t]) * gradient[t]
             wlHat[t] = wlHat[t] + petHat[t];
-            pHat[t] = rain[t] * gradient[t]; // * (-pet[t] <= rain[t]);
+            pHat[t] = rain[t] * gradient[t];
             wlHat[t] = wlHat[t] + pHat[t];
             
 
             // Snowmelt
-            mHat[t] = melt[t] * gradient[t];
+            mHat[t] = melt[t];
             wlHat[t] = wlHat[t] + mHat[t];
 
             // Streamflow
@@ -97,10 +82,6 @@ data {
    // vector[K] obs_sigma; // mean of daily water level change by site
 }
 parameters {
-   // vector<lower = 0>[1] z;
-   // real<lower = 0> bTilde;
-   // vector<lower=0>[1] tau;
-   // corr_matrix[2] Omega;
    // real<lower = 0> bPET;
    // real<lower = 0> bRain;
    // real<lower = 0> bMelt;
@@ -130,32 +111,26 @@ parameters {
    // row_vector<offset = bEsyMin, multiplier = taubEsyMin>[K] gEsyMin;
    // real<lower = 0> omega;
    // real<upper = 0> alpha;
+   // real<lower = 0> bEsyMax;
    real<lower = 0> sigma;
 }
-// transformed parameters{
-//    vector<lower = 0>[1] bParams;
-//    bParams = bTilde + z;
-// }
 model {
    matrix[K,D] yHat;
    
    // Population Estimates
-   // tau ~ gamma(1, 10);
-   // Omega ~ lkj_corr(0.5);
-   // bTilde ~ gamma(10, 10);
-   // z ~ multi_normal([0,0]', quad_form_diag(Omega, tau));
    // target += gamma_lpdf(bPET | 10, 10);
    // target += gamma_lpdf(bRain | 11, 10);
    // target += gamma_lpdf(bMelt | 11, 10);
    // target += gamma_lpdf(bQ | 3, 4);
    // target += exponential_lpdf(bphiRain | 10);
    // target += exponential_lpdf(bphiMelt | 10);
-   target += normal_lpdf(bEsyInt | 2, 1);
-   target += gamma_lpdf(bEsySlope | 0.5, 0.75);
-   target += std_normal_lpdf(bEsyMin);
+   bEsyInt ~ normal(2, 1);
+   bEsySlope ~ gamma(2, 16);
+   bEsyMin ~ gamma(6, 8);
    // target += std_normal_lpdf(omega);
    // target += std_normal_lpdf(alpha);
-   target += std_normal_lpdf(sigma);
+   sigma ~ std_normal();
+   // bEsyMax ~ gamma(20, 10);
 
    // Standard Deviation of Group Effects around Population Effects
    // target += normal_lpdf(taubPET | 0, 0.05);
@@ -181,7 +156,7 @@ model {
       // vector[N[k]] esyHat;
       // esyHat = fitEsy(waterBalance, y, gasympA[k], gasympB[k], gasympC[k]);
       // target += normal_lpdf()
-
+      // maxEsy = bEsyInt - bEsySlope * min(y[k, ]);
       yHat[k] = wetlandModel(
       //   bParams[1],
       //   bParams[2],
