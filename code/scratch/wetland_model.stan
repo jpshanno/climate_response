@@ -3,6 +3,7 @@ functions {
    row_vector wetlandModel(
    //   real bPET,
    //   real bRain,
+     real phiRain,
    //   real bQ,
      row_vector pet,
      row_vector rain,
@@ -15,7 +16,7 @@ functions {
             
       // Create empty vectors
       row_vector[D] wlHat;
-      // vector[D] Rain;
+      vector[D] Rain;
       // vector[D] Melt;
       vector[D] gradient;
       vector[D] qHat;
@@ -28,7 +29,7 @@ functions {
       
       // Loop through weather data
       for(t in 2:D){
-            // Rain[t] = rain[t] + rain[t-1] * phiRain;
+            Rain[t] = rain[t] + rain[t-1] * phiRain;
             // Melt[t] = melt[t] + melt[t-1] * phiMelt;
             wlHat[t] = wlHat[t - 1];
             // Esy
@@ -86,7 +87,7 @@ parameters {
    // real<lower = 0> bRain;
    // real<lower = 0> bMelt;
    // real<lower = 0> bQ;
-   // real<lower = 0> bphiRain;
+   real<lower = 0> bphiRain;
    // real<lower = 0> bphiMelt;
    real<lower = 0> bEsyInt;
    real<lower = 0> bEsySlope;
@@ -124,6 +125,8 @@ model {
    // target += gamma_lpdf(bQ | 3, 4);
    // target += exponential_lpdf(bphiRain | 10);
    // target += exponential_lpdf(bphiMelt | 10);
+   bphiRain ~ exponential(10);
+   // bQ ~ normal(1, 0.5);
    bEsyInt ~ normal(2, 1);
    bEsySlope ~ gamma(2, 16);
    bEsyMin ~ gamma(6, 8);
@@ -161,6 +164,7 @@ model {
       //   bParams[1],
       //   bParams[2],
       //   bPET,
+        bphiRain,
       //   bQ,
         pet[k],
         rain[k],
