@@ -56,7 +56,7 @@ functions {
             
 
             // Snowmelt
-            mHat[t] = bRain * melt[t];
+            mHat[t] = bRain * melt[t] * gradient[t];
             wlHat[t] = wlHat[t] + mHat[t];
 
             // Streamflow
