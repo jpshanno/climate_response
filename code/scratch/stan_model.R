@@ -63,11 +63,10 @@ generate_values <- function() {
     list(
       bPET = runif(1, 0.9, 1.1),
       bRain = runif(1, 1.4, 1.6),
-      # bMelt = runif(1, 0.9, 1.1),
+      bMelt = runif(1, 0.9, 1.1),
       bQ = runif(1, 0.1, 0.3),
       bphiRain = runif(1, 0.1, 0.3),
-      # bphiMelt = runif(1, 0.9, 1.1),
-      # bphiMelt = runif(1, 0.1, 0.2),
+      bphiMelt = runif(1, 0.1, 0.3),
       # bEsyInt = runif(1, 1, 2),
       # bEsySlope = runif(1, 0, 0.1),
       bEsyMin = bEsyMin,
@@ -79,20 +78,20 @@ generate_values <- function() {
       # z = array(z),
       # bEsyInt = array(bEsyIntTilde),
       # bEsySlope = array(bEsySlopeTilde),
-      # taubPET = runif(1, 0.01, 0.03),
-      # taubRain = runif(1, 0.01, 0.03),
-      # taubMelt = runif(1, 0.01, 0.03),
-      # taubQ = runif(1, 0.01, 0.03),
-      # tauphiRain = runif(1, 0.01, 0.03),
+      taubPET = runif(1, 0.01, 0.03),
+      taubRain = runif(1, 0.01, 0.03),
+      taubMelt = runif(1, 0.01, 0.03),
+      taubQ = runif(1, 0.01, 0.03),
+      tauphiRain = runif(1, 0.01, 0.03),
       # tauphiMelt = runif(1, 0.01, 0.03),
       # taubEsyInt = runif(1, 0.01, 0.03),
       # taubEsySlope = runif(1, 0.01, 0.03),
       # taubEsyMin = runif(1, 0.01, 0.03),
-      # gPET = runif(8, 0.9, 1.1),
-      # gRain = runif(8, 0.9, 1.1),
-      # gMelt = runif(8, 0.9, 1.1),
-      # gQ = runif(8, 0.9, 1.1),
-      # gphiRain = runif(8, 0.9, 1.1),
+      gPET = runif(8, 0.9, 1.1),
+      gRain = runif(8, 0.9, 1.1),
+      gMelt = runif(8, 7.5, 8.5),
+      gQ = runif(8, 0.9, 1.1),
+      gphiRain = runif(8, 0.9, 1.1),
       # gphiMelt = runif(8, 0.9, 1.1),
       # gEsyInt = runif(8, 1, 2),
       # gEsySlope = runif(8, 0, 0.1),
@@ -178,7 +177,7 @@ mod <- cmdstan_model(
 
 fit <- mod$variational(
   data = stan_data,
-  iter = 100000,
+  iter = 250000,
   init = init_values
 )
 
@@ -188,7 +187,7 @@ fit <- mod$variational(
 # ggplot(diag_dat) + aes(x = .draw, y = stepsize__) + geom_line() + facet_wrap(~chain) + scale_y_log10()
 # ggplot(draws_dat) + aes(x = .draw, y = lp__) + geom_line() + facet_wrap(~chain)
 
-fit$summary()
+fit$summary() %>% print(n = nrow(.))
 params <- str_subset(fit$summary()$variable, "lp__", negate = TRUE)
 n_total_draws <- nrow(fit$draws(c(params[1]), format = "df"))
 mcmc_trace(fit$draws(params, inc_warmup = FALSE))
@@ -282,6 +281,7 @@ plot_train_site <- function(site_id, pop_level = FALSE) {
   } else {
     test_params <- fit$summary() %>% dplyr::filter(grepl(glue::glue("\\[{idx}\\]"), .$variable)) %>% {set_names(.$mean, stringr::str_replace(.$variable, "(g([a-zA-Z]{1,})\\[[0-9]{1,}\\])", "b\\2"))}
   }
+  print(c(site_id, test_params))
   test_site <- unique(con_dat$site)[idx]
   dat <- con_dat[site == test_site][water_year == min(water_year)]
   wl_hat <- wetlandModel(
@@ -345,8 +345,8 @@ plot_test_site <- function(site_id, pop_level = FALSE) {
   lines(wl_hat, col = 'red', lty = "dashed")
 }
 
-# par(mfrow = c(2, 4)); purrr::walk(unique(con_dat$site), ~plot_train_site(.x)); par(mfrow = c(1,1))
+par(mfrow = c(2, 4)); purrr::walk(unique(con_dat$site), ~plot_train_site(.x)); par(mfrow = c(1,1))
 par(mfrow = c(2, 4)); purrr::walk(unique(con_dat$site), ~plot_train_site(.x, TRUE)); par(mfrow = c(1,1))
 sites_to_test <- intersect(testing_data[site_status == "Control"]$site, con_dat$site)
-# par(mfrow = c(2, 4)); purrr::walk(sites_to_test, ~plot_test_site(.x)); par(mfrow = c(1,1))
+par(mfrow = c(2, 4)); purrr::walk(sites_to_test, ~plot_test_site(.x)); par(mfrow = c(1,1))
 par(mfrow = c(2, 4)); purrr::walk(sites_to_test, ~plot_test_site(.x, TRUE)); par(mfrow = c(1,1))

@@ -86,7 +86,6 @@ data {
    matrix[K,D] y; // PET
    matrix[K,6] esyParams; // minESY, esyA, esyB, esyC
    vector[K] maxWL;
-   // vector[K] obs_sigma; // mean of daily water level change by site
 }
 parameters {
    real<lower = 0> bPET;
@@ -98,20 +97,20 @@ parameters {
    // real<lower = 0> bEsyInt;
    // real<lower = 0> bEsySlope;
    // real<lower = 0> bEsyMin;
-   // real<lower = 0> taubPET;
-   // real<lower = 0> taubRain;
-   // real<lower = 0> taubMelt;
+   real<lower = 0> taubPET;
+   real<lower = 0> taubRain;
+   real<lower = 0> taubMelt;
    // real<lower = 0> taubQ;
-   // real<lower = 0> tauphiRain;
+   real<lower = 0> tauphiRain;
    // real<lower = 0> tauphiMelt;
    // real<lower = 0> taubEsyInt;
    // real<lower = 0> taubEsySlope;
    // real<lower = 0> taubEsyMin;
-   // row_vector<offset = bPET, multiplier = taubPET>[K] gPET;
-   // row_vector<offset = bRain, multiplier = taubRain>[K] gRain;
-   // row_vector<offset = bMelt, multiplier = taubMelt>[K] gMelt;
+   row_vector<offset = bPET, multiplier = taubPET>[K] gPET;
+   row_vector<offset = bRain, multiplier = taubRain>[K] gRain;
+   row_vector<offset = bMelt, multiplier = taubMelt>[K] gMelt;
    // row_vector<offset = bQ, multiplier = taubQ>[K] gQ;
-   // row_vector<offset = bphiRain, multiplier = tauphiRain>[K] gphiRain;
+   row_vector<offset = bphiRain, multiplier = tauphiRain>[K] gphiRain;
    // row_vector<offset = bphiMelt, multiplier = tauphiMelt>[K] gphiMelt;
    // row_vector<offset = bEsyInt, multiplier = taubEsyInt>[K] gEsyInt;
    // row_vector<offset = bEsySlope, multiplier = taubEsySlope>[K] gEsySlope;
@@ -120,6 +119,10 @@ parameters {
    // real<upper = 0> alpha;
    // real<lower = 0> bEsyMax;
    real<lower = 0> sigma;
+}
+transformed parameters{
+   row_vector[K] gQ;
+   gQ = rep_row_vector(bQ, K);
 }
 model {
    matrix[K,D] yHat;
@@ -133,7 +136,7 @@ model {
    // target += exponential_lpdf(bphiMelt | 10);
    bPET ~ normal(1, 0.25);
    bRain ~ normal(1, 0.25);
-   bMelt ~ normal(8, 1);
+   bMelt ~ normal(1, 0.25);
    bphiRain ~ normal(0.2, 0.05);
    bQ ~ normal(0.2, 0.05);
    // bEsyInt ~ normal(2, 1);
@@ -145,22 +148,22 @@ model {
    // bEsyMax ~ gamma(20, 10);
 
    // Standard Deviation of Group Effects around Population Effects
-   // target += normal_lpdf(taubPET | 0, 0.05);
-   // target += normal_lpdf(taubRain | 0, 0.05);
-   // target += normal_lpdf(taubMelt | 0, 0.05);
-   // target += normal_lpdf(taubQ | 0, 0.05);
-   // target += normal_lpdf(tauphiRain | 0, 0.05);
+   taubPET ~ normal(0, 0.05);
+   taubRain ~ normal(0, 0.05);
+   taubMelt ~ normal(0, 0.05);
+   // taubQ ~ normal(0, 0.05);
+   tauphiRain ~ normal(0, 0.05);
    // target += normal_lpdf(tauphiMelt | 0, 0.05);
    // target += std_normal_lpdf(taubEsyInt);
    // target += normal_lpdf(taubEsySlope | 0, 0.005);
    // target += normal_lpdf(taubEsyMin | 0, 0.05);
    
    for(k in 1:K) {
-      // target += normal_lpdf(gPET[k] | bPET, taubPET);
-      // target += normal_lpdf(gRain[k] | bRain, taubRain);
-      // target += normal_lpdf(gMelt[k] | bMelt, taubMelt);
-      // target += normal_lpdf(gQ[k] | bQ, taubQ);
-      // target += normal_lpdf(gphiRain[k] | bphiRain, tauphiRain);
+      gPET[k] ~ normal(bPET, taubPET);
+      gRain[k] ~ normal(bRain, taubRain);
+      gMelt[k] ~ normal(bMelt, taubMelt);
+      // gQ[k] ~ normal(bQ, taubQ);
+      gphiRain[k] ~ normal(bphiRain, tauphiRain);
       // target += normal_lpdf(gphiMelt[k] | bphiMelt, tauphiMelt);
       // target += normal_lpdf(gEsyInt[k] | bEsyInt, taubEsyInt);
       // target += normal_lpdf(gEsySlope[k] | bEsySlope, taubEsySlope);
@@ -170,13 +173,11 @@ model {
       // target += normal_lpdf()
       // maxEsy = bEsyInt - bEsySlope * min(y[k, ]);
       yHat[k] = wetlandModel(
-      //   bParams[1],
-      //   bParams[2],
-        bPET,
-        bRain,
-        bMelt,
-        bphiRain,
-        bQ,
+        gPET[k],
+        gRain[k],
+        gMelt[k],
+        gphiRain[k],
+        gQ[k],
         pet[k],
         rain[k],
         melt[k],
