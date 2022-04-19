@@ -1,17 +1,19 @@
 functions {
 
    row_vector wetlandModel(
-   //   real bPET,
-   //   real bRain,
+     real bPET,
+     real bRain,
+     real bMelt,
      real phiRain,
-   //   real bQ,
+     real bQ,
      row_vector pet,
      row_vector rain,
      row_vector melt,
      int D,
      real maxWL,
-     real esyint,
-     real esyslope,
+     real esyA,
+     real esyB,
+     real esyC,
      real esymin){
             
       // Create empty vectors
@@ -34,7 +36,11 @@ functions {
             wlHat[t] = wlHat[t - 1];
             // Esy
             // Calculate gradient of drawdown 
-            gradient[t] = fmax(esyint - esyslope * (wlHat[t] / 100), esymin);
+            // gradient[t] = fmax(esyint - esyslope * wlHat[t], esymin);
+            gradient[t] = fmax(
+               esymin,
+               esyA - (esyA - esyB) * exp(esyC * wlHat[t])
+            );
             // gradient[t] = fmin(gradient[t], esymax);
             // PET or P times Esy
             // Use net input to determine if water level increases or decreases
@@ -42,28 +48,28 @@ functions {
             // Water level drawdown = PET2, if P2 <= PET2 then it can be assumed to be
             // less than interception (not necessarily true, but works as a
             // simplifying assumption)
-            petHat[t] = pet[t] * gradient[t];
+            petHat[t] = bPET * pet[t] * gradient[t];
                   // pet_fun(wl_hat[t-1], maxWL, future.forest.change) * (MPET * PET[t]) * gradient[t]
             wlHat[t] = wlHat[t] + petHat[t];
-            pHat[t] = rain[t] * gradient[t];
+            pHat[t] = bRain * Rain[t] * gradient[t];
             wlHat[t] = wlHat[t] + pHat[t];
             
 
             // Snowmelt
-            mHat[t] = melt[t];
+            mHat[t] = bMelt * melt[t];
             wlHat[t] = wlHat[t] + mHat[t];
 
             // Streamflow
             // If WL is above spill point threshold then lose some to streamflow. 
             // This could probably be improved using the morphology models to determine
             // streamflow
-            // if(wlHat[t-1] > maxWL){
-            // qHat[t] = bQ * (wlHat[t-1] - maxWL);
-            // if(qHat[t] > wlHat[t] - maxWL){
-            //       qHat[t] = wlHat[t] - maxWL;
-            // }
-            // wlHat[t] = wlHat[t] - qHat[t];
-            // }
+            if(wlHat[t-1] > maxWL){
+            qHat[t] = bQ * (wlHat[t-1] - maxWL);
+            if(qHat[t] > wlHat[t] - maxWL){
+                  qHat[t] = wlHat[t] - maxWL;
+            }
+            wlHat[t] = wlHat[t] - qHat[t];
+            }
 
       }
       return wlHat;
@@ -78,20 +84,20 @@ data {
    matrix[K,D] melt;
    matrix[K,D] wghts;
    matrix[K,D] y; // PET
-   // matrix[K,6] esyParams; // minESY, esyA, esyB, esyC
+   matrix[K,6] esyParams; // minESY, esyA, esyB, esyC
    vector[K] maxWL;
    // vector[K] obs_sigma; // mean of daily water level change by site
 }
 parameters {
-   // real<lower = 0> bPET;
-   // real<lower = 0> bRain;
-   // real<lower = 0> bMelt;
-   // real<lower = 0> bQ;
+   real<lower = 0> bPET;
+   real<lower = 0> bRain;
+   real<lower = 0> bMelt;
+   real<lower = 0> bQ;
    real<lower = 0> bphiRain;
    // real<lower = 0> bphiMelt;
-   real<lower = 0> bEsyInt;
-   real<lower = 0> bEsySlope;
-   real<lower = 0> bEsyMin;
+   // real<lower = 0> bEsyInt;
+   // real<lower = 0> bEsySlope;
+   // real<lower = 0> bEsyMin;
    // real<lower = 0> taubPET;
    // real<lower = 0> taubRain;
    // real<lower = 0> taubMelt;
@@ -125,11 +131,14 @@ model {
    // target += gamma_lpdf(bQ | 3, 4);
    // target += exponential_lpdf(bphiRain | 10);
    // target += exponential_lpdf(bphiMelt | 10);
-   bphiRain ~ exponential(10);
-   // bQ ~ normal(1, 0.5);
-   bEsyInt ~ normal(2, 1);
-   bEsySlope ~ gamma(2, 16);
-   bEsyMin ~ gamma(6, 8);
+   bPET ~ normal(1, 0.25);
+   bRain ~ normal(1, 0.25);
+   bMelt ~ normal(8, 1);
+   bphiRain ~ normal(0.2, 0.05);
+   bQ ~ normal(0.2, 0.05);
+   // bEsyInt ~ normal(2, 1);
+   // bEsySlope ~ normal(0.02, 0.005);
+   // bEsyMin ~ normal(0.75, 0.2);
    // target += std_normal_lpdf(omega);
    // target += std_normal_lpdf(alpha);
    sigma ~ std_normal();
@@ -163,17 +172,20 @@ model {
       yHat[k] = wetlandModel(
       //   bParams[1],
       //   bParams[2],
-      //   bPET,
+        bPET,
+        bRain,
+        bMelt,
         bphiRain,
-      //   bQ,
+        bQ,
         pet[k],
         rain[k],
         melt[k],
         D,
         maxWL[k],
-        bEsyInt,
-        bEsySlope,
-        bEsyMin
+        esyParams[k, 2],
+        esyParams[k, 3],
+        esyParams[k, 4],
+        esyParams[k, 1]
         );
       for(i in 1:D){
          target +=  normal_lpdf(y[k,i] | yHat[k,i], sigma) * wghts[k,i];

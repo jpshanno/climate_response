@@ -22,7 +22,7 @@ library(bayesplot)
 # Weights increase asymmetrically as water levels drop
 create_weights <- function(x, scale) {
   init_weight <- 1 / !is.na(x)
-  wghts <- pmax(init_weight, init_weight * abs(scale - x))
+  wghts <- pmax(init_weight, init_weight * (scale - x))
   # Weights are squared
   wghts <- wghts^2
   wghts[is.na(x)] <- 0
@@ -61,11 +61,12 @@ generate_values <- function() {
   )
   z <- as.numeric(z[[1]])
     list(
-      # bPET = runif(1, 0.9, 1.1),
-      # bRain = runif(1, 0.9, 1.1),
+      bPET = runif(1, 0.9, 1.1),
+      bRain = runif(1, 1.4, 1.6),
       # bMelt = runif(1, 0.9, 1.1),
-      bQ = runif(1, 0.5, 1.5),
-      bphiRain = runif(1, 0.05, 0.2),
+      bQ = runif(1, 0.1, 0.3),
+      bphiRain = runif(1, 0.1, 0.3),
+      # bphiMelt = runif(1, 0.9, 1.1),
       # bphiMelt = runif(1, 0.1, 0.2),
       # bEsyInt = runif(1, 1, 2),
       # bEsySlope = runif(1, 0, 0.1),
@@ -140,80 +141,9 @@ stan_data <- list(
   maxWL = create_data_matrix(con_dat, "max_wl")[, 1]
 )
 
-wl_model <- function(
-    # bPET,
-    # bRain,
-    # bMelt,
-    # bQ,
-    # phiRain,
-    # phiMelt,
-    pet,
-    rain,
-    melt,
-    D,
-    maxWL,
-    esyint,
-    esyslope,
-    esymin,
-    esymax
-){
-  wlHat <- numeric(D)
-  Rain <- numeric(D)
-  Melt <- numeric(D)
-  gradient <- numeric(D)
-  qHat <- numeric(D)
-  mHat <- numeric(D)
-  pHat <- numeric(D)
-  petHat <- numeric(D)
-      
-      # Initialize model at full water level
-      wlHat[1] <- maxWL
-      
-      # Loop through weather data
-      for(t in 2:D){
-            # Rain[t] <- rain[t] + rain[t-1] * phiRain
-            # Melt[t] <- melt[t] + melt[t-1] * phiMelt
-            wlHat[t] <- wlHat[t - 1]
-            # Esy
-            # Calculate gradient of drawdown 
-            gradient[t] <- pmax(esyint - esyslope * wlHat[t], esymin)
-            gradient[t] <- pmin(gradient[t], esymax)
-            # PET or P times Esy
-            # Use net input to determine if water level increases or decreases
-            # Assuming AET is negligible on days where P >= PET
-            # Water level drawdown = PET2, if P2 <= PET2 then it can be assumed to be
-            # less than interception (not necessarily true, but works as a
-            # simplifying assumption)
-            petHat[t] <- pet[t] * gradient[t]
-                  # pet_fun(wl_hat[t-1], maxWL, future.forest.change) * (MPET * PET[t]) * gradient[t]
-            wlHat[t] <- wlHat[t] + petHat[t]
-            pHat[t] <- rain[t] * gradient[t]
-            wlHat[t] <- wlHat[t] + pHat[t]
-            
-
-            # Snowmelt
-            mHat[t] <- Melt[t] * gradient[t]
-            wlHat[t] <- wlHat[t] + mHat[t]
-
-            # Streamflow
-            # If WL is above spill point threshold then lose some to streamflow. 
-            # This could probably be improved using the morphology models to determine
-            # streamflow
-            # if(wlHat[t-1] > maxWL){
-            # qHat[t] <- bQ * (wlHat[t-1] - maxWL)
-            # if(qHat[t] > wlHat[t] - maxWL){
-            #       qHat[t] <- wlHat[t] - maxWL
-            # }
-            # wlHat[t] <- wlHat[t] - qHat[t]
-            # }
-
-      }
-    wlHat
-   }
-
 # Priors -----------------------------------------------------------------------
-dist <- distributional::generate(distributional::dist_normal(1, 0.2), 10000)[[1]]
-ex_dist <- distributional::generate(distributional::dist_exponential(5), 10000)[[1]]
+dist <- distributional::generate(distributional::dist_gamma(2, 16), 10000)[[1]]
+dist <- distributional::generate(distributional::dist_exponential(10), 10000)[[1]]
 ggdist::mean_hdci(dist, .width = 0.9)
 ggdist::median_hdci(dist, .width = 0.9)
 plot(density(dist))
@@ -234,24 +164,29 @@ mod <- cmdstan_model(
 
 # Tightening priors and increasing adapt_delta reduces divergences (see last
 # commit)
-vals <- lapply(1:4, \(x){init_values(x)})
-fit <- mod$sample(
+# fit <- mod$sample(
+#   data = stan_data,
+#   # seed = 1234567,
+#   parallel_chains = 4,
+#   # adapt_delta = 0.99,
+#   iter_warmup = 600,
+#   iter_sampling = 200,
+#   refresh = 200,
+#   save_warmup = TRUE,
+#   init = init_values
+# )
+
+fit <- mod$variational(
   data = stan_data,
-  # seed = 1234567,
-  parallel_chains = 4,
-  adapt_delta = 0.99,
-  iter_warmup = 600,
-  iter_sampling = 200,
-  refresh = 200,
-  save_warmup = TRUE,
+  iter = 100000,
   init = init_values
 )
 
-diag_dat <- map_dfr(fit$output_files(), ~read_cmdstan_csv(.x, format = "df") %>% keep(str_detect(names(.), "_diagnostics")) %>% reduce(dplyr::bind_rows, .id = "type") %>% tibble::as_tibble(), .id = "chain") %>% dplyr::mutate(.draw = ifelse(type == "2", .draw + 600, .draw))
-draws_dat <- map_dfr(fit$output_files(), ~read_cmdstan_csv(.x, format = "df") %>% keep(str_detect(names(.), "_draws")) %>% reduce(dplyr::bind_rows, .id = "type") %>% tibble::as_tibble(), .id = "chain") %>% dplyr::mutate(.draw = ifelse(type == "2", .draw + 600, .draw))
-ggplot(diag_dat) + aes(x = .draw, y = accept_stat__) + geom_line() + facet_wrap(~chain)
-ggplot(diag_dat) + aes(x = .draw, y = stepsize__) + geom_line() + facet_wrap(~chain) + scale_y_log10()
-ggplot(draws_dat) + aes(x = .draw, y = lp__) + geom_line() + facet_wrap(~chain)
+# diag_dat <- map_dfr(fit$output_files(), ~read_cmdstan_csv(.x, format = "df") %>% keep(str_detect(names(.), "_diagnostics")) %>% reduce(dplyr::bind_rows, .id = "type") %>% tibble::as_tibble(), .id = "chain") %>% dplyr::mutate(.draw = ifelse(type == "2", .draw + 600, .draw))
+# draws_dat <- map_dfr(fit$output_files(), ~read_cmdstan_csv(.x, format = "df") %>% keep(str_detect(names(.), "_draws")) %>% reduce(dplyr::bind_rows, .id = "type") %>% tibble::as_tibble(), .id = "chain") %>% dplyr::mutate(.draw = ifelse(type == "2", .draw + 600, .draw))
+# ggplot(diag_dat) + aes(x = .draw, y = accept_stat__) + geom_line() + facet_wrap(~chain)
+# ggplot(diag_dat) + aes(x = .draw, y = stepsize__) + geom_line() + facet_wrap(~chain) + scale_y_log10()
+# ggplot(draws_dat) + aes(x = .draw, y = lp__) + geom_line() + facet_wrap(~chain)
 
 fit$summary()
 params <- str_subset(fit$summary()$variable, "lp__", negate = TRUE)
@@ -259,6 +194,28 @@ n_total_draws <- nrow(fit$draws(c(params[1]), format = "df"))
 mcmc_trace(fit$draws(params, inc_warmup = FALSE))
 mcmc_dens(fit$draws(params, inc_warmup = FALSE))
 mcmc_hist(fit$draws(params, inc_warmup = FALSE))
+
+mcmc_dens(fit$draws(c("bphiRain"))) +
+  geom_density(
+    color = 'red',
+    linetype = 'dashed',
+    aes(x = distributional::generate(
+      distributional::dist_normal(0.2, 0.1),
+      n_total_draws
+    )[[1]]
+  )
+  )
+
+mcmc_dens(fit$draws(c("bEsySlope"))) +
+  geom_density(
+    color = 'red',
+    linetype = 'dashed',
+    aes(x = distributional::generate(
+      distributional::dist_normal(0.2, 0.1),
+      n_total_draws
+    )[[1]]
+  )
+  )
 
 mcmc_dens(fit$draws(c("bEsyInt"))) +
   geom_density(
@@ -315,7 +272,7 @@ mcmc_dens(fit$draws(c("sigma"))) +
 
 # par(mfrow = c(2,2)); iwalk(draws, ~plot(log10(.x$stepsize__), type = "l", main = .y)); par(mfrow = c(1,1))
 
-if(exists("wetlandModel")) {rm(wetlandModel)}
+if (exists("wetlandModel")) { rm(wetlandModel) }
 rstan::expose_stan_functions(mod$stan_file())
 
 plot_train_site <- function(site_id, pop_level = FALSE) {
@@ -328,10 +285,10 @@ plot_train_site <- function(site_id, pop_level = FALSE) {
   test_site <- unique(con_dat$site)[idx]
   dat <- con_dat[site == test_site][water_year == min(water_year)]
   wl_hat <- wetlandModel(
-    # bPET = test_params[["bPET"]],
-    # bRain = test_params[["bRain"]],
-    # bMelt = test_params[["bMelt"]],
-    # bQ = test_params[["bQ"]],
+    bPET = test_params[["bPET"]],
+    bRain = test_params[["bRain"]],
+    bMelt = test_params[["bMelt"]],
+    bQ = test_params[["bQ"]],
     phiRain = test_params[["bphiRain"]],
     # phiMelt = test_params[["bphiMelt"]],
     pet = dat$pet_cm,
@@ -339,9 +296,13 @@ plot_train_site <- function(site_id, pop_level = FALSE) {
     melt = dat$melt_cm,
     D = nrow(dat),
     maxWL = esy_functions[site_id, max_wl],
-    esyslope = test_params[["bEsySlope"]],
-    esyint = test_params[["bEsyInt"]],
-    esymin = test_params[["bEsyMin"]]
+    esyA = esy_params[idx, 2],
+    esyB = esy_params[idx, 3],
+    esyC = esy_params[idx, 4],
+    esymin = esy_params[idx, 1]
+    # esyslope = test_params[["bEsySlope"]],
+    # esyint = test_params[["bEsyInt"]],
+    # esymin = test_params[["bEsyMin"]]
   )[1,]
   ylim <- c(min(c(wl_hat, dat$wl_initial_cm), na.rm = TRUE), max(c(wl_hat, dat$wl_initial_cm), na.rm = TRUE))
   plot(dat$wl_initial_cm, type = "l", main = site_id, ylim = ylim)
@@ -360,10 +321,10 @@ plot_test_site <- function(site_id, pop_level = FALSE) {
   if(nrow(dat) == 0) return(NULL)
   dat <- dat[water_year == sample(water_year, 1)]
   wl_hat <- wetlandModel(
-    # bPET = test_params[["bPET"]],
-    # bRain = test_params[["bRain"]],
-    # bMelt = test_params[["bMelt"]],
-    # bQ = test_params[["bQ"]],
+    bPET = test_params[["bPET"]],
+    bRain = test_params[["bRain"]],
+    bMelt = test_params[["bMelt"]],
+    bQ = test_params[["bQ"]],
     phiRain = test_params[["bphiRain"]],
     # phiMelt = test_params[["bphiMelt"]],
     pet = dat$pet_cm,
@@ -371,9 +332,13 @@ plot_test_site <- function(site_id, pop_level = FALSE) {
     melt = dat$melt_cm,
     D = nrow(dat),
     maxWL = esy_functions[site_id, max_wl],
-    esyslope = test_params[["bEsySlope"]],
-    esyint = test_params[["bEsyInt"]],
-    esymin = test_params[["bEsyMin"]]
+    esyA = esy_params[idx, 2],
+    esyB = esy_params[idx, 3],
+    esyC = esy_params[idx, 4],
+    esymin = esy_params[idx, 1]
+    # esyslope = test_params[["bEsySlope"]],
+    # esyint = test_params[["bEsyInt"]],
+    # esymin = test_params[["bEsyMin"]]
   )[1,]
   ylim <- c(min(c(wl_hat, dat$wl_initial_cm)), max(c(wl_hat, dat$wl_initial_cm)))
   plot(dat$wl_initial_cm, type = "l", main = site_id, ylim = ylim)
