@@ -287,7 +287,7 @@ plot_train_site <- function(site_id, pop_level = FALSE) {
   wl_hat <- wetlandModel(
     bPET = test_params[["bPET"]],
     bRain = test_params[["bRain"]],
-    bMelt = test_params[["bMelt"]],
+    # bMelt = test_params[["bMelt"]],
     bQ = test_params[["bQ"]],
     phiRain = test_params[["bphiRain"]],
     # phiMelt = test_params[["bphiMelt"]],
@@ -323,7 +323,7 @@ plot_test_site <- function(site_id, pop_level = FALSE) {
   wl_hat <- wetlandModel(
     bPET = test_params[["bPET"]],
     bRain = test_params[["bRain"]],
-    bMelt = test_params[["bMelt"]],
+    # bMelt = test_params[["bMelt"]],
     bQ = test_params[["bQ"]],
     phiRain = test_params[["bphiRain"]],
     # phiMelt = test_params[["bphiMelt"]],

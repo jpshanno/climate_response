@@ -3,7 +3,7 @@ functions {
    row_vector wetlandModel(
      real bPET,
      real bRain,
-     real bMelt,
+   //   real bMelt,
      real phiRain,
      real bQ,
      row_vector pet,
@@ -56,7 +56,7 @@ functions {
             
 
             // Snowmelt
-            mHat[t] = bMelt * melt[t];
+            mHat[t] = bRain * melt[t];
             wlHat[t] = wlHat[t] + mHat[t];
 
             // Streamflow
@@ -90,7 +90,7 @@ data {
 parameters {
    real<lower = 0> bPET;
    real<lower = 0> bRain;
-   real<lower = 0> bMelt;
+   // real<lower = 0> bMelt;
    real<lower = 0> bQ;
    real<lower = 0> bphiRain;
    // real<lower = 0> bphiMelt;
@@ -99,7 +99,7 @@ parameters {
    // real<lower = 0> bEsyMin;
    real<lower = 0> taubPET;
    real<lower = 0> taubRain;
-   real<lower = 0> taubMelt;
+   // real<lower = 0> taubMelt;
    // real<lower = 0> taubQ;
    real<lower = 0> tauphiRain;
    // real<lower = 0> tauphiMelt;
@@ -108,7 +108,7 @@ parameters {
    // real<lower = 0> taubEsyMin;
    row_vector<offset = bPET, multiplier = taubPET>[K] gPET;
    row_vector<offset = bRain, multiplier = taubRain>[K] gRain;
-   row_vector<offset = bMelt, multiplier = taubMelt>[K] gMelt;
+   // row_vector<offset = bMelt, multiplier = taubMelt>[K] gMelt;
    // row_vector<offset = bQ, multiplier = taubQ>[K] gQ;
    row_vector<offset = bphiRain, multiplier = tauphiRain>[K] gphiRain;
    // row_vector<offset = bphiMelt, multiplier = tauphiMelt>[K] gphiMelt;
@@ -136,7 +136,7 @@ model {
    // target += exponential_lpdf(bphiMelt | 10);
    bPET ~ normal(1, 0.25);
    bRain ~ normal(1, 0.25);
-   bMelt ~ normal(1, 0.25);
+   // bMelt ~ normal(1, 0.25);
    bphiRain ~ normal(0.2, 0.05);
    bQ ~ normal(0.2, 0.05);
    // bEsyInt ~ normal(2, 1);
@@ -150,7 +150,7 @@ model {
    // Standard Deviation of Group Effects around Population Effects
    taubPET ~ normal(0, 0.05);
    taubRain ~ normal(0, 0.05);
-   taubMelt ~ normal(0, 0.05);
+   // taubMelt ~ normal(0, 0.05);
    // taubQ ~ normal(0, 0.05);
    tauphiRain ~ normal(0, 0.05);
    // target += normal_lpdf(tauphiMelt | 0, 0.05);
@@ -161,7 +161,7 @@ model {
    for(k in 1:K) {
       gPET[k] ~ normal(bPET, taubPET);
       gRain[k] ~ normal(bRain, taubRain);
-      gMelt[k] ~ normal(bMelt, taubMelt);
+      // gMelt[k] ~ normal(bMelt, taubMelt);
       // gQ[k] ~ normal(bQ, taubQ);
       gphiRain[k] ~ normal(bphiRain, tauphiRain);
       // target += normal_lpdf(gphiMelt[k] | bphiMelt, tauphiMelt);
@@ -175,7 +175,7 @@ model {
       yHat[k] = wetlandModel(
         gPET[k],
         gRain[k],
-        gMelt[k],
+      //   gMelt[k],
         gphiRain[k],
         gQ[k],
         pet[k],
