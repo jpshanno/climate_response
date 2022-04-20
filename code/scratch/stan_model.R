@@ -1,18 +1,15 @@
 ####### WORK WITH ONLY TREATED SITES TO AVOID UNEVEN GROUP SIZES
 
 
-# TODO: Limit rain inputs to only periods when rain is greater than PET
-# TODO: compare symmetric and asymmetric weights
-# TODO: limit number of params by setting melt params equal to rain params
-# TODO: Try same starting params for all chains
 source("code/load_project.R")
 tar_load(training_data)
 tar_load(testing_data)
 tar_load(treatment_sites)
 tar_load(esy_functions)
 esy_functions[, min_esy := pred_fun[[1]](max_wl, -9999), by = "site"]
-training_data[["control"]][esy_functions, `:=`(max_wl = i.max_wl, funESY = i.pred_fun, minESY = i.min_esy)]
-con_dat <- training_data[["control"]][site %in% treatment_sites]
+con_dat <- rbindlist(training_data)[site %in% treatment_sites]
+setkey(con_dat, "site", "sample_date")
+con_dat[esy_functions, `:=`(max_wl = i.max_wl, funESY = i.pred_fun, minESY = i.min_esy)]
 con_dat <- con_dat[(!(month(sample_date) == 2 & mday(sample_date) == 29)),]
 
 library(cmdstanr)
@@ -42,43 +39,39 @@ create_data_matrix <- function(data, var) {
   res
 }
 
-generate_values <- function() {
-  bEsyMin <- distributional::generate(distributional::dist_gamma(6, 8), 1)[[1]]
-  bEsyInt <- 0
-  while(bEsyInt <= 0) {
-    bEsyInt <- rnorm(1, 4, 1)
-  }
-  bEsySlope <- distributional::generate(distributional::dist_gamma(2, 16), 1)[[1]]
-  tau <- distributional::generate(distributional::dist_gamma(1, 10), 1)[[1]]
-  Sigma <- matrix(c(1, tau, tau, 1), ncol = 2)
-  Omega <- matrix(c(1, 0, 0, 1), nrow = 2, ncol = 2)
-  z <- distributional::generate(
-    distributional::dist_multivariate_normal(
-      mu = list(c(0, 0)),
-      sigma = list(Sigma)
-    ),
-  1
+create_data_array <- function(data, var) {
+  arr <- sapply(
+    X = unique(data[["site_status"]]),
+    FUN = \(x) create_data_matrix(data[site_status == x], var),
+    simplify = "array"
   )
-  z <- as.numeric(z[[1]])
+  aperm(arr, c(3, 1:2))
+}
+
+generate_values <- function() {
     list(
       bPET = runif(1, 0.9, 1.1),
+      # bDeltaPET = runif(1, 0.45, 0.65),
       bRain = runif(1, 1.4, 1.6),
+      # bDeltaRain = runif(1, 1.1, 1.2),
       bMelt = runif(1, 0.9, 1.1),
       bQ = runif(1, 0.1, 0.3),
       bphiRain = runif(1, 0.1, 0.3),
       bphiMelt = runif(1, 0.1, 0.3),
       # bEsyInt = runif(1, 1, 2),
       # bEsySlope = runif(1, 0, 0.1),
-      bEsyMin = bEsyMin,
-      bEsyInt = bEsyInt,
-      bEsySlope = bEsySlope,
-      bEsyMax = distributional::generate(distributional::dist_gamma(20, 10), 1)[[1]],
+      # bEsyMin = bEsyMin,
+      # bEsyInt = bEsyInt,
+      # bEsySlope = bEsySlope,
+      # bEsyMax = distributional::generate(distributional::dist_gamma(20, 10), 1)[[1]],
       # tau = array(tau),
       # Omega = Omega,
       # z = array(z),
       # bEsyInt = array(bEsyIntTilde),
       # bEsySlope = array(bEsySlopeTilde),
       taubPET = runif(1, 0.01, 0.03),
+      # taubDeltaPET = runif(1, 0.01, 0.03),
+      # taubDeltaRain = runif(1, 0.01, 0.03),
       taubRain = runif(1, 0.01, 0.03),
       taubMelt = runif(1, 0.01, 0.03),
       taubQ = runif(1, 0.01, 0.03),
@@ -88,6 +81,8 @@ generate_values <- function() {
       # taubEsySlope = runif(1, 0.01, 0.03),
       # taubEsyMin = runif(1, 0.01, 0.03),
       gPET = runif(8, 0.9, 1.1),
+      # gDeltaPET = runif(1, 0.45, 0.65),
+      # gDeltaRain = runif(1, 1.1, 1.2),
       gRain = runif(8, 0.9, 1.1),
       gMelt = runif(8, 7.5, 8.5),
       gQ = runif(8, 0.9, 1.1),
@@ -107,7 +102,7 @@ init_values <- function(chain_id) {
   generate_values()
 }
 
-con_dat[, wghts := create_weights(wl_initial_cm, max_wl), by = .(site)]
+con_dat[, wghts := create_weights(wl_initial_cm, max_wl), by = .(site, site_status)]
 con_dat[, filled_wl := nafill(wl_initial_cm ,"const", -9999)]
 # esy_functions[sort(unique(con_dat$site))]$pred_fun
 # esy_functions[sort(unique(con_dat$site))]$min_esy
@@ -126,16 +121,15 @@ esy_params <- matrix(
   ncol = 6
 )
 
-obs_sigma <- con_dat[order(site), .(v = median(abs(diff(wl_initial_cm)), na.rm = TRUE)), by = .(site)][["v"]]
-
 stan_data <- list(
   D = 365L,
   K = length(unique(con_dat$site)),
-  pet = create_data_matrix(con_dat, "pet_cm"),
-  rain = create_data_matrix(con_dat, "rain_cm"),
-  melt = create_data_matrix(con_dat, "melt_cm"),
-  wghts = create_data_matrix(con_dat, "wghts"),
-  y = create_data_matrix(con_dat, "filled_wl"),
+  T = length(unique(con_dat$site_status)),
+  pet = create_data_array(con_dat, "pet_cm"),
+  rain = create_data_array(con_dat, "rain_cm"),
+  melt = create_data_array(con_dat, "melt_cm"),
+  wghts = create_data_array(con_dat, "wghts"),
+  y = create_data_array(con_dat, "filled_wl"),
   esyParams = esy_params,
   maxWL = create_data_matrix(con_dat, "max_wl")[, 1]
 )
@@ -178,7 +172,7 @@ mod <- cmdstan_model(
 fit <- mod$variational(
   data = stan_data,
   iter = 250000,
-  init = init_values
+  init = "/var/folders/h_/8p62bvmn4b73006tnwkgfrlc0000gn/T/Rtmpkzi4OT/init-1-396a2f8a0512.json"
 )
 
 # diag_dat <- map_dfr(fit$output_files(), ~read_cmdstan_csv(.x, format = "df") %>% keep(str_detect(names(.), "_diagnostics")) %>% reduce(dplyr::bind_rows, .id = "type") %>% tibble::as_tibble(), .id = "chain") %>% dplyr::mutate(.draw = ifelse(type == "2", .draw + 600, .draw))
@@ -281,33 +275,53 @@ plot_train_site <- function(site_id, pop_level = FALSE) {
   } else {
     test_params <- fit$summary() %>% dplyr::filter(grepl(glue::glue("\\[{idx}\\]"), .$variable)) %>% {set_names(.$mean, stringr::str_replace(.$variable, "(g([a-zA-Z]{1,})\\[[0-9]{1,}\\])", "b\\2"))}
   }
-  print(c(site_id, test_params))
-  test_site <- unique(con_dat$site)[idx]
-  dat <- con_dat[site == test_site][water_year == min(water_year)]
-  wl_hat <- wetlandModel(
-    bPET = test_params[["bPET"]],
-    bRain = test_params[["bRain"]],
-    # bMelt = test_params[["bMelt"]],
-    bQ = test_params[["bQ"]],
-    phiRain = test_params[["bphiRain"]],
-    # phiMelt = test_params[["bphiMelt"]],
-    pet = dat$pet_cm,
-    rain = dat$rain_cm,
-    melt = dat$melt_cm,
-    D = nrow(dat),
-    maxWL = esy_functions[site_id, max_wl],
-    esyA = esy_params[idx, 2],
-    esyB = esy_params[idx, 3],
-    esyC = esy_params[idx, 4],
-    esymin = esy_params[idx, 1]
-    # esyslope = test_params[["bEsySlope"]],
-    # esyint = test_params[["bEsyInt"]],
-    # esymin = test_params[["bEsyMin"]]
-  )[1,]
-  ylim <- c(min(c(wl_hat, dat$wl_initial_cm), na.rm = TRUE), max(c(wl_hat, dat$wl_initial_cm), na.rm = TRUE))
-  plot(dat$wl_initial_cm, type = "l", main = site_id, ylim = ylim)
-  lines(wl_hat, col = 'red', lty = "dashed")
+  print(as.data.table(as.list(c(site = site_id, round(test_params, 2)))))
+  dat <- con_dat[site == site_id]
+  dat[, 
+    wl_hat := wetlandModel(
+        bPET = test_params[["bPET"]],
+        bTreat = test_params[["bTreat"]],
+        T = 1 + (.BY[[1]] == "Treated"),
+        bRain = test_params[["bRain"]],
+        # bDeltaRain = test_params[["bDeltaRain"]],
+        # bMelt = test_params[["bMelt"]],
+        bQ = test_params[["bQ"]],
+        phiRain = test_params[["bphiRain"]],
+        # phiMelt = test_params[["bphiMelt"]],
+        pet = .SD$pet_cm,
+        rain = .SD$rain_cm,
+        melt = .SD$melt_cm,
+        D = nrow(.SD),
+        maxWL = esy_functions[site_id, max_wl],
+        esyA = esy_params[idx, 2],
+        esyB = esy_params[idx, 3],
+        esyC = esy_params[idx, 4],
+        esymin = esy_params[idx, 1]
+        # esyslope = test_params[["bEsySlope"]],
+        # esyint = test_params[["bEsyInt"]],
+        # esymin = test_params[["bEsyMin"]]
+      )[1,],
+    by = .(site_status)
+  ]
+  # ylim <- c(min(c(dat$wl_hat, dat$wl_initial_cm), na.rm = TRUE), max(c(dat$wl_hat, dat$wl_initial_cm), na.rm = TRUE))
+  ggplot(dat) +
+    aes(x = dowy) +
+    geom_line(aes(y = wl_initial_cm)) +
+    geom_line(aes(y = wl_hat), color = "red", linetype = "dashed") +
+    facet_wrap(~site_status) +
+    labs(caption = site_id)
+  # plot(dat$wl_initial_cm, type = "l", main = site_id, ylim = ylim)
+  # lines(wl_hat, col = 'red', lty = "dashed")
 }
+
+map(unique(con_dat$site), ~plot_train_site(.x)) %>%
+  reduce(`+`) +
+  plot_annotation(title = "Site-Level Parameters")
+
+map(unique(con_dat$site), ~plot_train_site(.x, TRUE)) %>%
+  reduce(`+`) +
+  plot_annotation(title = "Population-Level Parameters")
+
 
 plot_test_site <- function(site_id, pop_level = FALSE) {
   idx <- which(c("009", "053", "077", "119", "139", "140", "151", "156") == site_id)
@@ -344,6 +358,7 @@ plot_test_site <- function(site_id, pop_level = FALSE) {
   plot(dat$wl_initial_cm, type = "l", main = site_id, ylim = ylim)
   lines(wl_hat, col = 'red', lty = "dashed")
 }
+
 
 par(mfrow = c(2, 4)); purrr::walk(unique(con_dat$site), ~plot_train_site(.x)); par(mfrow = c(1,1))
 par(mfrow = c(2, 4)); purrr::walk(unique(con_dat$site), ~plot_train_site(.x, TRUE)); par(mfrow = c(1,1))

@@ -2,6 +2,8 @@ functions {
 
    row_vector wetlandModel(
      real bPET,
+     real bTreat,
+     int T,
      real bRain,
    //   real bMelt,
      real phiRain,
@@ -48,7 +50,7 @@ functions {
             // Water level drawdown = PET2, if P2 <= PET2 then it can be assumed to be
             // less than interception (not necessarily true, but works as a
             // simplifying assumption)
-            petHat[t] = bPET * pet[t] * gradient[t];
+            petHat[t] = (bPET - (bTreat * (T - 1))) * pet[t] * gradient[t];
                   // pet_fun(wl_hat[t-1], maxWL, future.forest.change) * (MPET * PET[t]) * gradient[t]
             wlHat[t] = wlHat[t] + petHat[t];
             pHat[t] = bRain * Rain[t] * gradient[t];
@@ -78,17 +80,19 @@ functions {
 data {
    int D; // number of days in year
    int K; // number of sites
+   int T; // number of site statuses (2 for control & treatment)
    // vector[K] nEsy; // number of days used in fitting Esy
-   matrix[K,D] pet;
-   matrix[K,D] rain;
-   matrix[K,D] melt;
-   matrix[K,D] wghts;
-   matrix[K,D] y; // PET
+   array[2] matrix[K,D] pet;
+   array[2] matrix[K,D] rain;
+   array[2] matrix[K,D] melt;
+   array[2] matrix[K,D] wghts;
+   array[2] matrix[K,D] y; // PET
    matrix[K,6] esyParams; // minESY, esyA, esyB, esyC
    vector[K] maxWL;
 }
 parameters {
    real<lower = 0> bPET;
+   real<lower = 0, upper = 1> bTreat;
    real<lower = 0> bRain;
    // real<lower = 0> bMelt;
    real<lower = 0> bQ;
@@ -98,6 +102,7 @@ parameters {
    // real<lower = 0> bEsySlope;
    // real<lower = 0> bEsyMin;
    real<lower = 0> taubPET;
+   real<lower = 0> taubTreat;
    real<lower = 0> taubRain;
    // real<lower = 0> taubMelt;
    // real<lower = 0> taubQ;
@@ -107,6 +112,7 @@ parameters {
    // real<lower = 0> taubEsySlope;
    // real<lower = 0> taubEsyMin;
    row_vector<offset = bPET, multiplier = taubPET>[K] gPET;
+   row_vector<offset = bPET, multiplier = taubPET>[K] gTreat;
    row_vector<offset = bRain, multiplier = taubRain>[K] gRain;
    // row_vector<offset = bMelt, multiplier = taubMelt>[K] gMelt;
    // row_vector<offset = bQ, multiplier = taubQ>[K] gQ;
@@ -120,12 +126,13 @@ parameters {
    // real<lower = 0> bEsyMax;
    real<lower = 0> sigma;
 }
+// TODO: Test using real gQ in model
 transformed parameters{
    row_vector[K] gQ;
    gQ = rep_row_vector(bQ, K);
 }
 model {
-   matrix[K,D] yHat;
+   array[2] matrix[K,D] yHat;
    
    // Population Estimates
    // target += gamma_lpdf(bPET | 10, 10);
@@ -135,6 +142,7 @@ model {
    // target += exponential_lpdf(bphiRain | 10);
    // target += exponential_lpdf(bphiMelt | 10);
    bPET ~ normal(1, 0.25);
+   bTreat ~ normal(0.5, 0.1);
    bRain ~ normal(1, 0.25);
    // bMelt ~ normal(1, 0.25);
    bphiRain ~ normal(0.2, 0.05);
@@ -149,6 +157,7 @@ model {
 
    // Standard Deviation of Group Effects around Population Effects
    taubPET ~ normal(0, 0.05);
+   taubTreat ~ normal(0, 0.05);
    taubRain ~ normal(0, 0.05);
    // taubMelt ~ normal(0, 0.05);
    // taubQ ~ normal(0, 0.05);
@@ -159,37 +168,42 @@ model {
    // target += normal_lpdf(taubEsyMin | 0, 0.05);
    
    for(k in 1:K) {
-      gPET[k] ~ normal(bPET, taubPET);
-      gRain[k] ~ normal(bRain, taubRain);
-      // gMelt[k] ~ normal(bMelt, taubMelt);
-      // gQ[k] ~ normal(bQ, taubQ);
-      gphiRain[k] ~ normal(bphiRain, tauphiRain);
-      // target += normal_lpdf(gphiMelt[k] | bphiMelt, tauphiMelt);
-      // target += normal_lpdf(gEsyInt[k] | bEsyInt, taubEsyInt);
-      // target += normal_lpdf(gEsySlope[k] | bEsySlope, taubEsySlope);
-      // target += normal_lpdf(gEsyMin[k] | bEsyMin, taubEsyMin);
-      // vector[N[k]] esyHat;
-      // esyHat = fitEsy(waterBalance, y, gasympA[k], gasympB[k], gasympC[k]);
-      // target += normal_lpdf()
-      // maxEsy = bEsyInt - bEsySlope * min(y[k, ]);
-      yHat[k] = wetlandModel(
-        gPET[k],
-        gRain[k],
-      //   gMelt[k],
-        gphiRain[k],
-        gQ[k],
-        pet[k],
-        rain[k],
-        melt[k],
-        D,
-        maxWL[k],
-        esyParams[k, 2],
-        esyParams[k, 3],
-        esyParams[k, 4],
-        esyParams[k, 1]
-        );
-      for(i in 1:D){
-         target +=  normal_lpdf(y[k,i] | yHat[k,i], sigma) * wghts[k,i];
+      for(t in 1:T) {
+         gPET[k] ~ normal(bPET, taubPET);
+         gTreat[k] ~ normal(bTreat, taubTreat);
+         gRain[k] ~ normal(bRain, taubRain);
+         // gMelt[k] ~ normal(bMelt, taubMelt);
+         // gQ[k] ~ normal(bQ, taubQ);
+         gphiRain[k] ~ normal(bphiRain, tauphiRain);
+         // target += normal_lpdf(gphiMelt[k] | bphiMelt, tauphiMelt);
+         // target += normal_lpdf(gEsyInt[k] | bEsyInt, taubEsyInt);
+         // target += normal_lpdf(gEsySlope[k] | bEsySlope, taubEsySlope);
+         // target += normal_lpdf(gEsyMin[k] | bEsyMin, taubEsyMin);
+         // vector[N[k]] esyHat;
+         // esyHat = fitEsy(waterBalance, y, gasympA[k], gasympB[k], gasympC[k]);
+         // target += normal_lpdf()
+         // maxEsy = bEsyInt - bEsySlope * min(y[k, ]);
+         yHat[t, k] = wetlandModel(
+            gPET[k],
+            gTreat[k],
+            t,
+            gRain[k],
+            //   gMelt[k],
+            gphiRain[k],
+            gQ[k],
+            pet[t, k],
+            rain[t, k],
+            melt[t, k],
+            D,
+            maxWL[k],
+            esyParams[k, 2],
+            esyParams[k, 3],
+            esyParams[k, 4],
+            esyParams[k, 1]
+            );
+         for(i in 1:D){
+            target +=  normal_lpdf(y[t,k,i] | yHat[t,k,i], sigma) * wghts[t,k,i];
+         }
       }
    }
 }
