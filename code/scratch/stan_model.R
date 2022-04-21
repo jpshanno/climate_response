@@ -51,49 +51,23 @@ create_data_array <- function(data, var) {
 generate_values <- function() {
     list(
       bPET = runif(1, 0.9, 1.1),
-      # bDeltaPET = runif(1, 0.45, 0.65),
       bRain = runif(1, 1.4, 1.6),
-      # bDeltaRain = runif(1, 1.1, 1.2),
-      bMelt = runif(1, 0.9, 1.1),
-      bQ = runif(1, 0.1, 0.3),
       bphiRain = runif(1, 0.1, 0.3),
-      bphiMelt = runif(1, 0.1, 0.3),
-      # bEsyInt = runif(1, 1, 2),
-      # bEsySlope = runif(1, 0, 0.1),
-      # bEsyMin = bEsyMin,
-      # bEsyInt = bEsyInt,
-      # bEsySlope = bEsySlope,
-      # bEsyMax = distributional::generate(distributional::dist_gamma(20, 10), 1)[[1]],
-      # tau = array(tau),
-      # Omega = Omega,
-      # z = array(z),
-      # bEsyInt = array(bEsyIntTilde),
-      # bEsySlope = array(bEsySlopeTilde),
+      bQ = runif(1, 0.1, 0.3),
+      sigma = array(runif(1, 0.9, 1.1)),
+
       taubPET = runif(1, 0.01, 0.03),
-      # taubDeltaPET = runif(1, 0.01, 0.03),
-      # taubDeltaRain = runif(1, 0.01, 0.03),
+      # taubPETStatus = runif(2, 0.01, 0.03),
       taubRain = runif(1, 0.01, 0.03),
-      taubMelt = runif(1, 0.01, 0.03),
-      taubQ = runif(1, 0.01, 0.03),
       tauphiRain = runif(1, 0.01, 0.03),
-      # tauphiMelt = runif(1, 0.01, 0.03),
-      # taubEsyInt = runif(1, 0.01, 0.03),
-      # taubEsySlope = runif(1, 0.01, 0.03),
-      # taubEsyMin = runif(1, 0.01, 0.03),
+
+      # bPETStatus = runif(2, 0.9, 1.1),
+
       gPET = runif(8, 0.9, 1.1),
-      # gDeltaPET = runif(1, 0.45, 0.65),
-      # gDeltaRain = runif(1, 1.1, 1.2),
+      # gPETTreated = runif(8, 0.45, 0.55),
+      gTreat = runif(8, 0.45, 0.55),
       gRain = runif(8, 0.9, 1.1),
-      gMelt = runif(8, 7.5, 8.5),
-      gQ = runif(8, 0.9, 1.1),
-      gphiRain = runif(8, 0.9, 1.1),
-      # gphiMelt = runif(8, 0.9, 1.1),
-      # gEsyInt = runif(8, 1, 2),
-      # gEsySlope = runif(8, 0, 0.1),
-      # gEsyMin = runif(8, 0, 1),
-      # omega = runif(1, 0, 1),
-      # alpha = runif(1, -1, 0)
-      sigma = array(runif(1, 0.9, 1.1))
+      gphiRain = runif(8, 0.9, 1.1)
     )
   }
 
@@ -171,8 +145,12 @@ mod <- cmdstan_model(
 
 fit <- mod$variational(
   data = stan_data,
+  seed = 20220420,
   iter = 250000,
-  init = "/var/folders/h_/8p62bvmn4b73006tnwkgfrlc0000gn/T/Rtmpkzi4OT/init-1-396a2f8a0512.json"
+  init = init_values
+  # init = "/var/folders/h_/8p62bvmn4b73006tnwkgfrlc0000gn/T/Rtmpkzi4OT/init-1-396a458e4661.json"
+  # init = "/Users/jpshanno/Downloads/working_init.json"
+  # init = "/var/folders/h_/8p62bvmn4b73006tnwkgfrlc0000gn/T/Rtmpkzi4OT/init-1-396a2f8a0512.json"
 )
 
 # diag_dat <- map_dfr(fit$output_files(), ~read_cmdstan_csv(.x, format = "df") %>% keep(str_detect(names(.), "_diagnostics")) %>% reduce(dplyr::bind_rows, .id = "type") %>% tibble::as_tibble(), .id = "chain") %>% dplyr::mutate(.draw = ifelse(type == "2", .draw + 600, .draw))
@@ -271,9 +249,14 @@ rstan::expose_stan_functions(mod$stan_file())
 plot_train_site <- function(site_id, pop_level = FALSE) {
   idx <- which(c("009", "053", "077", "119", "139", "140", "151", "156") == site_id)
   if(pop_level) {
-    test_params <- fit$summary() %>% dplyr::filter(grepl("^[bp]", .$variable)) %>% {set_names(.$mean, .$variable)}
+    test_params <- fit$summary() %>%
+      dplyr::filter(grepl(glue::glue("^([bp]|gTreat\\[{idx}\\])"), .$variable)) %>%
+      # {set_names(.$mean, .$variable)} %>%
+      {set_names(.$mean, stringr::str_replace(.$variable, "(g([a-zA-Z]{1,})\\[[0-9]{1,}\\])", "b\\2"))}
   } else {
-    test_params <- fit$summary() %>% dplyr::filter(grepl(glue::glue("\\[{idx}\\]"), .$variable)) %>% {set_names(.$mean, stringr::str_replace(.$variable, "(g([a-zA-Z]{1,})\\[[0-9]{1,}\\])", "b\\2"))}
+    test_params <- fit$summary() %>%
+      dplyr::filter(grepl(glue::glue("\\[{idx}\\]"), .$variable)) %>%
+      {set_names(.$mean, stringr::str_replace(.$variable, "(g([a-zA-Z]{1,})\\[[0-9]{1,}\\])", "b\\2"))}
   }
   print(as.data.table(as.list(c(site = site_id, round(test_params, 2)))))
   dat <- con_dat[site == site_id]
@@ -308,20 +291,19 @@ plot_train_site <- function(site_id, pop_level = FALSE) {
     aes(x = dowy) +
     geom_line(aes(y = wl_initial_cm)) +
     geom_line(aes(y = wl_hat), color = "red", linetype = "dashed") +
-    facet_wrap(~site_status) +
+    facet_wrap(~site_status, scales = "free_y") +
     labs(caption = site_id)
   # plot(dat$wl_initial_cm, type = "l", main = site_id, ylim = ylim)
   # lines(wl_hat, col = 'red', lty = "dashed")
 }
 
-map(unique(con_dat$site), ~plot_train_site(.x)) %>%
-  reduce(`+`) +
-  plot_annotation(title = "Site-Level Parameters")
-
 map(unique(con_dat$site), ~plot_train_site(.x, TRUE)) %>%
   reduce(`+`) +
   plot_annotation(title = "Population-Level Parameters")
 
+map(unique(con_dat$site), ~plot_train_site(.x)) %>%
+  reduce(`+`) +
+  plot_annotation(title = "Site-Level Parameters")
 
 plot_test_site <- function(site_id, pop_level = FALSE) {
   idx <- which(c("009", "053", "077", "119", "139", "140", "151", "156") == site_id)
