@@ -112,7 +112,7 @@ parameters {
    // real<lower = 0> taubEsySlope;
    // real<lower = 0> taubEsyMin;
    row_vector<offset = bPET, multiplier = taubPET>[K] gPET;
-   // row_vector<offset = bTreat, multiplier = taubTreat>[K] gTreat;
+   // row_vector<offset = bPET, multiplier = taubPET>[K] gTreat;
    row_vector<lower = 0, upper = 1>[K] gTreat;
    row_vector<offset = bRain, multiplier = taubRain>[K] gRain;
    // row_vector<offset = bMelt, multiplier = taubMelt>[K] gMelt;
