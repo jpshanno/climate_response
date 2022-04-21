@@ -160,6 +160,7 @@ fit <- mod$variational(
 # ggplot(draws_dat) + aes(x = .draw, y = lp__) + geom_line() + facet_wrap(~chain)
 
 fit$summary() %>% print(n = nrow(.))
+draws <- fit$draws(format = "df")
 params <- str_subset(fit$summary()$variable, "lp__", negate = TRUE)
 n_total_draws <- nrow(fit$draws(c(params[1]), format = "df"))
 mcmc_trace(fit$draws(params, inc_warmup = FALSE))
@@ -357,6 +358,60 @@ plot_test_site <- function(site_id, pop_level = FALSE) {
   # lines(wl_hat, col = 'red', lty = "dashed")
 }
 
+plot_all_test_data <- function(site_id, pop_level = FALSE) {
+  idx <- which(c("009", "053", "077", "119", "139", "140", "151", "156") == site_id)
+  if(pop_level) {
+    test_params <- fit$summary() %>%
+      dplyr::filter(grepl(glue::glue("^([bp]|gTreat\\[{idx}\\])"), .$variable)) %>%
+      # {set_names(.$mean, .$variable)} %>%
+      {set_names(.$mean, stringr::str_replace(.$variable, "(g([a-zA-Z]{1,})\\[[0-9]{1,}\\])", "b\\2"))}
+  } else {
+    test_params <- fit$summary() %>%
+      dplyr::filter(grepl(glue::glue("\\[{idx}\\]"), .$variable)) %>%
+      {set_names(.$mean, stringr::str_replace(.$variable, "(g([a-zA-Z]{1,})\\[[0-9]{1,}\\])", "b\\2"))}
+  }
+  dat <- testing_data[site == site_id][, c(.SD, list(n_records = !is.na(wl_initial_cm))), by = .(water_year)][n_records > 0]
+  if(nrow(dat) == 0) return(NULL)
+  # dat <- dat[water_year %in% dat[, .(wy = sample(water_year, 1)), by = .(site_status)]$wy]
+  dat[, 
+    wl_hat := wetlandModel(
+        bPET = test_params[["bPET"]],
+        bTreat = test_params[["bTreat"]],
+        T = 1 + (.BY[[1]] == "Treated"),
+        bRain = test_params[["bRain"]],
+        # bDeltaRain = test_params[["bDeltaRain"]],
+        # bMelt = test_params[["bMelt"]],
+        bQ = test_params[["bQ"]],
+        phiRain = test_params[["bphiRain"]],
+        # phiMelt = test_params[["bphiMelt"]],
+        pet = .SD$pet_cm,
+        rain = .SD$rain_cm,
+        melt = .SD$melt_cm,
+        D = nrow(.SD),
+        maxWL = esy_functions[site_id, max_wl],
+        esyA = esy_params[idx, 2],
+        esyB = esy_params[idx, 3],
+        esyC = esy_params[idx, 4],
+        esymin = esy_params[idx, 1]
+        # esyslope = test_params[["bEsySlope"]],
+        # esyint = test_params[["bEsyInt"]],
+        # esymin = test_params[["bEsyMin"]]
+      )[1,],
+    by = .(water_year)
+  ]
+  # ylim <- c(min(c(dat$wl_hat, dat$wl_initial_cm), na.rm = TRUE), max(c(dat$wl_hat, dat$wl_initial_cm), na.rm = TRUE))
+  ggplot(dat) +
+    aes(x = dowy) +
+    geom_line(aes(y = wl_initial_cm, color = site_status, linetype = site_status)) +
+    geom_line(aes(y = wl_hat, color = "Predicted"), linetype = "dotted") +
+    scale_color_manual(values = c(Treated = "red", Control = "blue", Predicted = "black")) +
+    scale_linetype_manual(values = c(Treated = "dashed", Control = "solid", Predicted = "dotted")) +
+    facet_wrap(~water_year, scales = "free_y") +
+    labs(caption = site_id)
+  # plot(dat$wl_initial_cm, type = "l", main = site_id, ylim = ylim)
+  # lines(wl_hat, col = 'red', lty = "dashed")
+}
+
 map(unique(testing_data[site %in% treatment_sites]$site), ~plot_test_site(.x, TRUE)) %>%
   reduce(`+`) +
   plot_annotation(title = "Population-Level Parameters")
@@ -364,3 +419,8 @@ map(unique(testing_data[site %in% treatment_sites]$site), ~plot_test_site(.x, TR
 map(unique(testing_data[site %in% treatment_sites]$site), ~plot_test_site(.x)) %>%
   reduce(`+`) +
   plot_annotation(title = "Site-Level Parameters")
+
+map(unique(testing_data[site %in% treatment_sites]$site), ~plot_all_test_data(.x)) %>%
+  reduce(`+`) +
+  plot_annotation(title = "Site-Level Parameters") +
+  plot_layout(guides = "collect")
