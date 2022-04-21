@@ -308,42 +308,59 @@ map(unique(con_dat$site), ~plot_train_site(.x)) %>%
 plot_test_site <- function(site_id, pop_level = FALSE) {
   idx <- which(c("009", "053", "077", "119", "139", "140", "151", "156") == site_id)
   if(pop_level) {
-    test_params <- fit$summary() %>% dplyr::filter(grepl("^[bp]", .$variable)) %>% {set_names(.$mean, .$variable)}
+    test_params <- fit$summary() %>%
+      dplyr::filter(grepl(glue::glue("^([bp]|gTreat\\[{idx}\\])"), .$variable)) %>%
+      # {set_names(.$mean, .$variable)} %>%
+      {set_names(.$mean, stringr::str_replace(.$variable, "(g([a-zA-Z]{1,})\\[[0-9]{1,}\\])", "b\\2"))}
   } else {
-    test_params <- fit$summary() %>% dplyr::filter(grepl(glue::glue("\\[{idx}\\]"), .$variable)) %>% {set_names(.$mean, stringr::str_replace(.$variable, "(g([a-zA-Z]{1,})\\[[0-9]{1,}\\])", "b\\2"))}
+    test_params <- fit$summary() %>%
+      dplyr::filter(grepl(glue::glue("\\[{idx}\\]"), .$variable)) %>%
+      {set_names(.$mean, stringr::str_replace(.$variable, "(g([a-zA-Z]{1,})\\[[0-9]{1,}\\])", "b\\2"))}
   }
-  print(c(site_id, test_params))
-  dat <- testing_data[site == site_id & site_status == "Control"][, c(.SD, list(n_records = !is.na(wl_initial_cm))), by = .(water_year)][n_records > 0]
+  dat <- testing_data[site == site_id][, c(.SD, list(n_records = !is.na(wl_initial_cm))), by = .(water_year)][n_records > 0]
   if(nrow(dat) == 0) return(NULL)
-  dat <- dat[water_year == sample(water_year, 1)]
-  wl_hat <- wetlandModel(
-    bPET = test_params[["bPET"]],
-    bRain = test_params[["bRain"]],
-    # bMelt = test_params[["bMelt"]],
-    bQ = test_params[["bQ"]],
-    phiRain = test_params[["bphiRain"]],
-    # phiMelt = test_params[["bphiMelt"]],
-    pet = dat$pet_cm,
-    rain = dat$rain_cm,
-    melt = dat$melt_cm,
-    D = nrow(dat),
-    maxWL = esy_functions[site_id, max_wl],
-    esyA = esy_params[idx, 2],
-    esyB = esy_params[idx, 3],
-    esyC = esy_params[idx, 4],
-    esymin = esy_params[idx, 1]
-    # esyslope = test_params[["bEsySlope"]],
-    # esyint = test_params[["bEsyInt"]],
-    # esymin = test_params[["bEsyMin"]]
-  )[1,]
-  ylim <- c(min(c(wl_hat, dat$wl_initial_cm)), max(c(wl_hat, dat$wl_initial_cm)))
-  plot(dat$wl_initial_cm, type = "l", main = site_id, ylim = ylim)
-  lines(wl_hat, col = 'red', lty = "dashed")
+  dat <- dat[water_year %in% dat[, .(wy = sample(water_year, 1)), by = .(site_status)]$wy]
+  dat[, 
+    wl_hat := wetlandModel(
+        bPET = test_params[["bPET"]],
+        bTreat = test_params[["bTreat"]],
+        T = 1 + (.BY[[1]] == "Treated"),
+        bRain = test_params[["bRain"]],
+        # bDeltaRain = test_params[["bDeltaRain"]],
+        # bMelt = test_params[["bMelt"]],
+        bQ = test_params[["bQ"]],
+        phiRain = test_params[["bphiRain"]],
+        # phiMelt = test_params[["bphiMelt"]],
+        pet = .SD$pet_cm,
+        rain = .SD$rain_cm,
+        melt = .SD$melt_cm,
+        D = nrow(.SD),
+        maxWL = esy_functions[site_id, max_wl],
+        esyA = esy_params[idx, 2],
+        esyB = esy_params[idx, 3],
+        esyC = esy_params[idx, 4],
+        esymin = esy_params[idx, 1]
+        # esyslope = test_params[["bEsySlope"]],
+        # esyint = test_params[["bEsyInt"]],
+        # esymin = test_params[["bEsyMin"]]
+      )[1,],
+    by = .(site_status)
+  ]
+  # ylim <- c(min(c(dat$wl_hat, dat$wl_initial_cm), na.rm = TRUE), max(c(dat$wl_hat, dat$wl_initial_cm), na.rm = TRUE))
+  ggplot(dat) +
+    aes(x = dowy) +
+    geom_line(aes(y = wl_initial_cm)) +
+    geom_line(aes(y = wl_hat), color = "red", linetype = "dashed") +
+    facet_wrap(~site_status, scales = "free_y") +
+    labs(caption = site_id)
+  # plot(dat$wl_initial_cm, type = "l", main = site_id, ylim = ylim)
+  # lines(wl_hat, col = 'red', lty = "dashed")
 }
 
+map(unique(testing_data[site %in% treatment_sites]$site), ~plot_test_site(.x, TRUE)) %>%
+  reduce(`+`) +
+  plot_annotation(title = "Population-Level Parameters")
 
-par(mfrow = c(2, 4)); purrr::walk(unique(con_dat$site), ~plot_train_site(.x)); par(mfrow = c(1,1))
-par(mfrow = c(2, 4)); purrr::walk(unique(con_dat$site), ~plot_train_site(.x, TRUE)); par(mfrow = c(1,1))
-sites_to_test <- intersect(testing_data[site_status == "Control"]$site, con_dat$site)
-par(mfrow = c(2, 4)); purrr::walk(sites_to_test, ~plot_test_site(.x)); par(mfrow = c(1,1))
-par(mfrow = c(2, 4)); purrr::walk(sites_to_test, ~plot_test_site(.x, TRUE)); par(mfrow = c(1,1))
+map(unique(testing_data[site %in% treatment_sites]$site), ~plot_test_site(.x)) %>%
+  reduce(`+`) +
+  plot_annotation(title = "Site-Level Parameters")
