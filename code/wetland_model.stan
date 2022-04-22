@@ -87,7 +87,7 @@ data {
    array[2] matrix[K,D] melt;
    array[2] matrix[K,D] wghts;
    array[2] matrix[K,D] y; // PET
-   matrix[K,6] esyParams; // minESY, esyA, esyB, esyC
+   matrix[K,4] esyParams; // minESY, esyA, esyB, esyC
    vector[K] maxWL;
 }
 parameters {
