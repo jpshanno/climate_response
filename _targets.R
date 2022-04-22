@@ -176,14 +176,14 @@ targets <- list(
   
   , tar_target(
     training_data,
-    list(control = select_training_data(water_budget),
-         treated = selected_treatment_training_data(water_budget)),
+    list(control = select_training_data(water_budget[site %in% treatment_sites]),
+         treated = selected_treatment_training_data(water_budget[site %in% treatment_sites])),
     format = "rds"
   )
   
   , tar_target(
     testing_data,
-    water_budget[!training_data[["control"]]][!training_data[["treated"]]]
+    water_budget[!training_data[["control"]]][!training_data[["treated"]]][site %in% treatment_sites]
   )
   
   
