@@ -206,36 +206,29 @@ targets <- list(
     build_esy_functions(esy_coefs),
     format = "rds"
   )
-    format = "rds"
+
+  , tar_target(
+    wetland_model,
+    fit_wetland_model(training_data, esy_coefs, "output/models/wetland_model.rds"),
+    format = "file"
   )
-  
+
   # Optimize Control Models
   # TODO: It it possible to set the upper limit MPET to 1. May likely require 
   # evaluating Esy within the optimization model?
   , tar_target(
     control_optimization,
-    fit_models(training_data[["control"]],
-               esy_functions,
-               par = list(MPET = 1,
-                          MP = 1.5,
-                          MM = 1,
-                          MQ = 0.5,
-                          minESY = 1,
-                          phiM = 0.9,
-                          phiP = 0.5)),
+    format_model_parameters("Control", "output/models/wetland_model.rds", esy_functions),
     format = "rds"
   )
-  
+
   # Reoptimize models for the treatment period
   , tar_target(
     treated_optimization,
-    refit_model(training_data[["treated"]],
-                control_optimization,
-                refit = list(MPET = 1, 
-                             MP = 1)),
+    format_model_parameters("Treated", "output/models/wetland_model.rds", esy_functions),
     format = "rds"
   )
-  
+
   # Combine Control & Treated Model Parameters
   , tar_target(
     model_params,
@@ -428,9 +421,9 @@ targets <- list(
     total_impact_plot,
     create_total_impact_plot(
       proportions = analysis_simulations[["proportions"]],
-      output.file = "output/figures/pointrange_and_slabinterval_ecohydrological_level_total_impact.tiff",
-      type = "cairo",
-      compression = "lzw",
+      output.file = "output/figures/pointrange_and_slabinterval_ecohydrological_level_total_impact.png",
+      # type = "cairo",
+      # compression = "lzw",
       dpi = 600,
       width = 7,
       height = 8
@@ -442,9 +435,9 @@ targets <- list(
     eab_impact_plot,
     create_eab_impact_plot(
       proportions = analysis_simulations[["proportions"]],
-      output.file = "output/figures/pointrange_and_slabinterval_ecohydrological_level_eab_impact.tiff",
-      type = "cairo",
-      compression = "lzw",
+      output.file = "output/figures/pointrange_and_slabinterval_ecohydrological_level_eab_impact.png",
+      # type = "cairo",
+      # compression = "lzw",
       dpi = 600,
       width = 10,
       height = 5
@@ -456,9 +449,9 @@ targets <- list(
     climate_impact_plot,
     create_climate_impact_plot(
       proportions = analysis_simulations[["proportions"]],
-      output.file = "output/figures/pointrange_and_slabinterval_ecohydrological_level_climate_impact.tiff",
-      type = "cairo",
-      compression = "lzw",
+      output.file = "output/figures/pointrange_and_slabinterval_ecohydrological_level_climate_impact.png",
+      # type = "cairo",
+      # compression = "lzw",
       dpi = 600,
       width = 10,
       height = 5
