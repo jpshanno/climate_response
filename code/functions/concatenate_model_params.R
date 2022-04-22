@@ -15,7 +15,7 @@ concatenate_model_params <-
       list(...)
     
     stopifnot(all(names(params) %in% c("Control", "Treated")))
-    
+    sites <- params[["Control"]]$site
     params[["Future Forested"]] <- 
       params[["Control"]][fread("data/overstory_ash_percentage.csv", 
                                 colClasses = c("character", "numeric", "character")), 
@@ -29,6 +29,8 @@ concatenate_model_params <-
     params <- 
       params[, .(site, site_status, params, future.forest.change)]
     
+    params <- params[site %in% sites]
+
     setkey(params, site, site_status)
     
     params
