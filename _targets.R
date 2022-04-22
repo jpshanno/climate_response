@@ -173,28 +173,39 @@ targets <- list(
   # availabile year of data. For most sites this is 2012 (which is ideal because
   # it has the largest drawdown period, which means it provides the best data
   # for ESy models). The same process is used for the treatment period
-  
+
   , tar_target(
     training_data,
     list(control = select_training_data(water_budget[site %in% treatment_sites]),
          treated = selected_treatment_training_data(water_budget[site %in% treatment_sites])),
     format = "rds"
   )
-  
+
   , tar_target(
     testing_data,
     water_budget[!training_data[["control"]]][!training_data[["treated"]]][site %in% treatment_sites]
   )
-  
-  
+
+
   # Train Wetland Models ----------------------------------------------------
 
   # Create Esy models for each wetland
-  # TODO: Try to adjust drawdown rates to account for rapid increase in black 
-  # ash T as water levels inrease. 
+  , tar_target(
+    esy_model,
+    fit_esy_model(training_data[["control"]]),
+    format = "rds"
+  )
+
+  , tar_target(
+    esy_coefs,
+    get_esy_coefs(esy_model),
+  )
+
   , tar_target(
     esy_functions,
-    build_esy_functions(training_data[["control"]]),
+    build_esy_functions(esy_coefs),
+    format = "rds"
+  )
     format = "rds"
   )
   
