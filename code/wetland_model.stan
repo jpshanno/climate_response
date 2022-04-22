@@ -92,7 +92,7 @@ data {
 }
 parameters {
    real<lower = 0> bPET;
-   // real<lower = 0, upper = 1> bTreat;
+   real<lower = 0, upper = 1> bTreat;
    real<lower = 0> bRain;
    // real<lower = 0> bMelt;
    real<lower = 0> bQ;
@@ -113,7 +113,7 @@ parameters {
    // real<lower = 0> taubEsyMin;
    row_vector<offset = bPET, multiplier = taubPET>[K] gPET;
    // row_vector<offset = bPET, multiplier = taubPET>[K] gTreat;
-   row_vector<lower = 0, upper = 1>[K] gTreat;
+   // row_vector<lower = 0, upper = 1>[K] gTreat;
    row_vector<offset = bRain, multiplier = taubRain>[K] gRain;
    // row_vector<offset = bMelt, multiplier = taubMelt>[K] gMelt;
    // row_vector<offset = bQ, multiplier = taubQ>[K] gQ;
@@ -130,7 +130,9 @@ parameters {
 // TODO: Test using real gQ in model
 transformed parameters{
    row_vector[K] gQ;
+   row_vector[K] gTreat;
    gQ = rep_row_vector(bQ, K);
+   gTreat = rep_row_vector(bTreat, K);
 }
 model {
    array[2] matrix[K,D] yHat;
@@ -142,12 +144,12 @@ model {
    // target += gamma_lpdf(bQ | 3, 4);
    // target += exponential_lpdf(bphiRain | 10);
    // target += exponential_lpdf(bphiMelt | 10);
-   bPET ~ normal(1, 0.25);
-   // bTreat ~ normal(0.5, 0.1);
-   bRain ~ normal(1, 0.25);
+   bPET ~ normal(1.75, 0.25);
+   bTreat ~ normal(0.5, 0.1);
+   bRain ~ normal(2, 0.25);
    // bMelt ~ normal(1, 0.25);
    bphiRain ~ normal(0.2, 0.05);
-   bQ ~ normal(0.2, 0.05);
+   bQ ~ normal(0.5, 0.1);
    // bEsyInt ~ normal(2, 1);
    // bEsySlope ~ normal(0.02, 0.005);
    // bEsyMin ~ normal(0.75, 0.2);
@@ -171,7 +173,7 @@ model {
    for(k in 1:K) {
       for(t in 1:T) {
          gPET[k] ~ normal(bPET, taubPET);
-         gTreat[k] ~ normal(0.5, 0.1);
+         gTreat ~ normal(0.5, 0.1);
          gRain[k] ~ normal(bRain, taubRain);
          // gMelt[k] ~ normal(bMelt, taubMelt);
          // gQ[k] ~ normal(bQ, taubQ);
