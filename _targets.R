@@ -1,6 +1,10 @@
 library(targets)
-# This is an example target script.
-# Read the tar_script() help file for details.
+# After the original creation of this project and writing the dissertation
+# chapter a large model overhaul was conducted to improve the wetland models,
+# including partial pooling using a Bayesian VI model. The data munging and
+# other processing have not been adapated to the updated model, but rather the
+# model inputs and outputs are maniuplated to match the existing pipeline. This
+# may lead to some strange design choices below.
 
 # Load functions
 for(i in list.files("code/functions", full.names = TRUE)){
