@@ -16,3 +16,4 @@ tidync
 ggdist
 ggridges
 forcats
+cmdstanr
