@@ -13,8 +13,8 @@
 create_esy_impact_plot <- function(data, esy_data, parameters, output.file, ...) {
 
   dat <- copy(data)
-  dat[parameters, on = "site", minESY := params[[1]][["minESY"]]]
-  dat[esy_data, on = "site", esy_hat := pred_fun[[1]](wl_initial_cm, minESY)]
+  dat[parameters, on = "site", min_esy := params[[1]][["min_esy"]]]
+  dat[esy_data, on = "site", esy_hat := esy_func[[1]](wl_initial_cm, min_esy)]
   dat[, `:=`(
     adj_pet = pet_cm * esy_hat,
     adj_rain = rain_cm * esy_hat,
