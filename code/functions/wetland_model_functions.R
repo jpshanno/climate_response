@@ -352,118 +352,105 @@ wetland_model <-
     # 7 152   0.663909 - 2012 Veg Surveys
     # 8 156   0.850605 - 2012 Veg Surveys
     # 9 157   0.821684 - 2012 Veg Surveys
-    
-    MPET <-
-      params[["MPET"]]
-    
-    if(is.na(future.forest.change)){
+
+    bPET <-
+      params[["gPET"]]
+
+    bTreat <-
+      params[["gTreat"]]
+
+    bRain <-
+      params[["gRain"]]
+
+    bQ <-
+      params[["gQ"]]
+
+    min_esy <-
+      params[["min_esy"]]
+
+    phiRain <-
+      params[["gphiRain"]]
+
+    max_wl <-
+      params[["max_wl"]]
+
+    T <-
+      params[["T"]]
+
+    if(inherits(params[["esy_func"]], "list")) {
+      esy_fun <-
+        params[["esy_func"]][[1]]
+
+    } else {
+      esy_fun <-
+        params[["esy_func"]]
+    }
+
+    if(is.na(future.forest.change)) {
       pet_fun <- 
         function(wl, max.wl, future.forest.change){ 1 }
     } else {
-      pet_fun <- 
+      pet_fun <-
         function(wl, max.wl, future.forest.change){
           (1 - future.forest.change) + future.forest.change * pmin(1, abs(1/(1.45077 - 0.05869 * (wl - max.wl))))
         }
     }
-    
-    MP <- 
-      params[["MP"]]
-    
-    MM <-
-      params[["MM"]]
-    
-    MQ <-
-      params[["MQ"]]
-    
-    minESY <- 
-      params[["minESY"]]
-    
-    # MG <- 
-    #   params[["MG"]]
-    
-    phiM <- 
-      params[["phiM"]]
-    
-    phiP <- 
-      params[["phiP"]]
-    
-    maxWL <- 
-      params[["maxWL"]]
-    
-    if(inherits(params[["funESY"]], "list")){
-      esy_fun <- 
-        params[["funESY"]][[1]]
-      
-    } else {
-      esy_fun <- 
-        params[["funESY"]]
-    }
-    
-    PET <- data$pet_cm
-    P <- as.numeric(filter(data$rain_cm, filter = phiP, method = "rec", sides = 1))
-    M <- as.numeric(filter(data$melt_cm, filter = phiM, method = "rec", sides = 1))
-    WL <- data$wl_initial_cm
-    
-    n <- 
-      length(PET)
+
+    pet <- data$pet_cm
+    rain <- data$rain_cm
+    melt <- data$melt_cm
+
+    D <-
+      nrow(data)
     
     # Create empty vectors
-    wl_hat <- 
-      gradient <- 
-      q_hat <- 
-      m_hat <- 
-      p_hat <- 
-      pet_hat <- 
-      g_hat <- 
-      numeric(n)
-    
+    wl_hat <-
+      Rain <-
+      gradient <-
+      q_hat <-
+      m_hat <-
+      p_hat <-
+      pet_hat <-
+        numeric(D)
+
     # Initialize model at full water level
-    wl_hat[1] <- 
-      maxWL
+    wl_hat[1] <-
+      max_wl
     
     # Loop through weather data
-    for(t in 2:n){
+    for(t in 2:D){
+      
+      Rain[t] <- rain[t] + rain[t-1] * phiRain
+      wl_hat[t] <- wl_hat[t-1]
 
       ######## Esy
       # Calculate gradient2 of drawdown 
-      gradient[t] <- 
-        esy_fun(wl_hat[t-1], minESY)
+      gradient[t] <-
+        esy_fun(wl_hat[t], min_esy)
 
-      ######## PET or P times Esy
-      # Use net input to determine if water level increases or decreases
-      # Assuming AET is negligible on days where P >= PET
-      if((P[t] + PET[t]) <= 0) {
-        # Water level drawdown = PET2, if P2 <= PET2 then it can be assumed to be
-        # less than interception (not necessarily true, but works as a
-        # simplifying assumption)
-        pet_hat[t] <- 
-          pet_fun(wl_hat[t-1], maxWL, future.forest.change) * (MPET * PET[t]) * gradient[t]
-        wl_hat[t] <-
-          wl_hat[t-1] + pet_hat[t]
-      } else {
-        p_hat[t] <- 
-          (MP * P[t]) * gradient[t]
-        wl_hat[t] <-
-          wl_hat[t-1] + p_hat[t]
-      }
+      ######## PET
+      pet_hat[t] =
+        pet_fun(wl_hat[t], max_wl, future.forest.change) *
+          (bPET - (bTreat * (T - 1))) * pet[t] * gradient[t]
+      wl_hat[t] = wl_hat[t] + pet_hat[t];
 
+      ######## Rain
+      p_hat[t] = bRain * Rain[t] * gradient[t];
+      wl_hat[t] = wl_hat[t] + p_hat[t];
+      
       ######## Snowmelt
-      # Directly add melt to water level. This should probably have some sort of
-      # multiplier
       m_hat[t] <- 
-        MM * M[t] * gradient[t]
+        bRain * melt[t] * gradient[t]
       wl_hat[t] <-
         wl_hat[t] + m_hat[t]
 
       ####### Streamflow
-      # If WL is above spill point threshold then lose some to streamflow. 
-      # This could probably be improved using the morphology models to determine
-      # streamflow
-      if(wl_hat[t-1] > maxWL){
+      # If WL is above spill point threshold then lose some to streamflow.
+      if(wl_hat[t-1] > max_wl){
         q_hat[t] <-
-          MQ * (wl_hat[t-1] - maxWL)
+          bQ * (wl_hat[t-1] - max_wl)
         q_hat[t] <- 
-          pmin(q_hat[t], wl_hat[t] - maxWL)
+          pmin(q_hat[t], wl_hat[t] - max_wl)
         wl_hat[t] <-
           wl_hat[t] - q_hat[t]
       }
