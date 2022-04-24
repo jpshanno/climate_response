@@ -52,7 +52,7 @@ pub_fig <-
           aes(x = wl_initial_cm,
               y = esy_emp)) + 
       geom_point() +
-      geom_function(fun = ~control_optimization[site == "135", params[[1]]$funESY](.x, control_optimization[site == "135", params[[1]]$minESY]),
+      geom_function(fun = ~control_optimization[site == "135", params[[1]]$funESY](.x, control_optimization[site == "135", params[[1]]$esy_min]),
                     color = 'red') + 
       labs(x = "Water Level Relative to Ground Surface (cm)",
            y = expression(Empiricial~E[Sy]))} * theme_bw(base_size = 16) +

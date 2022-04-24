@@ -26,7 +26,7 @@ month_lims <-
   function(brks){labs <- format(brks, "%b"); labs[1 + 2*(0:5)] <- ""; labs}
 
 
-model_params[site_status == "Control", .(maxWL = map_dbl(params, pluck, "maxWL")), by = .(site)]
+model_params[site_status == "Control", .(max_wl = map_dbl(params, pluck, "max_wl")), by = .(site)]
 
 
 
@@ -434,7 +434,7 @@ observations <- rbindlist(list(
 
 observations[, simulation_month := month(sample_date, label = TRUE, abbr = TRUE)]
 
-observations[control_optimization[, .(site, max_wl = map_dbl(params, "maxWL"))],
+observations[control_optimization[, .(site, max_wl = map_dbl(params, "max_wl"))],
              on = c("site"),
              max_wl := i.max_wl]
 

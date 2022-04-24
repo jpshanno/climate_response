@@ -95,8 +95,8 @@ simulate_wetlands <-
       
       simulation_proportions[[i]] <- 
         simulations[,
-                    .(prop_above_max_wl = sum(wl_hat >= PARAMS$maxWL) / .N,
-                      prop_within_5cm_max_wl = sum(wl_hat >= (PARAMS$maxWL - 5)) / .N,
+                    .(prop_above_max_wl = sum(wl_hat >= PARAMS$max_wl) / .N,
+                      prop_within_5cm_max_wl = sum(wl_hat >= (PARAMS$max_wl - 5)) / .N,
                       prop_above_0 = sum(wl_hat >= 0) / .N,
                       prop_above_neg_10 = sum(wl_hat >= -10) / .N,
                       prop_above_neg_25 = sum(wl_hat >= -25) / .N,

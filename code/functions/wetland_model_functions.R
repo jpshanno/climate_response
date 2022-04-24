@@ -507,7 +507,7 @@ optimize_params <-
                      init_weight <- 1 / sum(is.na(data$wl_initial_cm))
                      
                      # Weights increase asymmetrically as water levels drop
-                     wghts <- pmax(init_weight, init_weight * (params$maxWL - data$wl_initial_cm))
+                     wghts <- pmax(init_weight, init_weight * (params$max_wl - data$wl_initial_cm))
                      
                      # Weights are squared
                      sqrt(weighted.mean(resids^2, w = wghts^2, na.rm = TRUE))
@@ -535,7 +535,7 @@ fit_models <-
                     data = .SD, 
                     par = par,
                     fixed = c(fixed,
-                              maxWL = esy_mods[.BY[[1]], max_wl],
+                              max_wl = esy_mods[.BY[[1]], max_wl],
                               funESY = esy_mods[.BY[[1]], pred_fun[[1]]]),
                     ...,
                     method = "L-BFGS-B",
@@ -543,14 +543,14 @@ fit_models <-
                                  MP = 0, 
                                  MM = 0, 
                                  MQ = 0, 
-                                 minESY = 0, 
+                                 esy_min = 0, 
                                  phiM = 0, 
                                  phiP = 0),
                     upper = list(MPET = Inf, 
                                  MP = Inf, 
                                  MM = Inf,  
                                  MQ = 1-.Machine$double.neg.eps,
-                                 minESY = Inf, 
+                                 esy_min = Inf, 
                                  phiM = 1-.Machine$double.neg.eps, 
                                  phiP = 1-.Machine$double.neg.eps)))),
             keyby = .(site)]
@@ -605,10 +605,10 @@ refit_model <-
     # the upper/lower bound
     
     lower_bound <- 
-      modify_at(lower_bound, c("MPET", "MM", "MQ", "minESY", "phiM", "phiP"), ~0)
+      modify_at(lower_bound, c("MPET", "MM", "MQ", "esy_min", "phiM", "phiP"), ~0)
     
     upper_bound <- 
-      modify_at(upper_bound, c("MP", "MM", "minESY", "maxWL"), ~Inf) %>% 
+      modify_at(upper_bound, c("MP", "MM", "esy_min", "max_wl"), ~Inf) %>% 
       modify_at(c("MQ", "phiM", "phiP"), ~1-.Machine$double.neg.eps)
     
     refit_res <- 

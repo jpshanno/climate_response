@@ -667,8 +667,8 @@ pars <- control_optimization$params[[7]]
 
 esy_plot <- ggplot() +
   geom_function(
-    fun = ~pars$funESY(.x, pars$minESY),
-    xlim = c(-150, pars$maxWL + 10)
+    fun = ~pars$funESY(.x, pars$esy_min),
+    xlim = c(-150, pars$max_wl + 10)
   ) +
   labs(
     x = "Water Level Relative to Ground (cm)",
