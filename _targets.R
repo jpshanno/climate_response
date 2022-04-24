@@ -218,14 +218,14 @@ targets <- list(
   # evaluating Esy within the optimization model?
   , tar_target(
     control_optimization,
-    format_model_parameters("Control", "output/models/wetland_model.rds", esy_functions),
+    format_model_parameters("Control", wetland_model, esy_functions),
     format = "rds"
   )
 
   # Reoptimize models for the treatment period
   , tar_target(
     treated_optimization,
-    format_model_parameters("Treated", "output/models/wetland_model.rds", esy_functions),
+    format_model_parameters("Treated", wetland_model, esy_functions),
     format = "rds"
   )
 
@@ -241,7 +241,7 @@ targets <- list(
   # This should probably be done breaking the water years up rather than doing 
   # them sequentially. Need to also consider adjusting max.wl for different 
   # water years within a given site.
-  
+
   , tar_target(
     train_data_fits,
     predict_train_period(data = training_data,
