@@ -41,7 +41,7 @@ functions {
                esyA - (esyA - esyB) * exp(esyC * wlHat[t])
             );
             // PET or P times Esy
-            petHat[t] = (bPET - (bTreat * (T - 1))) * pet[t] * gradient[t];
+            petHat[t] = (bPET * (1 - bTreat * (T - 1))) * pet[t] * gradient[t];
                   // pet_fun(wl_hat[t-1], maxWL, future.forest.change) * (MPET * PET[t]) * gradient[t]
             wlHat[t] = wlHat[t] + petHat[t];
             pHat[t] = bRain * Rain[t] * gradient[t];
