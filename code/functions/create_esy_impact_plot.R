@@ -60,7 +60,7 @@ create_esy_impact_plot <- function(data, esy_data, parameters, output.file, ...)
   
   esy_plot <- 
     ggplot(data = aug_adj) +
-    ggtitle("B. E<sub>Sy</sub> Inputs") +
+    ggtitle("B. E<sub>Sy</sub>-Adjusted Inputs") +
     aes(x = `Observed Daily Change in Water Level (cm)`, y = `Predicted Daily Change in Water Level (cm)`) +
     annotate(x = min(aug_adj[["Observed Daily Change in Water Level (cm)"]]),
              y = max(aug_adj[["Predicted Daily Change in Water Level (cm)"]]),
