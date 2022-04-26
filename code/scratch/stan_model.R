@@ -6,10 +6,10 @@ tar_load(training_data)
 tar_load(testing_data)
 tar_load(treatment_sites)
 tar_load(esy_functions)
-esy_functions[, min_esy := pred_fun[[1]](max_wl, -9999), by = "site"]
+# esy_functions[, min_esy := esy_fun[[1]](max_wl, -9999), by = "site"]
 con_dat <- rbindlist(training_data)[site %in% treatment_sites]
 setkey(con_dat, "site", "sample_date")
-con_dat[esy_functions, `:=`(max_wl = i.max_wl, funESY = i.pred_fun, minESY = i.min_esy)]
+con_dat[esy_functions, `:=`(max_wl = i.max_wl, funESY = i.esy_func, minESY = i.min_esy)]
 con_dat <- con_dat[(!(month(sample_date) == 2 & mday(sample_date) == 29)),]
 
 library(cmdstanr)
@@ -51,7 +51,9 @@ create_data_array <- function(data, var) {
 generate_values <- function() {
     list(
       bPET = runif(1, 0.9, 1.1),
+      bTreat = runif(8, 0.45, 0.55),
       bRain = runif(1, 1.4, 1.6),
+      bInt = runif(1, 0.15, 0.25),
       bphiRain = runif(1, 0.1, 0.3),
       bQ = runif(1, 0.1, 0.3),
       sigma = array(runif(1, 0.9, 1.1)),
@@ -67,7 +69,9 @@ generate_values <- function() {
       # gPETTreated = runif(8, 0.45, 0.55),
       gTreat = runif(8, 0.45, 0.55),
       gRain = runif(8, 0.9, 1.1),
-      gphiRain = runif(8, 0.9, 1.1)
+      gphiRain = runif(8, 0.9, 1.1),
+      gQ = runif(8, 0.1, 0.3),
+      gInt = runif(1, 0.15, 0.25)
     )
   }
 
@@ -95,6 +99,12 @@ esy_params <- matrix(
   ncol = 6
 )
 
+max_wls <- dcast(
+  water_budget[!is.na(wl_initial_cm) & site %in% treatment_sites][, .(wl_max = numeric_mode(wl_initial_cm)), by = .(site, site_status)],
+  site ~ site_status,
+  value.var = "wl_max"
+  )
+
 stan_data <- list(
   D = 365L,
   K = length(unique(con_dat$site)),
@@ -104,8 +114,8 @@ stan_data <- list(
   melt = create_data_array(con_dat, "melt_cm"),
   wghts = create_data_array(con_dat, "wghts"),
   y = create_data_array(con_dat, "filled_wl"),
-  esyParams = esy_params,
-  maxWL = create_data_matrix(con_dat, "max_wl")[, 1]
+  esyParams = as.matrix(esy_coefs[, c(6,2,3,4)]),
+  maxWL = as.matrix(max_wls[, 2:3])
 )
 
 # Priors -----------------------------------------------------------------------
@@ -124,8 +134,7 @@ ggdist::median_hdci(gdist, .width = 0.9)
 
 
 mod <- cmdstan_model(
-  stan_file = "code/scratch/wetland_model.stan",
-  dir = "/tmp",
+  stan_file = "code/scratch/wetland_model_dev.stan",
   force_recompile = TRUE
   )
 
@@ -267,6 +276,7 @@ plot_train_site <- function(site_id, pop_level = FALSE) {
         bTreat = test_params[["bTreat"]],
         T = 1 + (.BY[[1]] == "Treated"),
         bRain = test_params[["bRain"]],
+        bInt = test_params[["bInt"]],
         # bDeltaRain = test_params[["bDeltaRain"]],
         # bMelt = test_params[["bMelt"]],
         bQ = test_params[["bQ"]],
@@ -276,7 +286,7 @@ plot_train_site <- function(site_id, pop_level = FALSE) {
         rain = .SD$rain_cm,
         melt = .SD$melt_cm,
         D = nrow(.SD),
-        maxWL = esy_functions[site_id, max_wl],
+        maxWL = max_wls[site == site_id][[.BY[[1]]]],
         esyA = esy_params[idx, 2],
         esyB = esy_params[idx, 3],
         esyC = esy_params[idx, 4],
@@ -327,6 +337,7 @@ plot_test_site <- function(site_id, pop_level = FALSE) {
         bTreat = test_params[["bTreat"]],
         T = 1 + (.BY[[1]] == "Treated"),
         bRain = test_params[["bRain"]],
+        bInt = test_params[["bInt"]],
         # bDeltaRain = test_params[["bDeltaRain"]],
         # bMelt = test_params[["bMelt"]],
         bQ = test_params[["bQ"]],
@@ -336,7 +347,7 @@ plot_test_site <- function(site_id, pop_level = FALSE) {
         rain = .SD$rain_cm,
         melt = .SD$melt_cm,
         D = nrow(.SD),
-        maxWL = esy_functions[site_id, max_wl],
+        maxWL = max_wls[site == site_id][[.BY[[1]]]],
         esyA = esy_params[idx, 2],
         esyB = esy_params[idx, 3],
         esyC = esy_params[idx, 4],
@@ -379,6 +390,7 @@ plot_all_test_data <- function(site_id, pop_level = FALSE) {
         bTreat = test_params[["bTreat"]],
         T = 1 + (.BY[[1]] == "Treated"),
         bRain = test_params[["bRain"]],
+        bInt = test_params[["bInt"]],
         # bDeltaRain = test_params[["bDeltaRain"]],
         # bMelt = test_params[["bMelt"]],
         bQ = test_params[["bQ"]],
@@ -388,7 +400,7 @@ plot_all_test_data <- function(site_id, pop_level = FALSE) {
         rain = .SD$rain_cm,
         melt = .SD$melt_cm,
         D = nrow(.SD),
-        maxWL = esy_functions[site_id, max_wl],
+        maxWL = max_wls[site == site_id][[.BY[[1]]]],
         esyA = esy_params[idx, 2],
         esyB = esy_params[idx, 3],
         esyC = esy_params[idx, 4],
@@ -397,7 +409,7 @@ plot_all_test_data <- function(site_id, pop_level = FALSE) {
         # esyint = test_params[["bEsyInt"]],
         # esymin = test_params[["bEsyMin"]]
       )[1,],
-    by = .(water_year)
+    by = .(site_status, water_year)
   ]
   # ylim <- c(min(c(dat$wl_hat, dat$wl_initial_cm), na.rm = TRUE), max(c(dat$wl_hat, dat$wl_initial_cm), na.rm = TRUE))
   ggplot(dat) +
@@ -419,6 +431,11 @@ map(unique(testing_data[site %in% treatment_sites]$site), ~plot_test_site(.x, TR
 map(unique(testing_data[site %in% treatment_sites]$site), ~plot_test_site(.x)) %>%
   reduce(`+`) +
   plot_annotation(title = "Site-Level Parameters")
+
+map(unique(testing_data[site %in% treatment_sites]$site), ~plot_all_test_data(.x, TRUE)) %>%
+  reduce(`+`) +
+  plot_annotation(title = "Population-Level Parameters") +
+  plot_layout(guides = "collect")
 
 map(unique(testing_data[site %in% treatment_sites]$site), ~plot_all_test_data(.x)) %>%
   reduce(`+`) +
