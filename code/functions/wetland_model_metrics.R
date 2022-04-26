@@ -35,7 +35,7 @@ create_wetland_model_metrics_plot <- function(data, output.file, metrics, ...) {
     split(f = .$metric) %>%
     map(~{
       ggplot(.x) +
-        aes(x = site, y = value, color = site_status) +
+        aes(x = site, y = value) +
         geom_boxplot() +
         labs(y = .x[["metric"]][1])
       }) %>%
