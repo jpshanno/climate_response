@@ -145,7 +145,7 @@ fit_esy_model <-
     brm_esy
 }
 
-get_esy_coefs <- function(esy_mod){
+get_esy_coefs <- function(esy_mod, water_budget) {
     esy_coefs <-
       fixef(esy_mod)
 
@@ -161,18 +161,24 @@ get_esy_coefs <- function(esy_mod){
       esy_coefs[str_detect(rownames(esy_coefs), "c_"), "Estimate"] %>% 
       set_names(~str_extract(., "[0-9]{3}"))
 
-    dat <- as.data.table(esy_mod$data)
+    dat <- water_budget[
+      !is.na(wl_initial_cm)][
+        ,
+        .(max_wl = numeric_mode(wl_initial_cm)),
+        by = .(site, site_status)
+      ]
 
     esy_coefs <- dat[,
-      j = .(
+      j = `:=`(
         a = esy_a[[.BY[[1]]]],
         b = esy_b[[.BY[[1]]]],
-        c = esy_c[[.BY[[1]]]],
-        max_wl = numeric_mode(wl_initial_cm, na.rm = TRUE)
+        c = esy_c[[.BY[[1]]]]
       ),
       keyby = .(site)]
 
-    esy_coefs[, min_esy := a - (a - b) * exp (c * max_wl)]
+    # Setting min_esy to the lower of the two max_wls as setting it at too high
+    # a water level can lead to negative esy
+    esy_coefs[, min_esy := a - (a - b) * exp (c * min(max_wl)), by = .(site)]
 
     esy_coefs
 }
@@ -190,71 +196,75 @@ build_esy_functions <- function(esy_coefs) {
       max_wl,
       min_esy
     ),
-    keyby = .(site)
+    keyby = .(site, site_status)
   ]
 
   }
 
 # Weights increase asymmetrically as water levels drop
-  create_weights <- function(x, scale) {
-    init_weight <- 1 / !is.na(x)
-    wghts <- pmax(init_weight, init_weight * (scale - x))
-    # Weights are squared
-    wghts <- wghts^2
-    wghts[is.na(x)] <- 0
-    # wghts <- wghts / sum(wghts)
-    assertthat::assert_that(assertthat::noNA(wghts))
-    wghts
-  }
+create_weights <- function(x, scale) {
+  init_weight <- 1 / !is.na(x)
+  wghts <- pmax(init_weight, init_weight * (scale - x))
+  # Weights are squared
+  wghts <- wghts^2
+  wghts[is.na(x)] <- 0
+  # wghts <- wghts / sum(wghts)
+  assertthat::assert_that(assertthat::noNA(wghts))
+  wghts
+}
 
-  create_data_matrix <- function(data, var) {
-    res <- lapply(
-      X = sort(unique(data[["site"]])),
-      FUN = \(x) matrix(data[site == x][[var]], nrow = 1)
-    ) %>%
-    purrr::reduce(rbind)
+create_data_matrix <- function(data, var) {
+  res <- lapply(
+    X = sort(unique(data[["site"]])),
+    FUN = \(x) matrix(data[site == x][[var]], nrow = 1)
+  ) %>%
+  purrr::reduce(rbind)
 
-    assertthat::assert_that(assertthat::noNA(res))
-    res
-  }
+  assertthat::assert_that(assertthat::noNA(res))
+  res
+}
 
-  create_data_array <- function(data, var) {
-    arr <- sapply(
-      X = unique(data[["site_status"]]),
-      FUN = \(x) create_data_matrix(data[site_status == x], var),
-      simplify = "array"
+create_data_array <- function(data, var) {
+  arr <- sapply(
+    X = unique(data[["site_status"]]),
+    FUN = \(x) create_data_matrix(data[site_status == x], var),
+    simplify = "array"
+  )
+  aperm(arr, c(3, 1:2))
+}
+
+generate_values <- function() {
+    list(
+      bPET = runif(1, 0.9, 1.1),
+      bTreat = runif(8, 0.45, 0.55),
+      bRain = runif(1, 1.4, 1.6),
+      bInt = runif(1, 0.15, 0.25),
+      bphiRain = runif(1, 0.1, 0.3),
+      bQ = runif(1, 0.1, 0.3),
+      sigma = array(runif(1, 0.9, 1.1)),
+
+      taubPET = runif(1, 0.01, 0.03),
+      # taubPETStatus = runif(2, 0.01, 0.03),
+      taubRain = runif(1, 0.01, 0.03),
+      tauphiRain = runif(1, 0.01, 0.03),
+
+      # bPETStatus = runif(2, 0.9, 1.1),
+
+      gPET = runif(8, 0.9, 1.1),
+      # gPETTreated = runif(8, 0.45, 0.55),
+      gTreat = runif(8, 0.45, 0.55),
+      gRain = runif(8, 0.9, 1.1),
+      gphiRain = runif(8, 0.9, 1.1),
+      gQ = runif(8, 0.1, 0.3),
+      gInt = runif(1, 0.15, 0.25)
     )
-    aperm(arr, c(3, 1:2))
   }
 
-  generate_values <- function() {
-      list(
-        bPET = runif(1, 0.9, 1.1),
-        bRain = runif(1, 1.4, 1.6),
-        bTreat = runif(1, 0.45, 0.65),
-        bphiRain = runif(1, 0.1, 0.3),
-        bQ = runif(1, 0.1, 0.3),
-        sigma = array(runif(1, 0.9, 1.1)),
 
-        taubPET = runif(1, 0.01, 0.03),
-        # taubPETStatus = runif(2, 0.01, 0.03),
-        taubRain = runif(1, 0.01, 0.03),
-        tauphiRain = runif(1, 0.01, 0.03),
-
-        # bPETStatus = runif(2, 0.9, 1.1),
-
-        gPET = runif(8, 0.9, 1.1),
-        # gPETTreated = runif(8, 0.45, 0.55),
-        gTreat = runif(8, 0.45, 0.55),
-        gRain = runif(8, 0.9, 1.1),
-        gphiRain = runif(8, 0.9, 1.1)
-      )
-    }
-
-  init_values <- function(chain_id) {
-    set.seed(8675309 + chain_id)
-    generate_values()
-  }
+init_values <- function(chain_id) {
+  set.seed(8675309 + chain_id)
+  generate_values()
+}
 
 #' Fit Wetland Model
 #' 
@@ -270,6 +280,12 @@ fit_wetland_model <- function(stan_fn, data, esy_coefs, out_path) {
   con_dat[, wghts := create_weights(wl_initial_cm, max_wl), by = .(site, site_status)]
   con_dat[, filled_wl := nafill(wl_initial_cm ,"const", -9999)]
 
+  max_wls <- dcast(
+    esy_coefs,
+    site ~ site_status,
+    value.var = "max_wl"
+  )
+
   stan_data <- list(
     D = 365L,
     K = length(unique(con_dat$site)),
@@ -279,8 +295,8 @@ fit_wetland_model <- function(stan_fn, data, esy_coefs, out_path) {
     melt = create_data_array(con_dat, "melt_cm"),
     wghts = create_data_array(con_dat, "wghts"),
     y = create_data_array(con_dat, "filled_wl"),
-    esyParams = as.matrix(esy_coefs[, .(min_esy, a, b, c)]),
-    maxWL = create_data_matrix(esy_coefs, "max_wl")[, 1]
+    esyParams = as.matrix(unique(esy_coefs[, .(min_esy, a, b, c)])),
+    maxWL = as.matrix(max_wls[, 2:3])
   )
 
   mod <- cmdstan_model(
@@ -303,8 +319,9 @@ fit_wetland_model <- function(stan_fn, data, esy_coefs, out_path) {
 
 }
 
-format_model_parameters <- function(site_status, in_path, esy_functions) {
-  match.arg(site_status, c("Control", "Treated"))
+format_model_parameters <- function(param_status, in_path, esy_functions) {
+  match.arg(param_status, c("Control", "Treated"))
+
   model <- readRDS(in_path)
   params_dt <- as.data.table(model$summary())[str_detect(variable, "^g")]
   params_dt[,
@@ -313,13 +330,15 @@ format_model_parameters <- function(site_status, in_path, esy_functions) {
       variable = str_extract(variable, "^[A-Za-z]+")
     )
   ]
-  params_dt[, site := esy_functions$site[idx]]
+
+  params_dt[, site := unique(esy_functions$site)[idx]]
   wide <- dcast(params_dt, site ~ variable, value.var = "median")
-  # T = 1 for Control, 2 for Treated
-  wide[, T := 1 + (site_status == "Treated")]
   setkey(wide, "site")
   out <- wide[esy_functions]
-
+  # T = 1 for Control, 2 for Treated
+  out[, T := 1 + (site_status == "Treated")]
+  out <- out[site_status == param_status]
+  out$site_status <- NULL
   out[, .(params = list(as.list(.SD))), keyby = .(site)]
 
 }
