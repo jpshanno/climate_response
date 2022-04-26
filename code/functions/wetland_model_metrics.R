@@ -3,7 +3,8 @@ calculate_wetland_model_metrics <- function(data, max_wl_data) {
   data[max_wl_data, max_wl := max_wl, on = "site"]
   # data[, wl_range := median_na(.SD[!is.na(wl_initial_cm + wl_hat), .(wl_range = diff(range(wl_initial_cm, na.rm = TRUE))), by = .(water_year)][["wl_range"]]), by = .(site)]
   data[!is.na(wl_initial_cm + wl_hat),
-        .(r2 = cor(wl_hat, wl_initial_cm, use = "pairwise.complete.obs"),
+        .(slope = coef(lm(wl_initial_cm ~ 0 + wl_hat, data = .SD))[1],
+          r2 = cor(wl_hat, wl_initial_cm, use = "pairwise.complete.obs"),
           med_err = median(wl_hat - wl_initial_cm, na.rm = TRUE),
           rmedse = rmedse(wl_hat, wl_initial_cm),
           rmedse_range = rmedse(wl_hat, wl_initial_cm) /  diff(range(wl_initial_cm, na.rm = TRUE))),
@@ -25,7 +26,7 @@ create_wetland_model_metrics_plot <- function(data, output.file, metrics, ...) {
   
   data <- copy(data[metric %in% metrics])
   
-  data[, metric := str_replace_all(metric, c("r2" = "R<sup>2</sup>", "med_err" = "Median Error (cm)", "^rmedse$" = "RMedSE (cm)", "rmedse_range" = "rRMedSE (cm)"))]
+  data[, metric := str_replace_all(metric, c("slope" = "Slope", "r2" = "R<sup>2</sup>", "med_err" = "Median Error (cm)", "^rmedse$" = "RMedSE (cm)", "rmedse_range" = "rRMedSE (cm)"))]
   
   # Keeping split + combine to label y-axis with metric. Could melt the data and
   # then facet by variable. But this was set up from when there were outlier 
@@ -34,7 +35,7 @@ create_wetland_model_metrics_plot <- function(data, output.file, metrics, ...) {
     split(f = .$metric) %>%
     map(~{
       ggplot(.x) +
-        aes(x = site, y = value) +
+        aes(x = site, y = value, color = site_status) +
         geom_boxplot() +
         labs(y = .x[["metric"]][1])
       }) %>%
@@ -188,7 +189,7 @@ create_wetland_model_metrics_table <- function(data) {
     by = .(`Model\nMetric` = metric, `Site\nCondition` = site_status)]
   
   tab[, 
-      `Model\nMetric` := str_replace_all(`Model\nMetric`, c("r2" = "R~2~", "med_err" = "Median Error (cm)", "^rmedse$" = "RMedSE", "rmedse_range" = "rRMedSE"))]
+      `Model\nMetric` := str_replace_all(`Model\nMetric`, c("slope" = "Slope", "r2" = "R~2~", "med_err" = "Median Error (cm)", "^rmedse$" = "RMedSE", "rmedse_range" = "rRMedSE"))]
   
   flextable::flextable(tab) %>%
     flextable::merge_v(j = 1:2) %>%
