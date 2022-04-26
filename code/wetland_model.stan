@@ -75,7 +75,7 @@ data {
    array[2] matrix[K,D] wghts;
    array[2] matrix[K,D] y; // PET
    matrix[K,4] esyParams; // minESY, esyA, esyB, esyC
-   vector[K] maxWL;
+   matrix[K, T] maxWL;
 }
 parameters {
    real<lower = 0> bPET;
@@ -135,7 +135,7 @@ model {
             rain[t, k],
             melt[t, k],
             D,
-            maxWL[k],
+            maxWL[k, t],
             esyParams[k, 2],
             esyParams[k, 3],
             esyParams[k, 4],
