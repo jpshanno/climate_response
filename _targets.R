@@ -198,7 +198,7 @@ targets <- list(
 
   , tar_target(
     esy_coefs,
-    get_esy_coefs(esy_model),
+    get_esy_coefs(esy_model, water_budget[site %in% treatment_sites]),
   )
 
   , tar_target(
@@ -220,8 +220,8 @@ targets <- list(
   )
 
   # Optimize Control Models
-  # TODO: It it possible to set the upper limit MPET to 1. May likely require 
-  # evaluating Esy within the optimization model?
+  # Could skip the control and treated optimizations, but haven't had a chance
+  # to refactor concatenate_model_params
   , tar_target(
     control_optimization,
     format_model_parameters("Control", wetland_model, esy_functions),
