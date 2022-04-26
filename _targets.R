@@ -208,8 +208,14 @@ targets <- list(
   )
 
   , tar_target(
+    wetland_model_code,
+    "code/wetland_model.stan",
+    format = "file"
+  )
+
+  , tar_target(
     wetland_model,
-    fit_wetland_model(training_data, esy_coefs, "output/models/wetland_model.rds"),
+    fit_wetland_model(wetland_model_code, training_data, esy_coefs, "output/models/wetland_model.rds"),
     format = "file"
   )
 
@@ -275,7 +281,8 @@ targets <- list(
       compression = "lzw",
       dpi = 600,
       width = 4,
-      height = 6
+      height = 6,
+      bg = "white"
       ),
     format = "file")
 
@@ -311,7 +318,8 @@ targets <- list(
       compression = "lzw",
       dpi = 600,
       width = 7.5,
-      height = 3.5),
+      height = 3,
+      bg = "white"),
     format = "file"
   )
 
@@ -383,7 +391,8 @@ targets <- list(
       compression = "lzw",
       dpi = 600,
       width = 10,
-      height = 6
+      height = 6,
+      bg = "white"
     ),
     format = "file"
   )
@@ -421,12 +430,13 @@ targets <- list(
     total_impact_plot,
     create_total_impact_plot(
       proportions = analysis_simulations[["proportions"]],
-      output.file = "output/figures/pointrange_and_slabinterval_ecohydrological_level_total_impact.png",
-      # type = "cairo",
-      # compression = "lzw",
+      output.file = "output/figures/pointrange_and_slabinterval_ecohydrological_level_total_impact.tiff",
+      type = "cairo",
+      compression = "lzw",
       dpi = 600,
       width = 7,
-      height = 8
+      height = 8,
+      bg = "white"
     ),
     format = "file"
   )
@@ -435,12 +445,13 @@ targets <- list(
     eab_impact_plot,
     create_eab_impact_plot(
       proportions = analysis_simulations[["proportions"]],
-      output.file = "output/figures/pointrange_and_slabinterval_ecohydrological_level_eab_impact.png",
-      # type = "cairo",
-      # compression = "lzw",
+      output.file = "output/figures/pointrange_and_slabinterval_ecohydrological_level_eab_impact.tiff",
+      type = "cairo",
+      compression = "lzw",
       dpi = 600,
       width = 10,
-      height = 5
+      height = 5,
+      bg = "white"
     ),
     format = "file"
   )
@@ -449,12 +460,13 @@ targets <- list(
     climate_impact_plot,
     create_climate_impact_plot(
       proportions = analysis_simulations[["proportions"]],
-      output.file = "output/figures/pointrange_and_slabinterval_ecohydrological_level_climate_impact.png",
-      # type = "cairo",
-      # compression = "lzw",
+      output.file = "output/figures/pointrange_and_slabinterval_ecohydrological_level_climate_impact.tiff",
+      type = "cairo",
+      compression = "lzw",
       dpi = 600,
       width = 10,
-      height = 5
+      height = 5,
+      bg = "white"
     ),
     format = "file"
   )
@@ -463,10 +475,13 @@ targets <- list(
     impact_attribution_plot,
     create_impact_attribution_plot(
       proportions = analysis_simulations[["proportions"]],
-      output.file = "output/figures/pointrange_impact_attribution.png",
+      output.file = "output/figures/pointrange_impact_attribution.tiff",
+      type = "cairo",
+      compression = "lzw",
       dpi = 600,
       width = 6,
-      height = 8
+      height = 8,
+      bg = "white"
     ),
     format = "file"
   )
@@ -488,7 +503,8 @@ targets <- list(
       compression = "lzw",
       dpi = 600,
       width = 6,
-      height = 3
+      height = 3,
+      bg = "white"
     ),
     format = "file"
   )
@@ -504,7 +520,8 @@ targets <- list(
       compression = "lzw",
       dpi = 600,
       width = 6,
-      height = 8
+      height = 8,
+      bg = "white"
     ),
     format = "file"
   )
@@ -520,7 +537,8 @@ targets <- list(
       compression = "lzw",
       dpi = 600,
       width = 10,
-      height = 7.5),
+      height = 7.5,
+      bg = "white"),
     format = "file"
   )
 
@@ -533,7 +551,8 @@ targets <- list(
       compression = "lzw",
       dpi = 600,
       width = 8,
-      height = 4
+      height = 4,
+      bg = "white"
     ),
     format = "file"
   )

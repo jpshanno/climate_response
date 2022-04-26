@@ -259,7 +259,7 @@ build_esy_functions <- function(esy_coefs) {
 #' Fit Wetland Model
 #' 
 #' Fit the hierarchical wetland model
-fit_wetland_model <- function(data, esy_coefs, out_path) {
+fit_wetland_model <- function(stan_fn, data, esy_coefs, out_path) {
 
   # Combine all data for joint fitting
   con_dat <- rbindlist(data)
@@ -284,7 +284,7 @@ fit_wetland_model <- function(data, esy_coefs, out_path) {
   )
 
   mod <- cmdstan_model(
-    stan_file = "code/wetland_model.stan",
+    stan_file = stan_fn,
     force_recompile = TRUE
     )
 
@@ -419,7 +419,7 @@ wetland_model <-
     
     # Loop through weather data
     for(t in 2:D){
-      
+
       Rain[t] <- rain[t] + rain[t-1] * phiRain
       wl_hat[t] <- wl_hat[t-1]
 
@@ -431,13 +431,13 @@ wetland_model <-
       ######## PET
       pet_hat[t] =
         pet_fun(wl_hat[t], max_wl, future.forest.change) *
-          (bPET - (bTreat * (T - 1))) * pet[t] * gradient[t]
+          (bPET * (1 - bTreat * (T - 1))) * pet[t] * gradient[t]
       wl_hat[t] = wl_hat[t] + pet_hat[t];
 
       ######## Rain
       p_hat[t] = bRain * Rain[t] * gradient[t];
       wl_hat[t] = wl_hat[t] + p_hat[t];
-      
+
       ######## Snowmelt
       m_hat[t] <- 
         bRain * melt[t] * gradient[t]
