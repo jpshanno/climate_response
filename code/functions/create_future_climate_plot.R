@@ -7,7 +7,7 @@ create_future_climate_plot <- function(observed.data, gcm.data, solrad.coefs, ou
   orange <- "#d55e00"
   
   gcm.data <- gcm.data[scenario != "historical"]
-  gcm.data[, Climate := fifelse(scenario == "rcp85" & gcm == "gfdl-cm3", "More Sensitive Future Scenario", "Less Sensitive Future Scenario")]
+  gcm.data[, Climate := fifelse(scenario == "rcp85" & gcm == "gfdl-cm3", "Hot & Wet", "Warm & Dry")]
   
   gcm.data <- gcm.data %>%
     calculate_mean_temp() %>% 
@@ -39,7 +39,7 @@ create_future_climate_plot <- function(observed.data, gcm.data, solrad.coefs, ou
     j = `:=`(
       Climate = factor(
         Climate,
-        levels = c("More Sensitive Future Scenario", "Less Sensitive Future Scenario", "Observed Climate"),
+        levels = c("Hot & Wet", "Warm & Dry", "Observed Climate"),
         ordered = TRUE
       ),
       sample_season = factor(
@@ -66,13 +66,13 @@ create_future_climate_plot <- function(observed.data, gcm.data, solrad.coefs, ou
     scale_fill_manual(
       values = c(
         "Observed Climate" = "gray30",
-        "Less Sensitive Future Scenario" = darkblue,
-        "More Sensitive Future Scenario" = orange),
+        "Warm & Dry" = darkblue,
+        "Hot & Wet" = orange),
       breaks = c(
         c(
           "Observed Climate",
-          "Less Sensitive Future Scenario",
-          "More Sensitive Future Scenario")
+          "Warm & Dry",
+          "Hot & Wet")
       )
     ) +
     facet_wrap(~ sample_season, nrow = 1)
