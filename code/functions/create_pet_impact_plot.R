@@ -27,8 +27,8 @@ create_pet_impact_plot <- function(data, output.file, ...) {
     j = `:=`(
       Climate = fcase(
         scenario == "historical", "Current Climate",
-        scenario == "rcp45", "Less Sensitive",
-        scenario == "rcp85", "More Sensitive"
+        scenario == "rcp45", "Warm & Dry",
+        scenario == "rcp85", "Hot & Wet"
       ),
       site_status = factor(
         site_status,
