@@ -75,8 +75,11 @@ create_pet_impact_plot <- function(data, output.file, ...) {
     theme_minimal(base_size = 10) +
     xlab(NULL) +
     ylab(as.expression("Evapotranspiration (cm)")) +
-    theme(legend.title = element_blank(),
-          legend.position = "bottom")
+    theme(
+      panel.border = element_rect(fill = NA, color = "black"),
+      legend.title = element_blank(),
+      legend.position = "bottom"
+    )
   
   # fixed_climate_fig <- ggplot(data) +
   #   aes(

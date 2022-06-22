@@ -42,9 +42,12 @@ create_wetland_model_metrics_plot <- function(data, output.file, metrics, ...) {
     reduce(`+`)  +
     plot_layout(ncol = 1, guides = "collect") &
     theme_minimal(base_size = 12) +
-    theme(axis.title.x = element_blank(),
-          axis.title.y = ggtext::element_markdown(),
-          legend.title = element_blank())
+    theme(
+      panel.border = element_rect(fill = NA, color = "black"),
+      axis.title.x = element_blank(),
+      axis.title.y = ggtext::element_markdown(),
+      legend.title = element_blank()
+    )
   
   ggsave(plot = fig, filename = output.file, ...)
   
@@ -168,9 +171,12 @@ create_wetland_model_probability_plot <- function(data, tests, output.file, ...)
                     position = position_dodge(width = 0.75)) +
     facet_wrap(. ~ variable, scales = "free") +
     theme_minimal(base_size = 13) +
-    theme(legend.position = "bottom",
-          axis.title.x = element_blank(),
-          legend.title = element_blank())
+    theme(
+      panel.border = element_rect(fill = NA, color = "black"),
+      legend.position = "bottom",
+      axis.title.x = element_blank(),
+      legend.title = element_blank()
+    )
   
   ggsave(filename = output.file, plot = fig, ...)
   
