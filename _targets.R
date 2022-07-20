@@ -280,8 +280,8 @@ targets <- list(
       type = "cairo",
       compression = "lzw",
       dpi = 600,
-      width = 4,
-      height = 6,
+      width = 6.7,
+      height = 5,
       bg = "white"
       ),
     format = "file")
