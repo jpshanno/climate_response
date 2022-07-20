@@ -64,17 +64,17 @@ create_pet_impact_plot <- function(data, output.file, ...) {
   fig <- 
     ggplot(data) +
     aes(x = simulation_date) +
-    ggpattern::geom_ribbon_pattern(aes(ymin = aet_hat.lower, ymax = aet_hat.upper, fill = "Modeled AET"), color = NA, alpha = 0.4, pattern_fill = "#ffffffff", pattern_colour = "#ffffffff") +
-    geom_ribbon(aes(ymin = aet_effect.lower, ymax = aet_effect.upper, fill = "Effective AET"), color = NA, alpha = 0.2) +
-    geom_line(aes(y = aet_hat, color = "Modeled AET", linetype = "Modeled AET")) +
-    geom_line(aes(y = aet_effect, color = "Effective AET", linetype = "Effective AET")) +
+    ggpattern::geom_ribbon_pattern(aes(ymin = aet_hat.lower, ymax = aet_hat.upper, fill = "Modeled"), color = NA, alpha = 0.4, pattern_fill = "#ffffffff", pattern_colour = "#ffffffff") +
+    geom_ribbon(aes(ymin = aet_effect.lower, ymax = aet_effect.upper, fill = "Effective"), color = NA, alpha = 0.2) +
+    geom_line(aes(y = aet_hat, color = "Modeled", linetype = "Modeled")) +
+    geom_line(aes(y = aet_effect, color = "Effective", linetype = "Effective")) +
     facet_grid(site_status~Climate) +
-    scale_color_manual(name = "AET", values = c("Modeled AET" = gray, "Effective AET" = palegreen)) +
-    scale_fill_manual(name = "AET", values = c("Modeled AET"= gray, "Effective AET" = palegreen)) +
-    scale_linetype_manual(name = "AET", values = c("Modeled AET" = "longdash", "Effective AET" = "solid")) +
+    scale_color_manual(name = "Actual Evapotranspiration", values = c("Modeled" = gray, "Effective" = palegreen)) +
+    scale_fill_manual(name = "Actual Evapotranspiration", values = c("Modeled"= gray, "Effective" = palegreen)) +
+    scale_linetype_manual(name = "Actual Evapotranspiration", values = c("Modeled" = "longdash", "Effective" = "solid")) +
     theme_minimal(base_size = 10) +
     xlab(NULL) +
-    ylab(as.expression("Evapotranspiration (cm)")) +
+    ylab(as.expression("Actual Evapotranspiration (cm)")) +
     theme(
       panel.border = element_rect(fill = NA, color = "black"),
       legend.title = element_blank(),
