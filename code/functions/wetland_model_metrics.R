@@ -40,7 +40,8 @@ create_wetland_model_metrics_plot <- function(data, output.file, metrics, ...) {
         labs(y = .x[["metric"]][1])
       }) %>%
     reduce(`+`)  +
-    plot_layout(ncol = 1, guides = "collect") &
+    plot_annotation(tag_levels = "A") +
+    plot_layout(ncol = 2, guides = "collect") &
     theme_minimal(base_size = 12) +
     theme(
       panel.border = element_rect(fill = NA, color = "black"),
