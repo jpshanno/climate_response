@@ -56,7 +56,8 @@ create_total_impact_plot <- function(proportions, output.file, ...){
                              ymax = c("connectivity_max", "inundation_max", "drawdown_max"))) %>% 
     transform(variable = fct_relabel(variable, ~fcase(.x=="1", "Connectivity", .x=="2", "Inundation", .x=="3", "Drawdown"))) %>%
     transform(site_status = str_replace_all(site_status, "Treated", "Non-Forested")) %>%
-    transform(site_status = factor(site_status, levels = c("Non-Forested", "Future Forested"), ordered = TRUE)) %>%
+    transform(site_status = str_replace_all(site_status, "Future Forested", "Alternate-Forest")) %>%
+    transform(site_status = factor(site_status, levels = c("Non-Forested", "Alternate-Forest"), labels = c("Non-Forested", "Alternate-Forest"), ordered = TRUE)) %>%
     .[
       i = zeroing,
       on = c("simulation_month", "variable"),
@@ -190,7 +191,7 @@ create_eab_impact_plot <- function(proportions, output.file, ...){
     transform(variable = fct_relabel(variable, ~fcase(.x=="1", "Connectivity", .x=="2", "Inundation", .x=="3", "Drawdown"))) %>%
     transform(site_status = factor(site_status,
                                    levels = c("Treated", "Future Forested"),
-                                   labels = c("Non-Forested", "Future Forested"),
+                                   labels = c("Non-Forested", "Alternate-Forest"),
                                    ordered = TRUE)) %>%
     .[
       i = eab_zeroing,
@@ -226,8 +227,8 @@ create_eab_impact_plot <- function(proportions, output.file, ...){
                     position = position_dodge(width = 0.6)) +
     scale_color_manual(values = c(`Baseline: Modeled Black Ash` = "gray30",
                                   `Non-Forested` = gold,
-                                  `Future Forested` = green),
-                       breaks = c("Non-Forested", "Future Forested", "Baseline: Modeled Black Ash")) +
+                                  `Alternate-Forest` = green),
+                       breaks = c("Non-Forested", "Alternate-Forest", "Baseline: Modeled Black Ash")) +
     facet_grid(variable ~ scenario,
                scales = "free") +
     guides(
@@ -269,9 +270,10 @@ create_climate_impact_plot <- function(proportions, output.file, ...){
     i = month(simulation_date) %in% 5:10 & scenario == "historical",
     j = .(
       simulation_month = month(simulation_date, label = TRUE, abbr = TRUE),
-      site_status = fcase(site_status == "Control", "Black Ash",
-                          site_status == "Treated", "Non-Forested",
-                          site_status == "Future Forested", "Future Forested"),
+      site_status = factor(site_status,
+                              levels = c("Control", "Treated", "Future Forested"),
+                              labels = c("Black Ash", "Non-Forested", "Alternate-Forest"),
+                              ordered = TRUE),
       Connectivity = prop_within_5cm_max_wl,
       Drawdown = 1-prop_above_neg_50,
       Inundation = prop_above_neg_10
@@ -314,7 +316,7 @@ create_climate_impact_plot <- function(proportions, output.file, ...){
     transform(variable = fct_relabel(variable, ~fcase(.x=="1", "Connectivity", .x=="2", "Inundation", .x=="3", "Drawdown"))) %>%
     transform(site_status = factor(site_status,
                                    levels = c("Control", "Treated", "Future Forested"),
-                                   labels = c("Black Ash", "Non-Forested", "Future Forested"),
+                                   labels = c("Black Ash", "Non-Forested", "Alternate-Forest"),
                                    ordered = TRUE)) %>%
     .[
       i = climate_zeroing,
@@ -524,7 +526,7 @@ create_impact_attribution_plot <- function(proportions, output.file, ...) {
   # Format Output Table
   tab_dat[, site_status := factor(site_status,
                                   levels = c("Treated", "Future Forested"),
-                                  labels = c("Non-Forested", "Future Forested"),
+                                  labels = c("Non-Forested", "Alternate-Forest"),
                                   ordered = TRUE)]
   tab_dat[, variable := factor(variable,
                                levels = c("connectivity", "inundation", "drawdown"),
@@ -718,7 +720,7 @@ create_impact_attribution_table <- function(proportions) {
   # Format Output Table
   tab_dat[, site_status := factor(site_status,
                                     levels = c("Treated", "Future Forested"),
-                                        labels = c("Non-Forested", "Future Forested"),
+                                        labels = c("Non-Forested", "Alternate-Forest"),
                                         ordered = TRUE)]
   tab_dat[, variable := factor(variable,
                                levels = c("connectivity", "inundation", "drawdown"),
